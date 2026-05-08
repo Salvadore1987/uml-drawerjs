@@ -47,6 +47,10 @@
       "types": "./dist/renderer/index.d.ts",
       "import": "./dist/renderer/index.js"
     },
+    "./exporters": {
+      "types": "./dist/exporters/index.d.ts",
+      "import": "./dist/exporters/index.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",

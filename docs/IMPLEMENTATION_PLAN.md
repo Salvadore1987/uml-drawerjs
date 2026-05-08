@@ -221,13 +221,13 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** интероперабельность форматов: `.puml`, SVG, PNG, `.umljson`.
 
-- [ ] `exporters/puml.ts` — обёртка над generator.
-- [ ] `exporters/svg.ts` — сериализация renderer-output с inline-стилями.
-- [ ] `exporters/png.ts` — SVG → `<foreignObject>` → Canvas → `Blob` через `canvas.toBlob()`.
-- [ ] `exporters/json.ts` — полный AST + `layoutOverrides` + `styles` + `schemaVersion`.
-- [ ] Симметричные импортёры: `importPuml`, `importJson` (с авто-layout при импорте текста без meta-комментариев).
+✅ `exporters/puml.ts` — `exportPuml(diagram)` обёртка над generator; `importPuml(text, options)` оборачивает parser + auto-layout при отсутствии `' @drawer:meta layoutOverrides`.
+✅ `exporters/svg.ts` — `exportSvg(diagram)` сериализует vnode-tree рендерера в SVG-строку (DOM не нужен); опциональный `themeStyleBlock` инлайнит резолвлённые `--uml-*` токены, `includeXmlDeclaration` добавляет XML prologue. Хелпер `buildThemeStyleBlock(tokens)` для кастомных скинов.
+✅ `exporters/png.ts` — SVG → data URI → `Image` → Canvas → `toBlob('image/png')`. Хуки `imageFactory` / `canvasFactory` позволяют тестам обходиться без real DOM; учёт `devicePixelRatio`.
+✅ `exporters/json.ts` — `exportJson(diagram)` (с stamping `schemaVersion`) + `importJson(text)` через zod-schema; ошибки структурированно (path + message).
+✅ Симметричные импортёры — `importPuml` (с `layoutMode: 'missing' | 'always' | 'never'`) и `importJson` (валидируется через `diagramSchema`).
 
-**Критерий выхода:** export ⇄ import round-trip сохраняет AST + layout для всех 5 типов диаграмм.
+**Критерий выхода:** export ⇄ import round-trip сохраняет AST + layout для всех 5 типов диаграмм. ✅ (16 новых тестов в `exporters.test.ts`; PUML round-trip проверен, JSON — byte-equal, SVG — well-formed XML с экранированием, PNG — через injected stub-канвас. 175 тестов в `core` зелёные).
 
 ---
 
@@ -474,4 +474,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
+*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
