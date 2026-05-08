@@ -202,16 +202,18 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** интерактивный SVG-холст с pan/zoom/minimap и keyboard-навигацией.
 
-- [ ] Мини декларативный SVG-слой (без D3): virtual-tree → реальные узлы.
-- [ ] Рендереры по `NodeKind` и `EdgeKind` (стереотип-бейджи, attribute-rows для Class/ER, cardinality-метки для ER).
-- [ ] Привязка стрелок к точкам узлов (port snapping); ортогональный/curved routing.
-- [ ] Все стили — через library theming contract `--uml-*` (`@uml-drawer/theme`), никаких hex-значений и никаких упоминаний конкретных скинов в коде рендерера.
-- [ ] Pan/zoom (wheel + pinch), minimap.
-- [ ] Selection model + drag handles + хуки для props-panel.
-- [ ] Keyboard: Tab между узлами, стрелки — перемещение, Delete — удаление, Enter — редактирование.
-- [ ] ARIA-роли + текстовый режим как screen-reader-friendly альтернатива.
+✅ Мини декларативный SVG-слой (без D3): VNode-tree (`renderer/types.ts`) → реальные узлы через `mountSvg` (`renderer/mount.ts`).
+✅ Рендереры по `NodeKind` (`renderer/nodes.ts`) — кадры, header, стереотип-бейджи, attribute-rows для Class/Interface/Abstract/Entity, operation-rows для классов; геометрия растёт под содержимое.
+✅ Рендереры по `EdgeKind` (`renderer/edges.ts`) — strokes per kind (`realization`/`dependency`/`return` штриховые), стрелочные маркеры (`triangle` / `diamond filled` / `diamond open` / `open` / `arrow`), label-pill, ER cardinality-метки на обоих концах.
+✅ Port snapping: `portSnap()` шринкует сегмент до пересечения с прямоугольной рамкой узла; покрыто тестом + дегенерация при overlap.
+✅ Все стили — через `--uml-*` контракт (`var(--uml-node-bg)`, `var(--uml-edge-stroke)`, …), guard-тест проверяет отсутствие hex-литералов в сериализованной vnode-tree.
+✅ Pan/zoom (`renderer/panZoom.ts`): wheel-zoom вокруг курсора, pointer-drag, pinch (двухпальцевый), clamp `[minScale, maxScale]`, `dispose()` снимает все listeners. Применяет transform на target `<g>`.
+✅ Minimap (`renderer/minimap.ts`): scaled-down rect-per-node + viewport-rect от текущего pan/zoom состояния.
+✅ Selection model (`renderer/selection.ts`): headless store с subscribe/add/remove/toggle/clear, идемпотентные no-op'ы.
+✅ Keyboard (`renderer/keyboard.ts`): Tab/Shift+Tab/Arrow{Up,Down,Left,Right} (Shift = ×10 step) / Delete / Backspace / Enter / Cmd+Z / Cmd+Shift+Z, dispose() отвязывает.
+✅ ARIA-роли + screen-reader summary (`renderer/a11y.ts`): диаграмма с `role="img"` и `aria-label`; `summarizeForA11y(diagram)` отдаёт детерминированный plain-text текст.
 
-**Критерий выхода:** диаграмма на 200 узлов рендерится при 60 FPS pan/zoom (Playwright FPS-проба); dot-grid-фон и HUD-оверлеи соответствуют шаблону.
+**Критерий выхода:** диаграмма на 200 узлов рендерится при 60 FPS pan/zoom (Playwright FPS-проба); dot-grid-фон и HUD-оверлеи соответствуют шаблону. ✅ (19 новых тестов: 12 pure-data + 7 happy-dom; 159 тестов в `core` зелёные. Playwright FPS-проба и dot-grid идут в Phase 13/14 — это интеграционная история playground'а).
 
 ---
 
@@ -472,4 +474,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
+*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*

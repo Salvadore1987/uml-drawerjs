@@ -16,6 +16,7 @@ export default defineConfig({
         "generator/index": "src/generator/index.ts",
         "validators/index": "src/validators/index.ts",
         "layout/index": "src/layout/index.ts",
+        "renderer/index": "src/renderer/index.ts",
       },
       formats: ["es"],
     },
