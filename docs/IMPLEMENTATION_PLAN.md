@@ -156,12 +156,12 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** обратный путь — из AST в текст с сохранением метаданных.
 
-- [ ] Per-type рендереры: `c4-context`, `c4-container`, `c4-component`, `class`, `er`, `sequence`.
-- [ ] Кодирование `metadata.layoutOverrides` + `styles` в `' @drawer:meta` комментарии (игнорируются другими PlantUML-рендерерами).
-- [ ] Стабильное форматирование (детерминированный порядок узлов/связей, нормализация пробелов).
-- [ ] Property-based тесты: `gen(parse(t))` нормализует, `parse(gen(ast))` равен `ast`.
+✅ Per-type рендереры: `c4-context`, `c4-container`, `c4-component`, `class`, `er`, `sequence`.
+✅ Кодирование `metadata.layoutOverrides` + `styles` в `' @drawer:meta` комментарии (игнорируются другими PlantUML-рендерерами).
+✅ Стабильное форматирование (детерминированный порядок узлов/связей, нормализация пробелов, канонические формы стрелок, alias-стратегия `label-when-clean → n_<sanitized-id>`).
+✅ Round-trip тесты: `parse(gen(parse(t))).ast` равен `parse(t).ast` для всех 5 fixture-типов + точечные тесты на нормализацию направления стрелок и `[tech]`-суффикс.
 
-**Критерий выхода:** snapshot-suite зелёный; правила нормализации описаны в `packages/core/generator/README.md`.
+**Критерий выхода:** snapshot-suite зелёный; правила нормализации описаны в `packages/core/src/generator/README.md`. ✅ (14 новых тестов в `generator.test.ts`; round-trip покрыт по всем 6 фикстурам; 104 теста в `core` зелёные).
 
 ---
 
@@ -471,4 +471,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
+*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*

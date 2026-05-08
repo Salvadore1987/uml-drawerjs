@@ -31,6 +31,10 @@
       "types": "./dist/parser/index.d.ts",
       "import": "./dist/parser/index.js"
     },
+    "./generator": {
+      "types": "./dist/generator/index.d.ts",
+      "import": "./dist/generator/index.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",

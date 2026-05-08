@@ -13,6 +13,7 @@ export default defineConfig({
         "commands/index": "src/commands/index.ts",
         "history/index": "src/history/index.ts",
         "parser/index": "src/parser/index.ts",
+        "generator/index": "src/generator/index.ts",
       },
       formats: ["es"],
     },
