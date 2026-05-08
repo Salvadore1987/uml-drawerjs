@@ -35,6 +35,10 @@
       "types": "./dist/generator/index.d.ts",
       "import": "./dist/generator/index.js"
     },
+    "./validators": {
+      "types": "./dist/validators/index.d.ts",
+      "import": "./dist/validators/index.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",

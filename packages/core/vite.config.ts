@@ -14,6 +14,7 @@ export default defineConfig({
         "history/index": "src/history/index.ts",
         "parser/index": "src/parser/index.ts",
         "generator/index": "src/generator/index.ts",
+        "validators/index": "src/validators/index.ts",
       },
       formats: ["es"],
     },

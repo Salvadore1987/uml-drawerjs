@@ -169,17 +169,18 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** многоуровневая валидация по спеке (sync / semantic / constraints / lint).
 
-- [ ] `validators/syntax.ts` — оборачивает Lezer-ошибки в `DiagramError`.
-- [ ] `validators/semantic.ts` — уникальность id, существование endpoints у edges, обязательные поля по `NodeKind`, пустые имена.
-- [ ] `validators/constraints.ts` — правила на тип диаграммы:
-    - C4: вложенность Boundary/Container/Component.
-    - Sequence: edges только между lifelines.
-    - ER: связи только Entity↔Entity, кардинальности валидны.
-    - Class: ассоциация/наследование/композиция корректны.
-- [ ] `validators/lint.ts` — orphan-узлы, дубликаты имён, циклы зависимостей.
-- [ ] Реестр quick-fixes по `code` ошибки → возвращает `Command[]` или текстовые правки.
+✅ `validators/syntax.ts` — pass-through wrapper над parser-ошибками; экспортирует `SYNTAX_ERROR_CODES` из `parser/errors`.
+✅ `validators/semantic.ts` — уникальность id (nodes / edges / groups), существование endpoints у edges, references group children, пустые labels.
+✅ `validators/constraints.ts` — правила на тип диаграммы:
+    ✅ C4: whitelist `NodeKind` + проверка вложенности Boundary (только C4-кинды внутри boundary).
+    ✅ Sequence: edges только между lifeline / actor.
+    ✅ ER: связи только Entity↔Entity, обязательная cardinality, валидация cardinality-токенов (`1`, `0..*`, `*`, …).
+    ✅ Class: whitelist `NodeKind` (class/interface/abstract-class/enum) + edge-kind whitelist.
+✅ `validators/lint.ts` — orphan-узлы (warning, исключая sequence), дубликаты labels (warning), циклы по inheritance/realization (error).
+✅ Реестр quick-fixes (`validators/quickfix.ts`) → `Command`-факторы для пустых labels, dangling edges, missing-children, orphan-узлов; `attachQuickFixes(errors, diagram, dispatch)` биндит `fix.apply()` к CommandBus.
+✅ Барель `runAllValidators(diagram, parserErrors)` объединяет уровни и дедуплицирует по `(code, location)`.
 
-**Критерий выхода:** каждое правило покрыто позитивным и негативным кейсом; quick-fix сэмплы прокидываются в CodeMirror lint и в panel of problems.
+**Критерий выхода:** каждое правило покрыто позитивным и негативным кейсом; quick-fix сэмплы прокидываются в CodeMirror lint и в panel of problems. ✅ (25 новых тестов в `validators.test.ts`; 129 тестов в `core` зелёные).
 
 ---
 
@@ -471,4 +472,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
+*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
