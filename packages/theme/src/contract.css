@@ -1,0 +1,66 @@
+/**
+ * @uml-drawer/theme — design-agnostic theming contract.
+ *
+ * Defines the public surface of `--uml-*` CSS custom properties used by
+ * @uml-drawer/core, @uml-drawer/react, and @uml-drawer/codemirror-plantuml.
+ *
+ * Every editor host element is expected to carry the `data-uml-host` attribute.
+ * Theme switching happens via `data-theme="light" | "dark"` on the same
+ * element. When `data-theme` is absent, the active theme is auto-detected
+ * from `prefers-color-scheme`.
+ *
+ * Defaults are intentionally neutral (no brand aesthetic). Skins extend the
+ * contract by overriding individual variables in a more specific selector;
+ * see `apps/playground/src/skins/cyber-topographic` for an example.
+ */
+
+@import "./defaults-dark.css";
+@import "./defaults-light.css";
+
+[data-uml-host] {
+  /* === typography ============================================ */
+  /* Sans-serif stack used for body copy, labels, panel UI. */
+  --uml-font-sans:
+    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Monospace stack used in the text editor and code-like surfaces. */
+  --uml-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  /* Base font size for editor chrome (panels, toolbars). */
+  --uml-font-size-sm: 12px;
+  --uml-font-size-base: 14px;
+  --uml-font-size-lg: 16px;
+  --uml-line-height: 1.5;
+
+  /* === radii ================================================= */
+  --uml-radius-sm: 4px;
+  --uml-radius-md: 8px;
+  --uml-radius-lg: 12px;
+
+  /* === edge geometry (theme-independent) ===================== */
+  /* Default stroke width for diagram edges (px). */
+  --uml-edge-stroke-width: 1.5px;
+
+  /* === canvas geometry (theme-independent) =================== */
+  /* Spacing between dot-grid points on the canvas backdrop (px). */
+  --uml-canvas-grid-density: 24px;
+
+  /* === motion ================================================ */
+  /* Duration applied to `background-color` / `color` transitions when
+     the host's `data-theme` toggles. Keep within 200–400 ms per spec. */
+  --uml-transition-theme: 0.3s;
+
+  background-color: var(--uml-bg);
+  color: var(--uml-text);
+  font-family: var(--uml-font-sans);
+  font-size: var(--uml-font-size-base);
+  line-height: var(--uml-line-height);
+  transition:
+    background-color var(--uml-transition-theme) ease,
+    color var(--uml-transition-theme) ease;
+}
+
+/* Honour user motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  [data-uml-host] {
+    transition: none;
+  }
+}

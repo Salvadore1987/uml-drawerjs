@@ -72,14 +72,14 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** опубликовать **theming contract** библиотеки — документированный набор CSS-переменных в namespace `--uml-*` с нейтральными дефолтами. Бренд-эстетики (cyber-topographic, любая иная) в этом пакете НЕТ.
 
-- [ ] Скелет `packages/theme` с Vite library build → CSS-only output.
-- [ ] `contract.css` — декларация всех `--uml-*` переменных (поверхности, текст, линии, семантика, узлы, связи, холст, выделение, шрифты, радиусы, тени) с краткими комментариями назначения.
-- [ ] `defaults-dark.css` и `defaults-light.css` — нейтральные дефолтные значения (`system-ui`, `ui-monospace`, neutral grays/blues, без бренд-акцентов). Подключаются автоматически вместе с `contract.css`.
-- [ ] Поддержка `data-theme="light" | "dark"` на host-контейнере виджета (не глобальный `:root`), transition 0.2–0.4s на `background` / `color`.
-- [ ] Авто-detect темы через `prefers-color-scheme`, если `data-theme` не задан.
-- [ ] `prefers-reduced-motion: reduce` overrides — отключение transition'ов; никаких glow/blur в библиотеке вообще не используется, поэтому этот override на стороне библиотеки тривиален (но контракт обязывает скины это поддерживать).
-- [ ] `tokens.json` — машиночитаемая декларация контракта (имена, дефолтные значения, описания) для downstream-пакетов, генератора SVG, API-reference и валидации скинов.
-- [ ] README пакета: пример «как написать свой скин» (override каких-нибудь переменных через `:where(.my-skin) { --uml-accent: ...; }`).
+✅ Скелет `packages/theme` с Vite library build → CSS-only output.
+✅ `contract.css` — декларация всех `--uml-*` переменных (поверхности, текст, линии, семантика, узлы, связи, холст, выделение, шрифты, радиусы, тени) с краткими комментариями назначения.
+✅ `defaults-dark.css` и `defaults-light.css` — нейтральные дефолтные значения (`system-ui`, `ui-monospace`, neutral grays/blues, без бренд-акцентов). Подключаются автоматически вместе с `contract.css`.
+✅ Поддержка `data-theme="light" | "dark"` на host-контейнере виджета (не глобальный `:root`), transition 0.2–0.4s на `background` / `color`.
+✅ Авто-detect темы через `prefers-color-scheme`, если `data-theme` не задан.
+✅ `prefers-reduced-motion: reduce` overrides — отключение transition'ов; никаких glow/blur в библиотеке вообще не используется, поэтому этот override на стороне библиотеки тривиален (но контракт обязывает скины это поддерживать).
+✅ `tokens.json` — машиночитаемая декларация контракта (имена, дефолтные значения, описания) для downstream-пакетов, генератора SVG, API-reference и валидации скинов.
+✅ README пакета: пример «как написать свой скин» (override каких-нибудь переменных через `:where(.my-skin) { --uml-accent: ...; }`).
 
 **Что НЕ делается в этой фазе:**
 
@@ -90,7 +90,7 @@ gap'ы контракта, которые могут потребовать ра
 
 Всё это переезжает в **Phase 13a** (cyber-topographic showcase skin) и живёт в `apps/playground/src/skins/cyber-topographic/`.
 
-**Критерий выхода:** `pnpm build` в `packages/theme` собирает `contract.css` + `defaults-*.css`; импорт в чистый HTML с пустым `<div data-theme="dark">` показывает нейтральный темный UI (никакого фирменного вида); все ожидаемые `--uml-*` переменные доступны через `getComputedStyle`.
+**Критерий выхода:** `pnpm build` в `packages/theme` собирает `contract.css` + `defaults-*.css`; импорт в чистый HTML с пустым `<div data-theme="dark">` показывает нейтральный темный UI (никакого фирменного вида); все ожидаемые `--uml-*` переменные доступны через `getComputedStyle`. ✅ (smoke см. `packages/theme/examples/smoke.html`; селектор скоупа — `[data-uml-host][data-theme]`, чтобы не загрязнять глобальные стили).
 
 ---
 
@@ -471,4 +471,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phase 0 complete.*
+*Last updated: 2026-05-08 — Phase 0 + Phase 1 complete.*

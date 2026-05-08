@@ -1,0 +1,9 @@
+/**
+ * @uml-drawer/theme — single-file entry.
+ *
+ * Importing `@uml-drawer/theme` is equivalent to importing
+ * `@uml-drawer/theme/contract.css`, which itself pulls in the neutral
+ * light/dark defaults.
+ */
+
+@import "./contract.css";

@@ -54,6 +54,8 @@ importers:
         specifier: ^2.1.4
         version: 2.1.9(@types/node@20.19.40)
 
+  packages/theme: {}
+
 packages:
 
   '@babel/code-frame@7.29.0':

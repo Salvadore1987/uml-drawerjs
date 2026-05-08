@@ -1,0 +1,108 @@
+/**
+ * @uml-drawer/theme — neutral dark defaults.
+ *
+ * Applied when the editor host has `data-theme="dark"` OR when no
+ * `data-theme` is set and the user prefers a dark colour scheme.
+ *
+ * Values here are deliberately neutral (slate / blue family). Skins
+ * override these by declaring `--uml-*` again in a more specific scope.
+ */
+
+/* Explicit override: data-theme="dark" wins regardless of OS preference. */
+[data-uml-host][data-theme="dark"] {
+  /* surface */
+  --uml-bg: #0f172a;
+  --uml-bg-elevated: #1e293b;
+  --uml-bg-overlay: #1e293b;
+
+  /* text */
+  --uml-text: #f1f5f9;
+  --uml-text-muted: #94a3b8;
+  --uml-text-faint: #64748b;
+  --uml-text-on-accent: #0f172a;
+
+  /* border */
+  --uml-border: #334155;
+  --uml-border-subtle: #1e293b;
+  --uml-border-strong: #475569;
+
+  /* semantic */
+  --uml-accent: #60a5fa;
+  --uml-success: #4ade80;
+  --uml-warning: #facc15;
+  --uml-danger: #f87171;
+  --uml-info: #38bdf8;
+
+  /* node */
+  --uml-node-bg: #1e293b;
+  --uml-node-text: #f1f5f9;
+  --uml-node-border: #475569;
+  --uml-node-stereotype: #94a3b8;
+
+  /* edge */
+  --uml-edge-stroke: #94a3b8;
+  --uml-edge-arrow: #94a3b8;
+  --uml-edge-label-bg: #1e293b;
+  --uml-edge-label-text: #cbd5e1;
+
+  /* canvas */
+  --uml-canvas-bg: #0b1120;
+  --uml-canvas-grid: #1e293b;
+
+  /* selection / focus */
+  --uml-selection-fill: rgba(96, 165, 250, 0.15);
+  --uml-selection-stroke: #60a5fa;
+  --uml-selection-handle: #60a5fa;
+  --uml-focus-ring: #60a5fa;
+
+  /* shadow */
+  --uml-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --uml-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --uml-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Auto-detect: no explicit data-theme + OS prefers dark. */
+@media (prefers-color-scheme: dark) {
+  [data-uml-host]:not([data-theme]) {
+    --uml-bg: #0f172a;
+    --uml-bg-elevated: #1e293b;
+    --uml-bg-overlay: #1e293b;
+
+    --uml-text: #f1f5f9;
+    --uml-text-muted: #94a3b8;
+    --uml-text-faint: #64748b;
+    --uml-text-on-accent: #0f172a;
+
+    --uml-border: #334155;
+    --uml-border-subtle: #1e293b;
+    --uml-border-strong: #475569;
+
+    --uml-accent: #60a5fa;
+    --uml-success: #4ade80;
+    --uml-warning: #facc15;
+    --uml-danger: #f87171;
+    --uml-info: #38bdf8;
+
+    --uml-node-bg: #1e293b;
+    --uml-node-text: #f1f5f9;
+    --uml-node-border: #475569;
+    --uml-node-stereotype: #94a3b8;
+
+    --uml-edge-stroke: #94a3b8;
+    --uml-edge-arrow: #94a3b8;
+    --uml-edge-label-bg: #1e293b;
+    --uml-edge-label-text: #cbd5e1;
+
+    --uml-canvas-bg: #0b1120;
+    --uml-canvas-grid: #1e293b;
+
+    --uml-selection-fill: rgba(96, 165, 250, 0.15);
+    --uml-selection-stroke: #60a5fa;
+    --uml-selection-handle: #60a5fa;
+    --uml-focus-ring: #60a5fa;
+
+    --uml-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --uml-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+    --uml-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+}

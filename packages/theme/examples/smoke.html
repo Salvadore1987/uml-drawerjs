@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@uml-drawer/theme — smoke test</title>
+    <link rel="stylesheet" href="../dist/index.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr 1fr;
+        padding: 24px;
+      }
+
+      [data-uml-host] {
+        padding: 24px;
+        border: 1px solid var(--uml-border);
+        border-radius: var(--uml-radius-lg);
+        box-shadow: var(--uml-shadow-md);
+        min-height: 220px;
+      }
+
+      [data-uml-host] h2 {
+        margin: 0 0 12px;
+        font-size: var(--uml-font-size-lg);
+      }
+
+      [data-uml-host] p {
+        margin: 0;
+        color: var(--uml-text-muted);
+      }
+
+      [data-uml-host] .swatches {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      [data-uml-host] .swatch {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--uml-radius-md);
+        border: 1px solid var(--uml-border);
+      }
+
+      [data-uml-host] .swatch--accent {
+        background: var(--uml-accent);
+      }
+      [data-uml-host] .swatch--success {
+        background: var(--uml-success);
+      }
+      [data-uml-host] .swatch--warning {
+        background: var(--uml-warning);
+      }
+      [data-uml-host] .swatch--danger {
+        background: var(--uml-danger);
+      }
+      [data-uml-host] .swatch--info {
+        background: var(--uml-info);
+      }
+
+      [data-uml-host] code {
+        font-family: var(--uml-font-mono);
+        font-size: var(--uml-font-size-sm);
+        background: var(--uml-bg-elevated);
+        border: 1px solid var(--uml-border-subtle);
+        border-radius: var(--uml-radius-sm);
+        padding: 2px 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <div data-uml-host data-theme="dark">
+        <h2>data-theme="dark"</h2>
+        <p>
+          Neutral dark defaults. Background <code>--uml-bg</code>, text <code>--uml-text</code>.
+        </p>
+        <div class="swatches">
+          <div class="swatch swatch--accent"></div>
+          <div class="swatch swatch--success"></div>
+          <div class="swatch swatch--warning"></div>
+          <div class="swatch swatch--danger"></div>
+          <div class="swatch swatch--info"></div>
+        </div>
+      </div>
+
+      <div data-uml-host data-theme="light">
+        <h2>data-theme="light"</h2>
+        <p>
+          Neutral light defaults. Background <code>--uml-bg</code>, text <code>--uml-text</code>.
+        </p>
+        <div class="swatches">
+          <div class="swatch swatch--accent"></div>
+          <div class="swatch swatch--success"></div>
+          <div class="swatch swatch--warning"></div>
+          <div class="swatch swatch--danger"></div>
+          <div class="swatch swatch--info"></div>
+        </div>
+      </div>
+
+      <div data-uml-host>
+        <h2>no data-theme — auto</h2>
+        <p>
+          Picks light or dark based on <code>prefers-color-scheme</code>. Toggle your OS setting to
+          verify both branches.
+        </p>
+        <div class="swatches">
+          <div class="swatch swatch--accent"></div>
+          <div class="swatch swatch--success"></div>
+          <div class="swatch swatch--warning"></div>
+          <div class="swatch swatch--danger"></div>
+          <div class="swatch swatch--info"></div>
+        </div>
+      </div>
+
+      <div data-uml-host data-theme="dark" style="font-family: var(--uml-font-mono)">
+        <h2>monospace surface</h2>
+        <p>
+          Demonstrates <code>--uml-font-mono</code>, <code>--uml-radius-md</code>, and shadow
+          tokens. Lorem ipsum dolor sit amet.
+        </p>
+        <div class="swatches">
+          <div class="swatch swatch--accent"></div>
+          <div class="swatch swatch--success"></div>
+          <div class="swatch swatch--warning"></div>
+          <div class="swatch swatch--danger"></div>
+          <div class="swatch swatch--info"></div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
