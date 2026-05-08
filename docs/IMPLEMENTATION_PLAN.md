@@ -115,23 +115,23 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** все мутации проходят через команды → бесплатный undo/redo + готовность к CRDT.
 
-- [ ] Базовый тип команды `{ kind, payload, apply(ast), invert(ast) }`.
-- [ ] Реализовать команды (по спеке):
-    - [ ] `AddNodeCommand`
-    - [ ] `RemoveNodeCommand` (каскадно убирает edges)
-    - [ ] `MoveNodeCommand` (writeback в `metadata.layoutOverrides`)
-    - [ ] `UpdateNodeCommand`
-    - [ ] `AddEdgeCommand`
-    - [ ] `RemoveEdgeCommand`
-    - [ ] `UpdateEdgeCommand`
-    - [ ] `GroupCommand` (create/update/dissolve)
-    - [ ] `ApplyLayoutCommand`
-    - [ ] `ImportTextCommand` (полная замена AST)
-- [ ] CommandBus с синхронным dispatch + before/after-events.
-- [ ] History stack: `undo()` / `redo()`, конфигурируемый coalesce (для bursts набора текста).
-- [ ] Vitest: каждая команда + её инверсия, redo детерминирован.
+✅ Базовый тип команды `{ kind, payload, apply(ast), invert(ast) }`.
+✅ Реализовать команды (по спеке):
+    ✅ `AddNodeCommand`
+    ✅ `RemoveNodeCommand` (каскадно убирает edges; восстанавливает индексы и `layoutOverrides` на invert)
+    ✅ `MoveNodeCommand` (writeback в `metadata.layoutOverrides`)
+    ✅ `UpdateNodeCommand`
+    ✅ `AddEdgeCommand`
+    ✅ `RemoveEdgeCommand`
+    ✅ `UpdateEdgeCommand`
+    ✅ `GroupCommand` (`addGroupCommand` / `updateGroupCommand` / `removeGroupCommand`)
+    ✅ `ApplyLayoutCommand`
+    ✅ `ImportTextCommand` (полная замена AST)
+✅ CommandBus с синхронным dispatch + before/after-events.
+✅ History stack: `undo()` / `redo()`, конфигурируемый coalesce (`sameKind`, `sameKindAndTarget`, `never`).
+✅ Vitest: каждая команда + её инверсия, redo детерминирован.
 
-**Критерий выхода:** 100% покрытие команд; `apply → invert` восстанавливает byte-equal JSON-снапшот AST.
+**Критерий выхода:** 100% покрытие команд; `apply → invert` восстанавливает byte-equal JSON-снапшот AST. ✅ (31 новый тест: 18 commands round-trip + 5 bus + 8 history; 68 тестов в `core` зелёные).
 
 ---
 
@@ -471,4 +471,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phases 0 / 1 / 2 complete.*
+*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 complete.*

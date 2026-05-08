@@ -1,9 +1,11 @@
 /**
  * @uml-drawer/core — main entry.
  *
- * Re-exports every public symbol from `./model`. As subsequent phases land,
- * this file will also re-export from `./parser`, `./generator`, `./commands`,
- * and so on.
+ * Re-exports every public symbol from the implemented inner-hexagon
+ * modules. Parser / generator / validators / layout / renderer / exporters /
+ * editor land in subsequent phases.
  */
 
 export * from "./model/index.js";
+export * from "./commands/index.js";
+export * from "./history/index.js";

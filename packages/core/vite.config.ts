@@ -10,6 +10,8 @@ export default defineConfig({
       entry: {
         index: "src/index.ts",
         "model/index": "src/model/index.ts",
+        "commands/index": "src/commands/index.ts",
+        "history/index": "src/history/index.ts",
       },
       formats: ["es"],
     },
