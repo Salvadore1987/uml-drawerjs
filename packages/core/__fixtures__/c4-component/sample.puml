@@ -1,0 +1,17 @@
+@startuml C4 Component
+title API Application Components
+
+Container(spa, "SPA", "JavaScript")
+ContainerDb(db, "Database", "Oracle")
+Component(signin, "Sign In Controller", "Spring MVC", "Handles authentication")
+Component(accounts, "Accounts Controller", "Spring MVC", "Handles account requests")
+Component(security, "Security Component", "Spring", "Authenticates users")
+Component(repo, "Account Repository", "Spring Data", "Persistence")
+
+Rel(spa, signin, "Submits credentials", "JSON/HTTPS")
+Rel(spa, accounts, "Requests accounts", "JSON/HTTPS")
+Rel(signin, security, "Uses")
+Rel(accounts, repo, "Uses")
+Rel(repo, db, "Reads/writes", "JDBC")
+
+@enduml

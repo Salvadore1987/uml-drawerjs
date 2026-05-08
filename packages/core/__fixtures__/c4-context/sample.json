@@ -1,0 +1,50 @@
+{
+  "id": "diagram-fixture",
+  "type": "c4-context",
+  "title": "Internet Banking Context",
+  "nodes": [
+    {
+      "id": "id-1",
+      "kind": "person",
+      "label": "Personal Banking Customer",
+      "description": "A customer of the bank"
+    },
+    {
+      "id": "id-2",
+      "kind": "system",
+      "label": "Internet Banking System",
+      "description": "Allows customers to view accounts"
+    },
+    {
+      "id": "id-3",
+      "kind": "system-external",
+      "label": "E-mail System",
+      "description": "Microsoft Exchange"
+    }
+  ],
+  "edges": [
+    {
+      "id": "id-4",
+      "source": "id-1",
+      "target": "id-2",
+      "kind": "uses",
+      "label": "Uses"
+    },
+    {
+      "id": "id-5",
+      "source": "id-2",
+      "target": "id-3",
+      "kind": "uses",
+      "label": "Sends e-mails"
+    },
+    {
+      "id": "id-6",
+      "source": "id-3",
+      "target": "id-1",
+      "kind": "uses",
+      "label": "Sends e-mails to"
+    }
+  ],
+  "groups": [],
+  "metadata": { "schemaVersion": "0.1.0" }
+}

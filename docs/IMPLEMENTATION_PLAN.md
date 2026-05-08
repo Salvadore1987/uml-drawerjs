@@ -139,16 +139,16 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** инкрементальный парсер PlantUML → AST, переиспользуемый и в ядре, и в CodeMirror.
 
-- [ ] Lezer-грамматика подмножества PlantUML под 5 типов диаграмм (старт: C4 + Class, далее ER/Sequence).
-- [ ] Build-скрипт `.grammar` → сгенерированный парсер (`@lezer/generator`).
-- [ ] AST-builder, обходящий Lezer-дерево и собирающий `Diagram`.
-- [ ] Opaque-block fallback для неподдерживаемых конструкций (preprocessor, !include) — сохраняем как `metadata.opaque`.
-- [ ] Декодер аннотаций `' @drawer:meta {...}` → `metadata.layoutOverrides`, `styles`.
-- [ ] Фикстуры: эталонные `.puml` файлы в `packages/core/__fixtures__/{c4-context,c4-container,c4-component,class,er,sequence}/`.
-- [ ] Round-trip тесты: `parse(text) → AST` совпадает с JSON-snapshot.
-- [ ] Подмножество PlantUML для MVP зафиксировать ADR-ом (см. Phase 17).
+⚠️ Lezer-грамматика подмножества PlantUML под 5 типов диаграмм — **отложено** в [ADR-0003](./adr/0003-plantuml-subset.md): MVP отгружен на ручном line-based парсере с тем же публичным API; миграция на Lezer пройдёт в Phase 4b или совместно с Phase 11 (CodeMirror).
+⚠️ Build-скрипт `.grammar` → сгенерированный парсер (`@lezer/generator`) — отложено вместе с Lezer (см. ADR-0003 § Migration plan).
+✅ AST-builder, собирающий `Diagram` (диспатчер по типу диаграммы + per-type pattern matchers; на Lezer-tree свалится после миграции).
+✅ Opaque-block fallback для неподдерживаемых конструкций (preprocessor, !include и т. п. → `metadata.opaque`).
+✅ Декодер аннотаций `' @drawer:meta {...}` → `metadata.layoutOverrides`, `styles`.
+✅ Фикстуры: эталонные `.puml` файлы в `packages/core/__fixtures__/{c4-context,c4-container,c4-component,class,er,sequence}/` + matching `.json` снапшоты.
+✅ Round-trip тесты: `parse(text) → AST` совпадает с JSON-snapshot (детерминированные id через `idFactory`).
+✅ Подмножество PlantUML для MVP зафиксировано в [ADR-0003](./adr/0003-plantuml-subset.md).
 
-**Критерий выхода:** все 5 типов парсятся; ошибочный ввод → `DiagramError` с `range` и `code: SYNTAX_*`; AST не разрушается (последний валидный сохраняется).
+**Критерий выхода:** все 5 типов парсятся; ошибочный ввод → `DiagramError` с `range` и `code: SYNTAX_*`; AST не разрушается (последний валидный сохраняется). ✅ (22 новых теста: 6 round-trip + 3 error/opaque/meta + 8 meta unit + 3 tokenizer + 2 misc; коды `SYNTAX_MALFORMED`, `SYNTAX_UNKNOWN_REFERENCE`, `SYNTAX_META`, `SYNTAX_MISSING_MARKER`, `SYNTAX_UNBALANCED_QUOTE`).
 
 ---
 
@@ -471,4 +471,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 complete.*
+*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*

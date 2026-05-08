@@ -1,0 +1,12 @@
+@startuml C4 Context
+title Internet Banking Context
+
+Person(customer, "Personal Banking Customer", "A customer of the bank")
+System(banking, "Internet Banking System", "Allows customers to view accounts")
+System_Ext(email, "E-mail System", "Microsoft Exchange")
+
+Rel(customer, banking, "Uses")
+Rel(banking, email, "Sends e-mails")
+Rel(email, customer, "Sends e-mails to")
+
+@enduml

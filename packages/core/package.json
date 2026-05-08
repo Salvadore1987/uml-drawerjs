@@ -27,6 +27,10 @@
       "types": "./dist/history/index.d.ts",
       "import": "./dist/history/index.js"
     },
+    "./parser": {
+      "types": "./dist/parser/index.d.ts",
+      "import": "./dist/parser/index.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",

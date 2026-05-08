@@ -1,0 +1,13 @@
+@startuml Sequence
+title Sign-in Sequence
+
+actor User
+participant Auth
+participant DB
+
+User -> Auth : login(credentials)
+Auth -> DB : validate
+DB --> Auth : ok
+Auth ->> User : token
+
+@enduml

@@ -2,7 +2,7 @@
 
 > Framework-agnostic TypeScript library for editing UML diagrams with bidirectional PlantUML synchronization.
 
-**Status:** pre-alpha. Phases 0–3 complete (repo bootstrap + design-agnostic theming contract + `@uml-drawer/core` AST model + CQRS commands & undo/redo history). Parser / generator / validators / etc. pending.
+**Status:** pre-alpha. Phases 0–4 complete (repo bootstrap + design-agnostic theming contract + `@uml-drawer/core` AST model + CQRS commands & undo/redo history + PlantUML parser for all 5 diagram types). Generator / validators / layout / renderer pending. The Phase 4 parser is hand-rolled; Lezer migration is tracked in [ADR-0003](./docs/adr/0003-plantuml-subset.md).
 
 See [`docs/uml-drawer.md`](./docs/uml-drawer.md) for the full specification and [`docs/IMPLEMENTATION_PLAN.md`](./docs/IMPLEMENTATION_PLAN.md) for the phased roadmap.
 

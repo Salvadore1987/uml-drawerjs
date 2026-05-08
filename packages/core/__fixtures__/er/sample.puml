@@ -1,0 +1,11 @@
+@startuml ER
+title E-commerce ER
+
+entity Customer
+entity Order
+entity Product
+
+Customer ||--o{ Order : places
+Order }o--o{ Product : contains
+
+@enduml

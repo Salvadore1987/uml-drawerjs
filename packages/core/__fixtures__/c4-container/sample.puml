@@ -1,0 +1,15 @@
+@startuml C4 Container
+title Internet Banking Containers
+
+Person(customer, "Customer")
+System_Ext(email, "E-mail System")
+Container(spa, "SPA", "JavaScript", "Provides banking functionality to customers")
+Container(api, "API Application", "Java + Spring", "Provides banking functionality")
+ContainerDb(db, "Database", "Oracle", "Stores account information")
+
+Rel(customer, spa, "Uses", "HTTPS")
+Rel(spa, api, "Calls", "JSON/HTTPS")
+Rel(api, db, "Reads/writes", "JDBC")
+Rel(api, email, "Sends e-mails", "SMTP")
+
+@enduml

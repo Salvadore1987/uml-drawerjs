@@ -1,0 +1,16 @@
+@startuml Class
+title Renderer Hierarchy
+
+interface Renderable
+abstract class Shape
+class Circle
+class Square
+enum LineStyle
+
+Circle --|> Shape
+Square --|> Shape
+Shape ..|> Renderable
+Shape *-- LineStyle : style
+Circle --> Square : transforms
+
+@enduml

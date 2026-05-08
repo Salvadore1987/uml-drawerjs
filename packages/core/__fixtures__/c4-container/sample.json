@@ -1,0 +1,62 @@
+{
+  "id": "diagram-fixture",
+  "type": "c4-container",
+  "title": "Internet Banking Containers",
+  "nodes": [
+    { "id": "id-1", "kind": "person", "label": "Customer" },
+    { "id": "id-2", "kind": "system-external", "label": "E-mail System" },
+    {
+      "id": "id-3",
+      "kind": "container",
+      "label": "SPA",
+      "technology": "JavaScript",
+      "description": "Provides banking functionality to customers"
+    },
+    {
+      "id": "id-4",
+      "kind": "container",
+      "label": "API Application",
+      "technology": "Java + Spring",
+      "description": "Provides banking functionality"
+    },
+    {
+      "id": "id-5",
+      "kind": "database",
+      "label": "Database",
+      "technology": "Oracle",
+      "description": "Stores account information"
+    }
+  ],
+  "edges": [
+    {
+      "id": "id-6",
+      "source": "id-1",
+      "target": "id-3",
+      "kind": "uses",
+      "label": "Uses [HTTPS]"
+    },
+    {
+      "id": "id-7",
+      "source": "id-3",
+      "target": "id-4",
+      "kind": "uses",
+      "label": "Calls [JSON/HTTPS]"
+    },
+    {
+      "id": "id-8",
+      "source": "id-4",
+      "target": "id-5",
+      "kind": "uses",
+      "label": "Reads/writes [JDBC]"
+    },
+    {
+      "id": "id-9",
+      "source": "id-4",
+      "target": "id-2",
+      "kind": "uses",
+      "label": "Sends e-mails [SMTP]"
+    }
+  ],
+  "groups": [],
+  "metadata": { "schemaVersion": "0.1.0" }
+}

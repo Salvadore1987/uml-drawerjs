@@ -9,3 +9,4 @@
 export * from "./model/index.js";
 export * from "./commands/index.js";
 export * from "./history/index.js";
+export * from "./parser/index.js";
