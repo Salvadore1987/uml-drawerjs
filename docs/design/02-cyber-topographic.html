@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SDD/02 — Cyber Topographic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+   *  THEME TOKENS — dark (default) + [data-theme="light"]
+   * ============================================================ */
+  :root {
+    color-scheme: dark;
+
+    /* surfaces & ink */
+    --bg-0: #06080C;
+    --bg-1: #0A0E14;
+    --bg-2: #11161F;
+    --panel: rgba(15, 21, 30, 0.78);
+    --line: rgba(120, 200, 255, 0.18);
+    --line-strong: rgba(120, 200, 255, 0.32);
+    --ink: #C9D7E6;
+    --ink-soft: #8B9AAE;
+    --ink-dim: #54647B;
+
+    /* accents */
+    --phos: #B8FF3D;
+    --phos-2: #97DA28;
+    --phos-soft: rgba(184, 255, 61, 0.14);
+    --phos-line: rgba(184, 255, 61, 0.40);
+    --cyan: #4DEEEA;
+    --cyan-soft: rgba(77, 238, 234, 0.12);
+    --cyan-line: rgba(77, 238, 234, 0.40);
+    --magenta: #FF4D9E;
+    --magenta-soft: rgba(255, 77, 158, 0.12);
+    --magenta-line: rgba(255, 77, 158, 0.40);
+    --warn: #FFB347;
+    --warn-soft: rgba(255, 179, 71, 0.12);
+    --warn-line: rgba(255, 179, 71, 0.40);
+
+    /* layered surfaces */
+    --page-grad:
+      radial-gradient(ellipse at 20% 0%, rgba(77, 238, 234, 0.10), transparent 55%),
+      radial-gradient(ellipse at 90% 100%, rgba(255, 77, 158, 0.08), transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(184, 255, 61, 0.04), transparent 60%),
+      var(--bg-0);
+    --topbar-grad: linear-gradient(180deg, rgba(15, 21, 30, 0.92), rgba(15, 21, 30, 0.6));
+    --canvas-grad: linear-gradient(180deg, rgba(10, 14, 20, 0.5), rgba(6, 8, 12, 0.7));
+    --statusbar-bg: rgba(6, 8, 12, 0.85);
+    --hud-bg: rgba(6, 8, 12, 0.7);
+    --turn-bg: rgba(6, 8, 12, 0.55);
+    --turn-user-grad: linear-gradient(180deg, rgba(184, 255, 61, 0.10), rgba(184, 255, 61, 0.04));
+    --input-bg: rgba(6, 8, 12, 0.5);
+    --icon-btn-bg: rgba(15, 21, 30, 0.6);
+    --hint-bg: rgba(120, 200, 255, 0.06);
+    --tree-hover: rgba(120, 200, 255, 0.05);
+    --grid-dot: rgba(120, 200, 255, 0.10);
+    --bar-track: rgba(255, 255, 255, 0.06);
+    --adr-glyph-bg: rgba(255, 255, 255, 0.04);
+
+    /* topographic + scanline */
+    --topo-color: #78C8FF;
+    --topo-opacity: 0.13;
+    --scan-opacity: 1;
+
+    /* glows (toned-down or removed in light) */
+    --glow-phos-text: 0 0 6px rgba(184, 255, 61, 0.5);
+    --glow-phos-sm: 0 0 8px var(--phos);
+    --glow-phos-lg: 0 0 18px rgba(184, 255, 61, 0.45);
+    --glow-cta: 0 0 18px rgba(184, 255, 61, 0.35);
+    --glow-cyan: 0 0 12px rgba(77, 238, 234, 0.5);
+    --glow-cyan-sm: 0 0 6px var(--cyan);
+    --glow-warn-sm: 0 0 6px var(--warn);
+    --avatar-stroke-bg: var(--bg-0);
+
+    /* SVG diagram surfaces */
+    --svg-lane-actor-fill: rgba(255, 77, 158, 0.10);
+    --svg-lane-app-fill-1: #11161F;
+    --svg-lane-app-fill-2: #1A2330;
+    --svg-lane-int-fill-1: rgba(255, 179, 71, 0.18);
+    --svg-lane-int-fill-2: rgba(255, 179, 71, 0.05);
+    --svg-validation-fill: rgba(255, 77, 158, 0.10);
+  }
+
+  [data-theme="light"] {
+    color-scheme: light;
+
+    /* surfaces & ink */
+    --bg-0: #F0EBDD;
+    --bg-1: #FFFFFF;
+    --bg-2: #FAF6EC;
+    --panel: rgba(255, 252, 244, 0.82);
+    --line: rgba(13, 47, 79, 0.14);
+    --line-strong: rgba(13, 47, 79, 0.28);
+    --ink: #15243A;
+    --ink-soft: #4D5C72;
+    --ink-dim: #7E8B9C;
+
+    /* accents — darker for legibility on light bg, palette-coherent */
+    --phos: #4F8C00;
+    --phos-2: #3D6B00;
+    --phos-soft: rgba(79, 140, 0, 0.10);
+    --phos-line: rgba(79, 140, 0, 0.40);
+    --cyan: #0B6A86;
+    --cyan-soft: rgba(11, 106, 134, 0.10);
+    --cyan-line: rgba(11, 106, 134, 0.40);
+    --magenta: #B8266F;
+    --magenta-soft: rgba(184, 38, 111, 0.10);
+    --magenta-line: rgba(184, 38, 111, 0.40);
+    --warn: #B5631A;
+    --warn-soft: rgba(181, 99, 26, 0.10);
+    --warn-line: rgba(181, 99, 26, 0.40);
+
+    /* layered surfaces */
+    --page-grad:
+      radial-gradient(ellipse at 20% 0%, rgba(11, 106, 134, 0.10), transparent 55%),
+      radial-gradient(ellipse at 90% 100%, rgba(184, 38, 111, 0.08), transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(79, 140, 0, 0.06), transparent 60%),
+      var(--bg-0);
+    --topbar-grad: linear-gradient(180deg, rgba(255, 252, 244, 0.92), rgba(255, 252, 244, 0.65));
+    --canvas-grad: linear-gradient(180deg, rgba(255, 252, 244, 0.55), rgba(245, 239, 226, 0.75));
+    --statusbar-bg: rgba(255, 252, 244, 0.85);
+    --hud-bg: rgba(255, 252, 244, 0.85);
+    --turn-bg: rgba(255, 252, 244, 0.78);
+    --turn-user-grad: linear-gradient(180deg, rgba(79, 140, 0, 0.10), rgba(79, 140, 0, 0.04));
+    --input-bg: rgba(255, 255, 255, 0.75);
+    --icon-btn-bg: rgba(255, 252, 244, 0.7);
+    --hint-bg: rgba(13, 47, 79, 0.04);
+    --tree-hover: rgba(13, 47, 79, 0.05);
+    --grid-dot: rgba(13, 47, 79, 0.10);
+    --bar-track: rgba(13, 47, 79, 0.08);
+    --adr-glyph-bg: rgba(13, 47, 79, 0.04);
+
+    /* topographic + scanline */
+    --topo-color: #1A3B6B;
+    --topo-opacity: 0.16;
+    --scan-opacity: 0;
+
+    /* glows — replaced with subtle drop-shadows on light */
+    --glow-phos-text: none;
+    --glow-phos-sm: 0 1px 0 rgba(79, 140, 0, 0.30);
+    --glow-phos-lg: 0 6px 16px rgba(79, 140, 0, 0.20);
+    --glow-cta: 0 4px 14px rgba(79, 140, 0, 0.22);
+    --glow-cyan: 0 4px 12px rgba(11, 106, 134, 0.25);
+    --glow-cyan-sm: 0 1px 0 rgba(11, 106, 134, 0.35);
+    --glow-warn-sm: 0 1px 0 rgba(181, 99, 26, 0.35);
+    --avatar-stroke-bg: var(--bg-0);
+
+    /* SVG diagram surfaces */
+    --svg-lane-actor-fill: rgba(184, 38, 111, 0.08);
+    --svg-lane-app-fill-1: #FFFCF4;
+    --svg-lane-app-fill-2: #F2EEDD;
+    --svg-lane-int-fill-1: rgba(181, 99, 26, 0.14);
+    --svg-lane-int-fill-2: rgba(181, 99, 26, 0.04);
+    --svg-validation-fill: rgba(184, 38, 111, 0.08);
+  }
+
+  /* ============================================================
+   *  Base
+   * ============================================================ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg-0);
+    color: var(--ink);
+    font-family: "Azeret Mono", monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    transition: background 0.4s ease, color 0.25s ease;
+  }
+  body {
+    height: 100vh;
+    background: var(--page-grad);
+    position: relative;
+  }
+  /* Topographic mask — color driven by --topo-color */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-color: var(--topo-color);
+    -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900'><g fill='none' stroke='black' stroke-width='0.9'><path d='M0,520 C220,440 380,560 600,500 C840,430 980,580 1240,520 C1420,480 1560,540 1600,510'/><path d='M0,560 C200,500 400,600 620,540 C860,470 1000,620 1260,560 C1440,520 1560,580 1600,550'/><path d='M0,600 C200,540 380,640 600,580 C860,510 1020,640 1260,600 C1440,560 1560,620 1600,590'/><path d='M0,460 C200,400 400,500 620,440 C860,380 1020,520 1260,460 C1440,420 1560,480 1600,450'/><path d='M0,400 C220,360 400,440 620,380 C880,320 1040,460 1260,400 C1460,360 1560,420 1600,390'/><path d='M0,340 C220,300 400,380 620,320 C880,260 1040,400 1260,340 C1460,300 1560,360 1600,330'/><path d='M0,280 C220,240 400,320 620,260 C880,200 1040,340 1260,280 C1460,240 1560,300 1600,270'/><path d='M0,220 C220,180 400,260 620,200 C880,140 1040,280 1260,220 C1460,180 1560,240 1600,210'/><path d='M0,160 C220,120 400,200 620,140 C880,80 1040,220 1260,160 C1460,120 1560,180 1600,150'/><path d='M0,680 C200,620 400,720 620,660 C880,580 1020,720 1260,680 C1440,640 1560,700 1600,670'/><path d='M0,740 C200,680 380,780 600,720 C860,660 1020,800 1260,740 C1440,700 1560,760 1600,730'/></g></svg>");
+    mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900'><g fill='none' stroke='black' stroke-width='0.9'><path d='M0,520 C220,440 380,560 600,500 C840,430 980,580 1240,520 C1420,480 1560,540 1600,510'/><path d='M0,560 C200,500 400,600 620,540 C860,470 1000,620 1260,560 C1440,520 1560,580 1600,550'/><path d='M0,600 C200,540 380,640 600,580 C860,510 1020,640 1260,600 C1440,560 1560,620 1600,590'/><path d='M0,460 C200,400 400,500 620,440 C860,380 1020,520 1260,460 C1440,420 1560,480 1600,450'/><path d='M0,400 C220,360 400,440 620,380 C880,320 1040,460 1260,400 C1460,360 1560,420 1600,390'/><path d='M0,340 C220,300 400,380 620,320 C880,260 1040,400 1260,340 C1460,300 1560,360 1600,330'/><path d='M0,280 C220,240 400,320 620,260 C880,200 1040,340 1260,280 C1460,240 1560,300 1600,270'/><path d='M0,220 C220,180 400,260 620,200 C880,140 1040,280 1260,220 C1460,180 1560,240 1600,210'/><path d='M0,160 C220,120 400,200 620,140 C880,80 1040,220 1260,160 C1460,120 1560,180 1600,150'/><path d='M0,680 C200,620 400,720 620,660 C880,580 1020,720 1260,680 C1440,640 1560,700 1600,670'/><path d='M0,740 C200,680 380,780 600,720 C860,660 1020,800 1260,740 C1440,700 1560,760 1600,730'/></g></svg>");
+    -webkit-mask-size: cover;
+    mask-size: cover;
+    opacity: var(--topo-opacity);
+    pointer-events: none;
+    z-index: 0;
+    transition: background-color 0.4s ease, opacity 0.4s ease;
+  }
+  /* Scanline grain — fades out completely on light */
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: overlay;
+    opacity: var(--scan-opacity);
+    transition: opacity 0.3s ease;
+  }
+  ::selection { background: var(--phos); color: var(--bg-0); }
+
+  /* === Layout === */
+  .shell { position: relative; z-index: 2; height: 100vh; display: grid; grid-template-rows: 56px 1fr 30px; }
+
+  /* === Top bar === */
+  .topbar {
+    display: grid;
+    grid-template-columns: 280px 1fr auto;
+    align-items: center;
+    padding: 0 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--topbar-grad);
+    backdrop-filter: blur(10px);
+    gap: 24px;
+    transition: background 0.3s ease, border-color 0.3s ease;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-family: "Sora", sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .brand .glyph {
+    width: 28px; height: 28px;
+    border: 1.5px solid var(--phos);
+    box-shadow: 0 0 12px rgba(184, 255, 61, 0.45), inset 0 0 12px rgba(184, 255, 61, 0.18);
+    display: grid; place-items: center;
+    font-family: "Azeret Mono", monospace;
+    color: var(--phos);
+    font-size: 14px;
+  }
+  [data-theme="light"] .brand .glyph {
+    box-shadow: 0 2px 8px rgba(79, 140, 0, 0.22), inset 0 0 8px rgba(79, 140, 0, 0.10);
+  }
+  .brand .name { font-size: 18px; }
+  .brand .name span { color: var(--phos); }
+  .brand .tag {
+    font-family: "Azeret Mono", monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.22em;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    padding-left: 12px;
+    margin-left: 8px;
+    border-left: 1px solid var(--line);
+  }
+  .breadcrumb {
+    display: flex; gap: 14px; align-items: center;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+  .breadcrumb b { color: var(--ink); font-weight: 600; }
+  .breadcrumb .sep { color: var(--ink-dim); }
+  .breadcrumb .live {
+    margin-left: 12px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 10px;
+    border: 1px solid var(--phos);
+    background: var(--phos-soft);
+    color: var(--phos);
+    font-size: 10px;
+    border-radius: 999px;
+  }
+  .breadcrumb .live .pulse {
+    width: 6px; height: 6px; background: var(--phos); border-radius: 50%;
+    box-shadow: var(--glow-phos-sm);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .topbar-actions { display: flex; gap: 8px; align-items: center; }
+  .icon-btn {
+    width: 34px; height: 34px;
+    border: 1px solid var(--line-strong);
+    background: var(--icon-btn-bg);
+    color: var(--ink-soft);
+    display: grid; place-items: center;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all .15s;
+  }
+  .icon-btn:hover { color: var(--phos); border-color: var(--phos); box-shadow: 0 0 0 3px var(--phos-soft); }
+
+  /* Theme toggle — segmented switch */
+  .theme-switch {
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    height: 34px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--icon-btn-bg);
+    padding: 3px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .theme-switch button {
+    border: 0;
+    background: transparent;
+    color: var(--ink-dim);
+    font-family: "Azeret Mono", monospace;
+    font-size: 14px;
+    width: 32px;
+    cursor: pointer;
+    border-radius: 999px;
+    display: grid; place-items: center;
+    z-index: 2;
+    transition: color 0.2s ease;
+  }
+  .theme-switch button.active { color: var(--bg-0); }
+  .theme-switch::before {
+    content: "";
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 32px; height: calc(100% - 6px);
+    background: var(--phos);
+    box-shadow: var(--glow-phos-lg);
+    border-radius: 999px;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
+  }
+  [data-theme="light"] .theme-switch::before { transform: translateX(32px); }
+
+  .cta {
+    height: 34px;
+    padding: 0 16px;
+    border: 1px solid var(--phos);
+    background: linear-gradient(180deg, var(--phos), var(--phos-2));
+    color: var(--bg-0);
+    font-family: "Sora", sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 8px;
+    box-shadow: var(--glow-cta);
+  }
+  [data-theme="light"] .cta { color: #FFFCF4; }
+  .cta:hover { filter: brightness(1.05); }
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--cyan), var(--magenta));
+    border: 1.5px solid var(--cyan);
+    box-shadow: 0 0 0 2px var(--avatar-stroke-bg), var(--glow-cyan);
+  }
+
+  /* === Body grid === */
+  .body { display: grid; grid-template-columns: 280px 1fr 360px; min-height: 0; }
+
+  /* Panels */
+  .panel {
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    backdrop-filter: blur(14px);
+    display: flex; flex-direction: column;
+    min-height: 0;
+    transition: background 0.3s ease, border-color 0.3s ease;
+  }
+  .panel:last-child { border-right: 0; border-left: 1px solid var(--line); }
+  .panel-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    color: var(--ink-dim);
+  }
+  .panel-head b { color: var(--ink); font-weight: 600; letter-spacing: 0.18em; }
+  .panel-head .chip {
+    padding: 2px 8px;
+    background: var(--cyan-soft);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    border-radius: 4px;
+    font-size: 9.5px;
+  }
+
+  /* === Tree === */
+  .tree { overflow: auto; padding: 8px 0; flex: 1; }
+  .tree-section { padding: 8px 14px 14px; border-bottom: 1px solid var(--line); }
+  .tree-section:last-child { border-bottom: 0; }
+  .tree-title {
+    display: flex; justify-content: space-between;
+    font-family: "Sora", sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    margin: 4px 0 8px;
+  }
+  .tree-title .count {
+    background: var(--cyan-soft); border: 1px solid var(--cyan);
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-family: "Azeret Mono", monospace;
+  }
+  .anchor-row {
+    display: grid;
+    grid-template-columns: 24px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    margin-bottom: 2px;
+  }
+  .anchor-row:hover { background: var(--tree-hover); border-color: var(--line); }
+  .anchor-row.active {
+    background: linear-gradient(90deg, var(--phos-soft), transparent);
+    border-color: var(--phos);
+    box-shadow: inset 3px 0 0 var(--phos);
+  }
+  .anchor-row .glyph {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    font-size: 10px;
+    border-radius: 4px;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-soft);
+  }
+  .anchor-row .glyph.bc { background: var(--magenta-soft); border-color: var(--magenta); color: var(--magenta); }
+  .anchor-row .glyph.ent { background: var(--cyan-soft); border-color: var(--cyan); color: var(--cyan); }
+  .anchor-row .glyph.uc { background: var(--phos-soft); border-color: var(--phos); color: var(--phos); }
+  .anchor-row .glyph.dto { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+  .anchor-row .glyph.adr { background: var(--adr-glyph-bg); }
+  .anchor-row .name { color: var(--ink); font-size: 12px; }
+  .anchor-row .meta { color: var(--ink-dim); font-size: 10px; }
+  .anchor-row.active .name { color: var(--phos); }
+
+  /* === Canvas === */
+  .canvas-col { background: var(--canvas-grad); display: flex; flex-direction: column; min-width: 0; transition: background 0.3s ease; }
+  .canvas-toolbar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .tab {
+    padding: 6px 12px;
+    font-family: "Azeret Mono", monospace;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active {
+    border-color: var(--cyan);
+    background: var(--cyan-soft);
+    color: var(--cyan);
+    box-shadow: 0 0 0 1px var(--cyan-line);
+  }
+  .canvas-toolbar .spacer { flex: 1; }
+  .zoom-pill {
+    border: 1px solid var(--line);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    color: var(--ink-soft);
+  }
+
+  .canvas {
+    flex: 1; position: relative; overflow: hidden;
+    background-image: radial-gradient(circle at 1px 1px, var(--grid-dot) 1px, transparent 0);
+    background-size: 22px 22px;
+    transition: background-color 0.3s ease;
+  }
+  .canvas svg { width: 100%; height: 100%; display: block; }
+
+  /* HUD */
+  .hud {
+    position: absolute;
+    pointer-events: none;
+    border: 1px solid var(--line);
+    background: var(--hud-bg);
+    backdrop-filter: blur(8px);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 10.5px;
+  }
+  .hud.tl { top: 14px; left: 14px; }
+  .hud.tr { top: 14px; right: 14px; min-width: 220px; }
+  .hud.br { bottom: 14px; right: 14px; }
+  .hud.bl { bottom: 14px; left: 14px; }
+  .hud .label { color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.18em; font-size: 9.5px; margin-bottom: 4px; }
+  .hud .value { color: var(--ink); font-family: "Azeret Mono", monospace; }
+  .hud .value.phos { color: var(--phos); text-shadow: var(--glow-phos-text); }
+  .hud .row { display: flex; justify-content: space-between; gap: 18px; }
+  .hud .row + .row { margin-top: 6px; }
+  .hud .bar {
+    height: 4px; width: 100%;
+    background: var(--bar-track);
+    margin-top: 6px; border-radius: 2px; overflow: hidden;
+  }
+  .hud .bar > span { display: block; height: 100%; background: var(--phos); box-shadow: var(--glow-phos-sm); }
+
+  /* === Chat panel === */
+  .chat { display: flex; flex-direction: column; min-height: 0; }
+  .chat-stream { flex: 1; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+  .turn { display: flex; flex-direction: column; gap: 4px; }
+  .turn .who {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-dim);
+    display: flex; justify-content: space-between;
+  }
+  .turn .who b { color: var(--cyan); font-weight: 600; }
+  .turn.user .who b { color: var(--phos); }
+  .turn .body {
+    border: 1px solid var(--line);
+    background: var(--turn-bg);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.55;
+    position: relative;
+  }
+  .turn.user .body {
+    background: var(--turn-user-grad);
+    border-color: var(--phos);
+  }
+  .turn .body code {
+    background: var(--phos-soft);
+    border: 1px solid var(--phos-line);
+    color: var(--phos);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: "Azeret Mono", monospace;
+    font-size: 11px;
+  }
+  .turn .pill {
+    display: inline-flex;
+    background: var(--cyan-soft);
+    color: var(--cyan);
+    border: 1px solid var(--cyan-line);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-family: "Azeret Mono", monospace;
+    margin: 0 2px;
+  }
+  .turn .pill.phos { background: var(--phos-soft); color: var(--phos); border-color: var(--phos-line); }
+  .turn .pill.warn { background: var(--warn-soft); color: var(--warn); border-color: var(--warn-line); }
+  .turn .diff {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+    font-family: "Azeret Mono", monospace;
+    font-size: 11px;
+  }
+  .turn .diff .add { color: var(--phos); }
+  .turn .diff .rem { color: var(--magenta); }
+  .turn .diff .ref { color: var(--cyan); }
+  .turn .stream::after { content: "▌"; color: var(--phos); animation: blink 1s steps(2) infinite; margin-left: 2px; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Composer */
+  .composer { border-top: 1px solid var(--line); }
+  .composer .hints {
+    padding: 10px 14px;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    border-bottom: 1px solid var(--line);
+  }
+  .composer .hint {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    background: var(--hint-bg);
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-family: "Azeret Mono", monospace;
+    cursor: pointer;
+  }
+  .composer .hint:hover { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-soft); }
+  .composer .input-wrap {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .composer .prompt {
+    font-family: "Sora", sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--phos);
+    text-shadow: 0 0 12px rgba(184, 255, 61, 0.5);
+  }
+  [data-theme="light"] .composer .prompt { text-shadow: none; }
+  .composer input {
+    background: var(--input-bg);
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    color: var(--ink);
+    padding: 10px 12px;
+    font-family: "Azeret Mono", monospace;
+    font-size: 12.5px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .composer input::placeholder { color: var(--ink-dim); }
+  .composer input:focus { border-color: var(--phos); box-shadow: 0 0 0 3px var(--phos-soft); }
+  .composer .send {
+    width: 38px; height: 38px;
+    border-radius: 8px;
+    background: var(--phos);
+    border: 0;
+    color: var(--bg-0);
+    cursor: pointer;
+    box-shadow: var(--glow-phos-lg);
+    font-size: 16px;
+  }
+  [data-theme="light"] .composer .send { color: #FFFCF4; }
+
+  /* === Status bar === */
+  .statusbar {
+    border-top: 1px solid var(--line);
+    background: var(--statusbar-bg);
+    padding: 0 18px;
+    display: flex; align-items: center; gap: 18px;
+    font-size: 10.5px;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+  .statusbar .item { display: flex; align-items: center; gap: 6px; }
+  .statusbar .item b { color: var(--ink); font-weight: 500; }
+  .statusbar .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .statusbar .dot.green { background: var(--phos); box-shadow: var(--glow-phos-sm); }
+  .statusbar .dot.cyan { background: var(--cyan); box-shadow: var(--glow-cyan-sm); }
+  .statusbar .dot.warn { background: var(--warn); box-shadow: var(--glow-warn-sm); }
+  .statusbar .item.right { margin-left: auto; }
+
+  /* ============================================================
+   *  SVG diagram styles — driven by theme tokens
+   * ============================================================ */
+  .svg-comment   { fill: var(--ink-dim); }
+  .svg-actor-rect { fill: var(--svg-lane-actor-fill); stroke: var(--magenta); }
+  .svg-app-rect   { fill: url(#ucg); stroke: var(--cyan); }
+  .svg-domain-rect { fill: url(#ucg); stroke: var(--phos); }
+  .svg-int-rect    { fill: url(#dtog); stroke: var(--warn); }
+  .svg-text-magenta { fill: var(--magenta); }
+  .svg-text-cyan    { fill: var(--cyan); }
+  .svg-text-phos    { fill: var(--phos); }
+  .svg-text-warn    { fill: var(--warn); }
+  .svg-text-meta    { fill: var(--ink-soft); }
+  .svg-text-ink     { fill: var(--ink); }
+  .svg-life-magenta { stroke: var(--magenta); }
+  .svg-life-cyan    { stroke: var(--cyan); }
+  .svg-life-phos    { stroke: var(--phos); }
+  .svg-life-warn    { stroke: var(--warn); }
+  .svg-act-cyan     { fill: var(--cyan); }
+  .svg-act-phos     { fill: var(--phos); }
+  .svg-act-warn     { fill: var(--warn); }
+  .svg-msg-magenta  { stroke: var(--magenta); }
+  .svg-msg-cyan     { stroke: var(--cyan); }
+  .svg-msg-phos     { stroke: var(--phos); }
+  .svg-msg-warn     { stroke: var(--warn); }
+  .svg-validation-rect { fill: var(--svg-validation-fill); stroke: var(--magenta); }
+
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="glyph">⌘</div>
+      <div>
+        <div class="name">spec<span>·</span>forge</div>
+      </div>
+      <div class="tag">DIAGRAM-DRIVEN SDD</div>
+    </div>
+
+    <div class="breadcrumb">
+      <b>acme/platform</b>
+      <span class="sep">/</span>
+      <b>order-management</b>
+      <span class="sep">/</span>
+      <span>application</span>
+      <span class="sep">/</span>
+      <span style="color:var(--phos)">APP-USECASE-PlaceOrder</span>
+      <span class="live"><span class="pulse"></span>EVENT 0142 · LIVE</span>
+    </div>
+
+    <div class="topbar-actions">
+      <button class="icon-btn" title="Search">⌕</button>
+      <button class="icon-btn" title="History">↺</button>
+      <button class="icon-btn" title="Validate">⚑</button>
+
+      <!-- THEME TOGGLE -->
+      <div class="theme-switch" role="group" aria-label="Theme">
+        <button id="themeDark" class="active" aria-pressed="true" title="Dark theme">☾</button>
+        <button id="themeLight" aria-pressed="false" title="Light theme">☀</button>
+      </div>
+
+      <button class="cta">EXPORT ↗</button>
+      <div class="avatar"></div>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <main class="body">
+
+    <!-- LEFT TREE -->
+    <aside class="panel">
+      <div class="panel-head">
+        <span><b>ANCHORS</b> · 142</span>
+        <span class="chip">/validate ✓</span>
+      </div>
+      <div class="tree">
+
+        <div class="tree-section">
+          <div class="tree-title">PRODUCT · C4-L1 <span class="count">3</span></div>
+          <div class="anchor-row"><span class="glyph bc">B</span><span class="name">BC-Customer</span><span class="meta">2↗</span></div>
+          <div class="anchor-row"><span class="glyph bc">B</span><span class="name">BC-Sales</span><span class="meta">7↗</span></div>
+          <div class="anchor-row"><span class="glyph bc">B</span><span class="name">BC-Fulfillment</span><span class="meta">5↗</span></div>
+        </div>
+
+        <div class="tree-section">
+          <div class="tree-title">DOMAIN · ENTITIES <span class="count">9</span></div>
+          <div class="anchor-row"><span class="glyph ent">E</span><span class="name">ENTITY-Order</span><span class="meta">12↗</span></div>
+          <div class="anchor-row"><span class="glyph ent">E</span><span class="name">ENTITY-OrderLine</span><span class="meta">3↗</span></div>
+          <div class="anchor-row"><span class="glyph ent">E</span><span class="name">ENTITY-Customer</span><span class="meta">4↗</span></div>
+          <div class="anchor-row"><span class="glyph ent">E</span><span class="name">ENTITY-Product</span><span class="meta">2↗</span></div>
+        </div>
+
+        <div class="tree-section">
+          <div class="tree-title">APPLICATION · USE CASES <span class="count">6</span></div>
+          <div class="anchor-row active"><span class="glyph uc">U</span><span class="name">USECASE-PlaceOrder</span><span class="meta">●LIVE</span></div>
+          <div class="anchor-row"><span class="glyph uc">U</span><span class="name">USECASE-CancelOrder</span><span class="meta">SEQ</span></div>
+          <div class="anchor-row"><span class="glyph uc">U</span><span class="name">USECASE-ShipOrder</span><span class="meta">—</span></div>
+        </div>
+
+        <div class="tree-section">
+          <div class="tree-title">CONTRACTS · DTO + INT <span class="count">11</span></div>
+          <div class="anchor-row"><span class="glyph dto">D</span><span class="name">DTO-PlaceOrderRequest</span><span class="meta">in</span></div>
+          <div class="anchor-row"><span class="glyph dto">D</span><span class="name">DTO-OrderCreated</span><span class="meta">out</span></div>
+          <div class="anchor-row"><span class="glyph dto">D</span><span class="name">INT-PaymentGateway</span><span class="meta">REST</span></div>
+        </div>
+
+        <div class="tree-section">
+          <div class="tree-title">ADR · DECISIONS <span class="count">4</span></div>
+          <div class="anchor-row"><span class="glyph adr">◆</span><span class="name">ADR-001 event-store</span><span class="meta">✓</span></div>
+          <div class="anchor-row"><span class="glyph adr">◆</span><span class="name">ADR-002 anchor-id</span><span class="meta">✓</span></div>
+          <div class="anchor-row"><span class="glyph adr">◆</span><span class="name">ADR-003 litellm</span><span class="meta">~</span></div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- CENTER CANVAS -->
+    <section class="canvas-col">
+      <div class="canvas-toolbar">
+        <div class="tab">C4 / CONTEXT</div>
+        <div class="tab">C4 / CONTAINER</div>
+        <div class="tab active">SEQUENCE</div>
+        <div class="tab">ER</div>
+        <div class="tab">UML / DTO</div>
+        <div class="tab">INTEGRATION</div>
+        <div class="spacer"></div>
+        <span class="zoom-pill">⌖ 0,0</span>
+        <span class="zoom-pill">100%</span>
+      </div>
+
+      <div class="canvas">
+
+        <svg viewBox="0 0 980 540" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="ucg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" style="stop-color: var(--svg-lane-app-fill-1);"/>
+              <stop offset="100%" style="stop-color: var(--svg-lane-app-fill-2);"/>
+            </linearGradient>
+            <linearGradient id="dtog" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" style="stop-color: var(--svg-lane-int-fill-1);"/>
+              <stop offset="100%" style="stop-color: var(--svg-lane-int-fill-2);"/>
+            </linearGradient>
+            <filter id="glow"><feGaussianBlur stdDeviation="2.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            <marker id="arr-c" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L9,3 L0,6 Z" style="fill: var(--cyan);"/>
+            </marker>
+            <marker id="arr-p" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L9,3 L0,6 Z" style="fill: var(--phos);"/>
+            </marker>
+            <marker id="arr-m" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L9,3 L0,6 Z" style="fill: var(--magenta);"/>
+            </marker>
+          </defs>
+
+          <text x="24" y="34" font-family="Azeret Mono" font-size="10" letter-spacing="2" class="svg-comment">// SEQUENCE · APP-USECASE-PlaceOrder · v0.4 · seq=0142</text>
+
+          <!-- Lifelines -->
+          <g font-family="Sora" font-weight="600" font-size="12">
+            <!-- Customer -->
+            <rect x="48" y="60" width="160" height="50" rx="10" class="svg-actor-rect" />
+            <text x="64" y="84" class="svg-text-magenta">Customer</text>
+            <text x="64" y="100" font-family="Azeret Mono" font-size="9.5" letter-spacing="1.5" class="svg-text-meta">ACTOR · external</text>
+            <line x1="128" y1="110" x2="128" y2="510" class="svg-life-magenta" stroke-dasharray="3 4" stroke-opacity="0.55"/>
+
+            <!-- API -->
+            <rect x="248" y="60" width="180" height="50" rx="10" class="svg-app-rect"/>
+            <text x="264" y="84" class="svg-text-cyan">OrderAPI</text>
+            <text x="264" y="100" font-family="Azeret Mono" font-size="9.5" letter-spacing="1.5" class="svg-text-meta">APP-CONTAINER-Api</text>
+            <line x1="338" y1="110" x2="338" y2="510" class="svg-life-cyan" stroke-dasharray="3 4" stroke-opacity="0.55"/>
+
+            <!-- Aggregate -->
+            <rect x="468" y="60" width="200" height="50" rx="10" class="svg-domain-rect" filter="url(#glow)"/>
+            <text x="484" y="84" class="svg-text-phos">OrderAggregate</text>
+            <text x="484" y="100" font-family="Azeret Mono" font-size="9.5" letter-spacing="1.5" class="svg-text-meta">DOMAIN-ENTITY-Order</text>
+            <line x1="568" y1="110" x2="568" y2="510" class="svg-life-phos" stroke-dasharray="3 4" stroke-opacity="0.55"/>
+
+            <!-- Payment -->
+            <rect x="708" y="60" width="200" height="50" rx="10" class="svg-int-rect"/>
+            <text x="724" y="84" class="svg-text-warn">PaymentGW</text>
+            <text x="724" y="100" font-family="Azeret Mono" font-size="9.5" letter-spacing="1.5" class="svg-text-meta">INTEGRATION-Payment</text>
+            <line x1="808" y1="110" x2="808" y2="510" class="svg-life-warn" stroke-dasharray="3 4" stroke-opacity="0.55"/>
+          </g>
+
+          <!-- Activations -->
+          <rect x="333" y="140" width="10" height="320" class="svg-act-cyan" opacity="0.85" filter="url(#glow)"/>
+          <rect x="563" y="180" width="10" height="240" class="svg-act-phos" opacity="0.85" filter="url(#glow)"/>
+          <rect x="803" y="240" width="10" height="80" class="svg-act-warn" opacity="0.85" filter="url(#glow)"/>
+
+          <!-- Messages -->
+          <g font-family="Azeret Mono" font-size="10.5" letter-spacing="0.3">
+            <line x1="128" y1="148" x2="333" y2="148" class="svg-msg-magenta" stroke-width="1.5" marker-end="url(#arr-m)"/>
+            <text x="148" y="140" class="svg-text-magenta">1 · POST /orders ⇢ DTO-PlaceOrderRequest</text>
+
+            <line x1="343" y1="190" x2="563" y2="190" class="svg-msg-cyan" stroke-width="1.5" marker-end="url(#arr-c)"/>
+            <text x="360" y="182" class="svg-text-cyan">2 · validate &amp; create</text>
+
+            <line x1="573" y1="250" x2="803" y2="250" class="svg-msg-warn" stroke-width="1.5" marker-end="url(#arr-p)"/>
+            <text x="590" y="242" class="svg-text-warn">3 · charge ⇢ DTO-PaymentRequest</text>
+
+            <line x1="803" y1="310" x2="573" y2="310" class="svg-msg-warn" stroke-dasharray="5 4" stroke-width="1.5" marker-end="url(#arr-p)"/>
+            <text x="600" y="302" class="svg-text-warn">4 · 200 OK · auth_id</text>
+
+            <line x1="563" y1="370" x2="343" y2="370" class="svg-msg-phos" stroke-dasharray="5 4" stroke-width="1.5" marker-end="url(#arr-p)"/>
+            <text x="360" y="362" class="svg-text-phos">5 · OrderCreated (event)</text>
+
+            <line x1="333" y1="430" x2="133" y2="430" class="svg-msg-cyan" stroke-dasharray="5 4" stroke-width="1.5" marker-end="url(#arr-c)"/>
+            <text x="148" y="422" class="svg-text-cyan">6 · 201 ⇢ DTO-OrderCreated</text>
+          </g>
+
+          <!-- Validation pin -->
+          <g transform="translate(48, 470)">
+            <rect x="0" y="0" width="280" height="48" rx="8" class="svg-validation-rect" stroke-width="1"/>
+            <text x="14" y="20" font-family="Azeret Mono" font-size="10" letter-spacing="1.6" class="svg-text-magenta">⚑ VALIDATION ISSUE</text>
+            <text x="14" y="38" font-family="Azeret Mono" font-size="10" class="svg-text-ink">DTO PaymentRequest.currency · not ISO-4217</text>
+          </g>
+        </svg>
+
+        <!-- HUD overlays -->
+        <div class="hud tl">
+          <div class="label">Layer · Diagram</div>
+          <div class="value">application · sequence</div>
+          <div class="row" style="margin-top:6px;">
+            <span style="color:var(--ink-dim)">elements</span>
+            <span class="value">12</span>
+          </div>
+          <div class="row">
+            <span style="color:var(--ink-dim)">refs</span>
+            <span class="value">8</span>
+          </div>
+        </div>
+
+        <div class="hud tr">
+          <div class="label">Coverage</div>
+          <div class="row">
+            <span style="color:var(--ink-dim)">use cases · sequence</span>
+            <span class="value phos">6 / 6</span>
+          </div>
+          <div class="bar"><span style="width: 100%"></span></div>
+          <div class="row" style="margin-top:8px;">
+            <span style="color:var(--ink-dim)">DTO referenced</span>
+            <span class="value phos">10 / 11</span>
+          </div>
+          <div class="bar"><span style="width: 91%"></span></div>
+          <div class="row" style="margin-top:8px;">
+            <span style="color:var(--ink-dim)">orphan refs</span>
+            <span class="value" style="color:var(--magenta)">1</span>
+          </div>
+        </div>
+
+        <div class="hud bl">
+          <div class="label">Legend</div>
+          <div class="row" style="gap:14px"><span style="color:var(--magenta)">▮</span><span class="value" style="font-size:10.5px">ACTOR</span></div>
+          <div class="row" style="gap:14px"><span style="color:var(--cyan)">▮</span><span class="value" style="font-size:10.5px">CONTAINER</span></div>
+          <div class="row" style="gap:14px"><span style="color:var(--phos)">▮</span><span class="value" style="font-size:10.5px">DOMAIN</span></div>
+          <div class="row" style="gap:14px"><span style="color:var(--warn)">▮</span><span class="value" style="font-size:10.5px">INTEGRATION</span></div>
+        </div>
+
+        <div class="hud br">
+          <div class="label">Telemetry · last regen</div>
+          <div class="value phos" style="font-size: 14px">2.31 s</div>
+          <div class="row" style="margin-top:6px;">
+            <span style="color:var(--ink-dim)">SDD bytes</span>
+            <span class="value">42.7 KiB</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT CHAT -->
+    <aside class="panel chat">
+      <div class="panel-head">
+        <span><b>COMMAND CHANNEL</b></span>
+        <span class="chip">opus-4.7</span>
+      </div>
+      <div class="chat-stream">
+
+        <div class="turn user">
+          <div class="who"><b>YOU</b><span>14:02:11 · seq 0139</span></div>
+          <div class="body"><code>/add-dto OrderCreated --direction=out</code><br/>
+            <span style="color:var(--ink-soft)">fields:</span> orderId:UUID, total:Money, status:OrderStatus
+          </div>
+        </div>
+
+        <div class="turn">
+          <div class="who"><b>SPEC·FORGE</b><span>14:02:13 · 1.9s</span></div>
+          <div class="body">
+            Создан DTO <span class="pill">CONTRACT-DTO-OrderCreated</span> и привязан к
+            <span class="pill phos">APP-USECASE-PlaceOrder</span>.
+            <div class="diff">
+              <div class="add">＋ contracts/CONTRACT-DTO-OrderCreated.md</div>
+              <div class="add">＋ APP-USECASE-PlaceOrder.md ↻ message #5</div>
+              <div class="ref">↘ ref · APP-USECASE-PlaceOrder → CONTRACT-DTO-OrderCreated</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="turn user">
+          <div class="who"><b>YOU</b><span>14:04:38 · seq 0141</span></div>
+          <div class="body"><code>/add-integration PaymentGateway --channel=REST</code></div>
+        </div>
+
+        <div class="turn">
+          <div class="who"><b>SPEC·FORGE</b><span>STREAMING…</span></div>
+          <div class="body">
+            Добавлена интеграция <span class="pill warn">INTEGRATION-PaymentGateway</span>,
+            канал <code>REST</code>. Привязан к sequence-сообщению №3.<span class="stream"></span>
+            <div class="diff">
+              <div class="add">＋ contracts/INTEGRATION-PaymentGateway.md</div>
+              <div class="add">＋ APP-USECASE-PlaceOrder.md ↻ message #3</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="composer">
+        <div class="hints">
+          <span class="hint">/add-bc</span>
+          <span class="hint">/add-usecase</span>
+          <span class="hint">/add-entity</span>
+          <span class="hint">/rename</span>
+          <span class="hint">/validate</span>
+          <span class="hint">/export --format=md</span>
+        </div>
+        <div class="input-wrap">
+          <span class="prompt">/</span>
+          <input type="text" placeholder="add-adr 'event-store-immutability' — Enter to send" />
+          <button class="send" aria-label="send">↑</button>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- STATUS BAR -->
+  <footer class="statusbar">
+    <span class="item"><span class="dot green"></span> SYSTEM <b>OPERATIONAL</b></span>
+    <span class="item"><span class="dot cyan"></span> POSTGRES <b>32ms</b></span>
+    <span class="item"><span class="dot warn"></span> LITELLM <b>DEGRADED · failover Anthropic→OpenAI</b></span>
+    <span class="item">EVENTS <b>0142</b></span>
+    <span class="item">ORPHAN-REFS <b style="color:var(--magenta)">1</b></span>
+    <span class="item right">UTC+05 · 14:07:42</span>
+    <span class="item">v0.4.7-α</span>
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    const STORAGE_KEY = "spec-forge-theme";
+    const root = document.documentElement;
+    const dark = document.getElementById("themeDark");
+    const light = document.getElementById("themeLight");
+
+    function apply(theme) {
+      root.setAttribute("data-theme", theme);
+      const isLight = theme === "light";
+      dark.classList.toggle("active", !isLight);
+      light.classList.toggle("active", isLight);
+      dark.setAttribute("aria-pressed", String(!isLight));
+      light.setAttribute("aria-pressed", String(isLight));
+      try { localStorage.setItem(STORAGE_KEY, theme); } catch (e) { /* ignore */ }
+    }
+
+    // Initial: stored → system preference → dark
+    let initial = "dark";
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored === "light" || stored === "dark") {
+        initial = stored;
+      } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+        initial = "light";
+      }
+    } catch (e) { /* ignore */ }
+    apply(initial);
+
+    dark.addEventListener("click", () => apply("dark"));
+    light.addEventListener("click", () => apply("light"));
+
+    // Optional: react to OS-level changes only when user hasn't picked manually
+    if (window.matchMedia) {
+      const mql = window.matchMedia("(prefers-color-scheme: light)");
+      mql.addEventListener && mql.addEventListener("change", (e) => {
+        try {
+          if (!localStorage.getItem(STORAGE_KEY)) apply(e.matches ? "light" : "dark");
+        } catch (err) { /* ignore */ }
+      });
+    }
+  })();
+</script>
+
+</body>
+</html>
