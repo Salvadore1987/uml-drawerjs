@@ -15,11 +15,12 @@ export default defineConfig({
         "parser/index": "src/parser/index.ts",
         "generator/index": "src/generator/index.ts",
         "validators/index": "src/validators/index.ts",
+        "layout/index": "src/layout/index.ts",
       },
       formats: ["es"],
     },
     rollupOptions: {
-      external: [/^node:/, "zod"],
+      external: [/^node:/, "zod", /^elkjs(\/.*)?$/],
       output: {
         preserveModules: false,
         entryFileNames: "[name].js",

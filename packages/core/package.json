@@ -39,6 +39,10 @@
       "types": "./dist/validators/index.d.ts",
       "import": "./dist/validators/index.js"
     },
+    "./layout": {
+      "types": "./dist/layout/index.d.ts",
+      "import": "./dist/layout/index.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",
@@ -52,6 +56,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "elkjs": "^0.9.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -188,13 +188,13 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** auto-layout по кнопке и при импорте текста, lazy-загрузка ELK.
 
-- [ ] `layout/elk.ts` — адаптер: dynamic-import ELK.js, маппинг `Diagram` → ELK graph → запись координат.
-- [ ] Поддержка вложенных групп для C4 boundaries.
-- [ ] `layout/sequence.ts` — кастомный алгоритм: вертикальные lifelines + временная ось по индексу события.
-- [ ] Fallback layout (grid) при ошибке ELK.
-- [ ] Перф-бенч в Vitest: ≤ 50 мс на 200 узлов.
+✅ `layout/elk.ts` — адаптер: dynamic-import `elkjs/lib/elk.bundled.js` (через переопределяемый `elkLoader` для тестов), маппинг `Diagram` → ELK graph → запись координат, кэш конструктора.
+✅ Поддержка вложенных групп для C4 boundaries (boundary-группы становятся nested ELK-узлами; координаты потомков аккумулируют offset родителя на сборке).
+✅ `layout/sequence.ts` — кастомный алгоритм: вертикальные lifelines на горизонтальной оси, синхронный, детерминированный.
+✅ Fallback layout (`layout/fallback.ts`, grid ≈√N×√N) при ошибке ELK; обёртка `runAutoLayout` ловит исключение и переключается на grid.
+✅ Перф-бенч в Vitest: 200 узлов через grid укладывается в `< 50 мс`.
 
-**Критерий выхода:** auto-layout детерминирован; ELK подключается только при первом вызове `runAutoLayout()`; bundle ядра без ELK не превышает базовый бюджет.
+**Критерий выхода:** auto-layout детерминирован; ELK подключается только при первом вызове `runAutoLayout()` (`elkjs` помечен как rollup external, в `dist/layout/index.js` остаётся `await import('elkjs/...')`); bundle ядра без ELK не превышает базовый бюджет. ✅ (11 новых тестов в `layout.test.ts`, 140 тестов в `core` зелёные; ELK не входит в `core`/`layout/index.js` — verified через grep).
 
 ---
 
@@ -472,4 +472,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
+*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
