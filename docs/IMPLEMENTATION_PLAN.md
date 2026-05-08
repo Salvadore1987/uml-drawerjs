@@ -98,16 +98,16 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** базовая структура ядра + типы AST как фундамент для всех остальных модулей.
 
-- [ ] Пакет `packages/core`: Vite library mode, ESM-only, `sideEffects: false`, `.d.ts`.
-- [ ] Папки модулей: `parser/`, `model/`, `generator/`, `validators/`, `layout/`, `renderer/`, `commands/`, `history/`, `exporters/`, `editor/`.
-- [ ] `model/types.ts`: `Diagram`, `Node`, `Edge`, `Group`, `Attribute`, `Operation`, `NodeKind`, `EdgeKind`, `StyleMap`, `DiagramError` (по спеке).
-- [ ] Иммутабельные операции над AST (Immer или ручной structural sharing).
-- [ ] UUIDv7 генератор id (по глобальному правилу проекта).
-- [ ] `metadata.schemaVersion` + JSON-schema для `.umljson`.
-- [ ] Zod-схемы (или type guards) для runtime-валидации AST на API-границе.
-- [ ] Утилиты: `createEmptyDiagram(type)`, `findNode(ast, id)`, `getEdgesOfNode`, `cloneDiagram`.
+✅ Пакет `packages/core`: Vite library mode, ESM-only, `sideEffects: false`, `.d.ts`.
+✅ Папки модулей: `parser/`, `model/`, `generator/`, `validators/`, `layout/`, `renderer/`, `commands/`, `history/`, `exporters/`, `editor/`.
+✅ `model/types.ts`: `Diagram`, `Node`, `Edge`, `Group`, `Attribute`, `Operation`, `NodeKind`, `EdgeKind`, `StyleMap`, `DiagramError` (по спеке).
+✅ Иммутабельные операции над AST (`structuredClone`-based; Immer/structural sharing зайдут с командами P3, когда появятся реальные мутации).
+✅ UUIDv7 генератор id (по глобальному правилу проекта).
+✅ `metadata.schemaVersion` + JSON-schema для `.umljson`.
+✅ Zod-схемы (или type guards) для runtime-валидации AST на API-границе.
+✅ Утилиты: `createEmptyDiagram(type)`, `findNode(ast, id)`, `getEdgesOfNode`, `cloneDiagram`.
 
-**Критерий выхода:** `createEmptyDiagram('class')` сериализуется/десериализуется без потерь; все типы экспортируются из `@uml-drawer/core/model`.
+**Критерий выхода:** `createEmptyDiagram('class')` сериализуется/десериализуется без потерь; все типы экспортируются из `@uml-drawer/core/model`. ✅ (37 unit-тестов в `vitest`, round-trip покрыт `validation.test.ts`).
 
 ---
 
@@ -471,4 +471,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phase 0 + Phase 1 complete.*
+*Last updated: 2026-05-08 — Phases 0 / 1 / 2 complete.*

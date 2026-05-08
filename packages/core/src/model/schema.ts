@@ -1,0 +1,225 @@
+/**
+ * Schema versioning and JSON Schema for `.umljson` documents.
+ *
+ * `SCHEMA_VERSION` is stamped into every newly-created `Diagram.metadata`.
+ * Migrations between versions live in `migrations/` (added when needed).
+ */
+
+export const SCHEMA_VERSION = "0.1.0";
+
+/**
+ * JSON Schema (draft-2020-12) describing the on-disk `.umljson` shape. The
+ * downstream documentation site, the CLI validator, and editor integrations
+ * consume this directly.
+ */
+export const diagramJsonSchema = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  $id: "https://uml-drawer.dev/schemas/diagram.v1.json",
+  title: "UML Drawer JS — Diagram",
+  description: "Native `.umljson` document. Mirrors the in-memory AST 1:1.",
+  type: "object",
+  required: ["id", "type", "nodes", "edges", "groups", "metadata"],
+  additionalProperties: false,
+  properties: {
+    id: { type: "string", description: "UUIDv7 of the diagram." },
+    type: {
+      enum: ["c4-context", "c4-container", "c4-component", "class", "er", "sequence"],
+    },
+    title: { type: "string" },
+    nodes: { type: "array", items: { $ref: "#/$defs/node" } },
+    edges: { type: "array", items: { $ref: "#/$defs/edge" } },
+    groups: { type: "array", items: { $ref: "#/$defs/group" } },
+    styles: {
+      type: "object",
+      additionalProperties: { $ref: "#/$defs/styleEntry" },
+    },
+    metadata: { $ref: "#/$defs/metadata" },
+  },
+  $defs: {
+    nodeKind: {
+      enum: [
+        "person",
+        "system",
+        "system-external",
+        "container",
+        "component",
+        "database",
+        "class",
+        "interface",
+        "abstract-class",
+        "enum",
+        "entity",
+        "lifeline",
+        "actor",
+      ],
+    },
+    edgeKind: {
+      enum: [
+        "uses",
+        "depends-on",
+        "association",
+        "inheritance",
+        "realization",
+        "composition",
+        "aggregation",
+        "dependency",
+        "one-to-one",
+        "one-to-many",
+        "many-to-many",
+        "sync-call",
+        "async-call",
+        "return",
+        "create",
+        "destroy",
+      ],
+    },
+    visibility: { enum: ["public", "protected", "private", "package"] },
+    arrowhead: {
+      enum: ["none", "arrow", "open-arrow", "diamond", "open-diamond", "triangle", "open-triangle"],
+    },
+    nodeStyle: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        fill: { type: "string" },
+        stroke: { type: "string" },
+        strokeWidth: { type: "number" },
+        strokeDasharray: { type: "string" },
+        textColor: { type: "string" },
+        fontFamily: { type: "string" },
+        fontSize: { type: "number" },
+        borderRadius: { type: "number" },
+      },
+    },
+    edgeStyle: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        stroke: { type: "string" },
+        strokeWidth: { type: "number" },
+        strokeDasharray: { type: "string" },
+        textColor: { type: "string" },
+        fontFamily: { type: "string" },
+        fontSize: { type: "number" },
+        arrowStart: { $ref: "#/$defs/arrowhead" },
+        arrowEnd: { $ref: "#/$defs/arrowhead" },
+      },
+    },
+    styleEntry: {
+      oneOf: [{ $ref: "#/$defs/nodeStyle" }, { $ref: "#/$defs/edgeStyle" }],
+    },
+    operationParameter: {
+      type: "object",
+      required: ["name"],
+      additionalProperties: false,
+      properties: {
+        name: { type: "string" },
+        type: { type: "string" },
+        default: { type: "string" },
+      },
+    },
+    operation: {
+      type: "object",
+      required: ["id", "name"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string" },
+        name: { type: "string" },
+        parameters: { type: "array", items: { $ref: "#/$defs/operationParameter" } },
+        returnType: { type: "string" },
+        visibility: { $ref: "#/$defs/visibility" },
+        static: { type: "boolean" },
+        abstract: { type: "boolean" },
+        description: { type: "string" },
+      },
+    },
+    attribute: {
+      type: "object",
+      required: ["id", "name"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string" },
+        name: { type: "string" },
+        type: { type: "string" },
+        visibility: { $ref: "#/$defs/visibility" },
+        multiplicity: { type: "string" },
+        default: { type: "string" },
+        primaryKey: { type: "boolean" },
+        foreignKey: { type: "boolean" },
+        nullable: { type: "boolean" },
+        description: { type: "string" },
+      },
+    },
+    node: {
+      type: "object",
+      required: ["id", "kind", "label"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string" },
+        kind: { $ref: "#/$defs/nodeKind" },
+        label: { type: "string" },
+        stereotype: { type: "string" },
+        technology: { type: "string" },
+        description: { type: "string" },
+        attributes: { type: "array", items: { $ref: "#/$defs/attribute" } },
+        operations: { type: "array", items: { $ref: "#/$defs/operation" } },
+        style: { $ref: "#/$defs/nodeStyle" },
+      },
+    },
+    edge: {
+      type: "object",
+      required: ["id", "source", "target", "kind"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string" },
+        source: { type: "string" },
+        target: { type: "string" },
+        kind: { $ref: "#/$defs/edgeKind" },
+        label: { type: "string" },
+        cardinality: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            source: { type: "string" },
+            target: { type: "string" },
+          },
+        },
+        style: { $ref: "#/$defs/edgeStyle" },
+      },
+    },
+    group: {
+      type: "object",
+      required: ["id", "kind", "label", "children"],
+      additionalProperties: false,
+      properties: {
+        id: { type: "string" },
+        kind: { enum: ["boundary", "package", "system"] },
+        label: { type: "string" },
+        children: { type: "array", items: { type: "string" } },
+        description: { type: "string" },
+        style: { $ref: "#/$defs/nodeStyle" },
+      },
+    },
+    metadata: {
+      type: "object",
+      required: ["schemaVersion"],
+      additionalProperties: false,
+      properties: {
+        schemaVersion: { type: "string" },
+        layoutOverrides: {
+          type: "object",
+          additionalProperties: {
+            type: "object",
+            required: ["x", "y"],
+            additionalProperties: false,
+            properties: {
+              x: { type: "number" },
+              y: { type: "number" },
+            },
+          },
+        },
+        opaque: { type: "array", items: { type: "string" } },
+      },
+    },
+  },
+} as const;
