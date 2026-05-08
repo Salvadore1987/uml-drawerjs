@@ -54,17 +54,17 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** монорепо, инструментарий, единый pipeline `lint → typecheck → test → build`.
 
-- [ ] `git init`, `.gitignore`, `.editorconfig`, `.nvmrc` (Node 20 LTS).
-- [ ] Корневой `package.json` (`"private": true`) + `pnpm-workspace.yaml` со списком `packages/*` и `apps/*`.
-- [ ] `tsconfig.base.json`: `strict: true`, `target: ES2022`, `moduleResolution: bundler`, `noUncheckedIndexedAccess: true`.
-- [ ] ESLint + Prettier конфиги в корне (опционально — внутренний пакет `@uml-drawer/eslint-config`).
-- [ ] Husky + lint-staged + commitlint (Conventional Commits).
-- [ ] Changesets (`@changesets/cli init`) для версионирования монорепо.
-- [ ] Vitest workspace + Playwright config skeleton.
-- [ ] GitHub Actions workflow stubs: `lint.yml`, `test.yml`, `build.yml`, `release.yml`.
-- [ ] `LICENSE` (MIT), корневой `README.md` (placeholder), `CONTRIBUTING.md`.
+✅ `git init`, `.gitignore`, `.editorconfig`, `.nvmrc` (Node 20 LTS).
+✅ Корневой `package.json` (`"private": true`) + `pnpm-workspace.yaml` со списком `packages/*` и `apps/*`.
+✅ `tsconfig.base.json`: `strict: true`, `target: ES2022`, `moduleResolution: bundler`, `noUncheckedIndexedAccess: true`.
+✅ ESLint + Prettier конфиги в корне (опционально — внутренний пакет `@uml-drawer/eslint-config`).
+✅ Husky + lint-staged + commitlint (Conventional Commits).
+✅ Changesets (`@changesets/cli init`) для версионирования монорепо.
+✅ Vitest workspace + Playwright config skeleton.
+✅ GitHub Actions workflow stubs: `lint.yml`, `test.yml`, `build.yml`, `release.yml`.
+✅ `LICENSE` (MIT), корневой `README.md` (placeholder), `CONTRIBUTING.md`.
 
-**Критерий выхода:** `pnpm install && pnpm typecheck && pnpm lint` работают на пустых workspace без ошибок.
+**Критерий выхода:** `pnpm install && pnpm typecheck && pnpm lint` работают на пустых workspace без ошибок. ✅
 
 ---
 
@@ -471,4 +471,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08*
+*Last updated: 2026-05-08 — Phase 0 complete.*

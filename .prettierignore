@@ -1,0 +1,17 @@
+node_modules
+dist
+build
+coverage
+.turbo
+.vitest-cache
+playwright-report
+test-results
+pnpm-lock.yaml
+*.tsbuildinfo
+docs/design
+docs/uml-drawer.md
+docs/IMPLEMENTATION_PLAN.md
+CLAUDE.md
+.claude
+.changeset/*.md
+!.changeset/README.md
