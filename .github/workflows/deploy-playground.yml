@@ -1,0 +1,72 @@
+name: deploy-playground
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Single in-flight deployment; never cancel a run already publishing.
+concurrency:
+  group: deploy-playground
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build playground + docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The playground depends on workspace package builds (vite resolves
+      # `@uml-drawer/*` to dist/index.js via `exports`).
+      - name: Build publishable packages
+        run: pnpm build
+
+      - name: Build playground
+        run: pnpm --filter '@uml-drawer/playground' build
+        env:
+          # Serve under /<repo-name>/playground/ on github.io. The base
+          # path is read by Vite at build time via `BASE_PATH`.
+          BASE_PATH: /uml-drawerjs/playground/
+
+      - name: Build docs site
+        run: pnpm --filter '@uml-drawer/docs' build
+        env:
+          BASE_PATH: /uml-drawerjs/
+
+      - name: Assemble Pages output
+        run: |
+          mkdir -p out
+          cp -r apps/docs/.vitepress/dist/* out/
+          mkdir -p out/playground
+          cp -r apps/playground/dist/* out/playground/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

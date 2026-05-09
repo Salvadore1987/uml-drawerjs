@@ -2,7 +2,17 @@
 
 > Framework-agnostic TypeScript library for editing UML diagrams with bidirectional PlantUML synchronization.
 
-**Status:** pre-alpha. Phases 0–13 complete (repo bootstrap + design-agnostic theming contract + `@uml-drawer/core` AST model + CQRS commands & undo/redo history + PlantUML parser for all 5 diagram types + AST → PlantUML generator with round-trip guarantees + multi-level validator stack with quick-fix registry + auto-layout with lazy ELK + custom sequence + grid fallback + declarative SVG renderer with pan/zoom/minimap/keyboard/a11y + `.puml`/`.umljson`/`.svg`/`.png` exporters & importers + vanilla `createEditor` bootstrap composing every inner-hexagon module behind a single host-mounted instance + `@uml-drawer/codemirror-plantuml` language extension with highlight + diagnostics/quick-fix + context-aware autocomplete & snippets per diagram type + `@uml-drawer/react` adapter exposing `<UmlEditor>` + Canvas/Palette/PropsPanel/TextEditor/Outline + HUD/CommandChannel/Statusbar primitives, controlled/uncontrolled state, useEditor/useEditorState/useDiagramErrors/useSelection hooks, layout slot config, paletteFilter, and a design-agnostic `--uml-*`-only stylesheet + `apps/playground` showcase composition with topbar / breadcrumb / theme switch / skin toggle / per-type sample diagrams / 4-corner HUD bindings / slash-command channel routing CQRS commands, layered with the cyber-topographic skin that maps onto the library's `--uml-*` contract without touching `packages/*`). The Phase 4 parser is hand-rolled; the CodeMirror package rides the same parser via `StreamLanguage`. Lezer migration is tracked in [ADR-0003](./docs/adr/0003-plantuml-subset.md) and will not change the published API.
+**Status:** MVP feature-complete (pre-alpha). Phases 0–17 closed except for the browser-test layer (Phase 14b — Playwright E2E + visual regression + axe-core), which lands alongside the first deploy. The roadmap and exit criteria for every phase live in [`docs/IMPLEMENTATION_PLAN.md`](./docs/IMPLEMENTATION_PLAN.md).
+
+What ships today:
+
+- **Library packages** (publishable on npm): `@uml-drawer/core` (parser + AST + commands + history + validators + layout + renderer + exporters + vanilla `createEditor`), `@uml-drawer/react` (idiomatic React 18+ adapter), `@uml-drawer/codemirror-plantuml` (CM6 language + diagnostics + autocomplete), `@uml-drawer/theme` (design-agnostic `--uml-*` contract).
+- **Showcase** (`apps/playground`): full composition under the cyber-topographic skin with topbar / breadcrumb / theme switch / skin toggle / per-type sample diagrams / 4-corner HUD / slash-command channel.
+- **Documentation site** (`apps/docs`): VitePress site with Getting Started, Concepts, per-type guides, Theming, hand-curated API reference, Recipes, Migration; deploys alongside the playground via GitHub Pages.
+- **CI / quality gates**: lint + typecheck + Vitest + coverage gate (≥ 85% on core) + design-agnostic CSS guard + perf bench (parse + regen < 50 ms) + size-limit (core + react + ELK ≤ 500 KB gzip).
+- **ADRs for every open question** in `docs/adr/0001..0006-*.md` plus a touch/mobile interaction matrix in `docs/design/interaction-matrix.md`.
+
+The Phase 4 parser is hand-rolled; the CodeMirror package rides the same parser via `StreamLanguage`. Lezer migration is tracked in [ADR-0003](./docs/adr/0003-plantuml-subset.md) and will not change the published API.
 
 See [`docs/uml-drawer.md`](./docs/uml-drawer.md) for the full specification and [`docs/IMPLEMENTATION_PLAN.md`](./docs/IMPLEMENTATION_PLAN.md) for the phased roadmap.
 

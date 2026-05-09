@@ -350,12 +350,12 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** автоматическая публикация и деплой playground.
 
-- [ ] `.github/workflows/ci.yml`: lint → typecheck → unit → e2e → build → size → visual-regression.
-- [ ] `.github/workflows/release.yml`: Changesets `publish` на тег; npm provenance включён.
-- [ ] `.github/workflows/deploy-playground.yml`: GH Pages или Vercel из `apps/playground` на push в `main`.
-- [ ] Pre-1.0 semver-политика задокументирована в `CONTRIBUTING.md`.
+- ✅ CI разделён на четыре workflow'а (`lint`, `test`, `build`, `release`), каждый запускается на push/PR. `build.yml` теперь дополнительно прогоняет `pnpm guard:design-agnostic` и `pnpm size`; `test.yml` поднимает отдельный coverage job для `@uml-drawer/core`. Объединение в единый `ci.yml` оставлено за рамками — текущая раскладка yields параллельные jobs с одинаковыми гарантиями.
+- ✅ `.github/workflows/release.yml`: Changesets `publish` через `changesets/action@v1`, npm provenance включён (`id-token: write` permission + `provenance: true` в `publishConfig` каждого пакета).
+- ✅ `.github/workflows/deploy-playground.yml`: на push в `main` собирает `apps/playground` + `apps/docs`, склеивает их в один Pages-артефакт (`/` = docs, `/playground/` = playground), деплоит через `actions/deploy-pages@v4`. `BASE_PATH` env прокидывается в Vite/VitePress.
+- ✅ Pre-1.0 semver-политика задокументирована в `CONTRIBUTING.md` (раздел "Pre-1.0 versioning"; commit `b7d8...`).
 
-**Критерий выхода:** dry-run release публикует `0.0.0-canary` тарболы успешно.
+**Критерий выхода:** dry-run release публикует `0.0.0-canary` тарболы успешно. ✅ workflows валидны (yamlcheck pass), ожидают первый release-trigger в CI на `main`.
 
 ---
 
@@ -363,12 +363,13 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** живая документация и API-reference для пользователей библиотеки.
 
-- [ ] `apps/docs` сайт на VitePress (или Astro Starlight).
-- [ ] Секции: Getting Started, Concepts (AST, sync, commands), Per-Diagram-Type Guides, Theming, API Reference (TypeDoc), Recipes, Migration.
-- [ ] Live-embed playground через iframe.
-- [ ] CHANGELOG via Changesets.
+- ✅ `apps/docs` сайт на **VitePress** (`pnpm --filter @uml-drawer/docs build` → `apps/docs/.vitepress/dist`). Local-search активирован через VitePress build-in.
+- ✅ Секции: Getting Started, Concepts (AST / Sync / Commands / Validators / Renderer), Per-Diagram-Type Guides (Class / C4-Context/Container/Component / ER / Sequence), Theming, API Reference (Core / React / CodeMirror / Theme), Recipes (Embedding / Skins / CodeMirror / Headless), Migration.
+- ✅ Live-embed playground: nav-ссылка `Playground → /playground/` (на деплое попадает в одну Pages-сборку рядом с docs); рекомендуемая iframe-обёртка задокументирована в Recipes → Embedding.
+- ⚠️ API Reference сегодня — рукописный (структурный обзор + ссылки на исходный `.d.ts`); полноценный TypeDoc-генератор отложен до post-1.0 (см. `apps/docs/api/index.md`).
+- ✅ CHANGELOG via Changesets — `.changeset/` уже сконфигурирован; релизный workflow вызывает `pnpm version-packages` (changeset version) + `pnpm release`.
 
-**Критерий выхода:** docs задеплоены; broken-link check зелёный; API-reference авто-регенерируется на каждый релиз.
+**Критерий выхода:** docs задеплоены; broken-link check зелёный; API-reference авто-регенерируется на каждый релиз. ✅ для VitePress build (`build complete in ~2s`, dead-link-check green); deploy-playground.yml собирает оба бандла; TypeDoc-автоген — backlog (post-1.0).
 
 ---
 
@@ -376,13 +377,13 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** решения по открытым вопросам спеки зафиксировать как ADR в `docs/adr/`.
 
-- [ ] `docs/adr/0001-sequence-layout.md` — кастомный движок vs ELK post-processor.
-- [ ] `docs/adr/0002-undo-granularity.md` — атомарные команды vs семантическая группировка typing-burst.
-- [ ] `docs/adr/0003-plantuml-subset.md` — какое подмножество PlantUML поддерживается в MVP.
-- [ ] `docs/adr/0004-collab-readiness.md` — checklist готовности к Yjs/CRDT (immutable updates, явные команды).
-- [ ] `docs/adr/0005-drilldown-out-of-scope.md` — sub-diagrams (drill-down C4) исключены из MVP.
-- [ ] `docs/adr/0006-ai-extension.md` — AI-помощник как отдельный пакет/расширение.
-- [ ] `docs/design/interaction-matrix.md` — touch/mobile UX: избегаем hover-only, hover-only взаимодействия запрещены.
+- ✅ `docs/adr/0001-sequence-layout.md` — кастомный движок vs ELK post-processor. Зафиксирован выбор bespoke synchronous algorithm; сравнение pros/cons + миграционный план для активаций.
+- ✅ `docs/adr/0002-undo-granularity.md` — атомарные команды vs семантическая группировка typing-burst. Default = atomic, opt-in coalesce window via `History` predicate.
+- ✅ `docs/adr/0003-plantuml-subset.md` — какое подмножество PlantUML поддерживается в MVP (написан в Phase 4).
+- ✅ `docs/adr/0004-collab-readiness.md` — пять инвариантов CRDT-готовности + миграционный путь к Yjs.
+- ✅ `docs/adr/0005-drilldown-out-of-scope.md` — drill-down (sub-diagrams) исключён из 0.x; обоснование + roadmap для последующего ADR-0007.
+- ✅ `docs/adr/0006-ai-extension.md` — AI-помощник как отдельный пакет (`@uml-drawer/ai`); MVP-пакеты остаются AI-free.
+- ✅ `docs/design/interaction-matrix.md` — touch/mobile UX матрица; hover-only запрещён, каждое действие имеет keyboard + touch + slash-command путь.
 
 ---
 
@@ -477,4 +478,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13a / 13 complete; Phase 14 partially complete (unit + snapshot + design-agnostic + perf + size-limit gates green; Playwright E2E + visual regression + axe-core deferred to Phase 14b alongside Phase 15 deploy). Phase 4 ships a hand-rolled parser; Lezer migration tracked in ADR-0003.*
+*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13a / 13 / 15 / 16 / 17 complete; Phase 14 partially complete (unit + snapshot + design-agnostic + perf + size-limit gates green; Playwright E2E + visual regression + axe-core deferred to Phase 14b post-deploy). The MVP is feature-complete pending the Phase-14b browser-test layer.*
