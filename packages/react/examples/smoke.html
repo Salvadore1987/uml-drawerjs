@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@uml-drawer/react — smoke test</title>
+    <link rel="stylesheet" href="../dist/styles.css" />
+    <style>
+      html,
+      body,
+      #root {
+        margin: 0;
+        height: 100vh;
+        font-family: var(--uml-font-sans, system-ui);
+        background: var(--uml-bg, #0f172a);
+        color: var(--uml-text, #f1f5f9);
+      }
+      .shell {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        height: 100vh;
+      }
+      header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--uml-border, #334155);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      header select {
+        background: var(--uml-bg-elevated);
+        color: var(--uml-text);
+        border: 1px solid var(--uml-border);
+        border-radius: var(--uml-radius-sm);
+        padding: 4px 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from "https://esm.sh/react@18.3.1";
+      import { createRoot } from "https://esm.sh/react-dom@18.3.1/client?deps=react@18.3.1";
+      import {
+        UmlEditor,
+        Canvas,
+        Palette,
+        PropsPanel,
+        Outline,
+        TextEditor,
+        Statusbar,
+      } from "../dist/index.js";
+
+      const SAMPLES = {
+        class: `@startuml\nclass Order\nclass Customer\nOrder --> Customer : owner\n@enduml\n`,
+        "c4-context": `@startuml\nPerson(user, "User")\nSystem(svc, "Service", "Core")\nRel(user, svc, "uses")\n@enduml\n`,
+        er: `@startuml\nentity User\nentity Order\nUser ||--o{ Order : places\n@enduml\n`,
+        sequence: `@startuml\nactor User\nparticipant API\nUser -> API : login\n@enduml\n`,
+      };
+
+      function App() {
+        const [type, setType] = React.useState("class");
+        return React.createElement(
+          "div",
+          { className: "shell" },
+          React.createElement(
+            "header",
+            null,
+            React.createElement("strong", null, "uml-drawer · react smoke"),
+            React.createElement(
+              "label",
+              null,
+              "Type ",
+              React.createElement(
+                "select",
+                {
+                  value: type,
+                  onChange: (e) => setType(e.target.value),
+                },
+                Object.keys(SAMPLES).map((t) =>
+                  React.createElement("option", { key: t, value: t }, t),
+                ),
+              ),
+            ),
+          ),
+          React.createElement(
+            UmlEditor,
+            { diagramType: type, defaultValue: SAMPLES[type], theme: "auto" },
+            React.createElement(Palette, null),
+            React.createElement(Canvas, null),
+            React.createElement(PropsPanel, null),
+            React.createElement(TextEditor, null),
+          ),
+        );
+      }
+
+      createRoot(document.getElementById("root")).render(React.createElement(App));
+    </script>
+  </body>
+</html>

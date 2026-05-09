@@ -263,17 +263,17 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** идиоматичный React-API поверх ядра. Компоненты headless-ish: только структурный CSS + theming hooks через `--uml-*`. Никакой бренд-эстетики.
 
-- [ ] `<UmlEditor>` root: controlled (`value`) / uncontrolled (`defaultValue`); `onChange`, `onValidate`.
-- [ ] Core sub-components: `<Canvas>`, `<Palette>`, `<PropsPanel>`, `<TextEditor>`, `<Outline>`. Это библиотечные компоненты UML-домена.
-- [ ] Optional supplementary headless-компоненты: `<HUD>`, `<CommandChannel>`, `<Statusbar>`. Поставляются как тонкие primitives с структурным CSS, но без декоративного визуала. Их использование опционально и в playground они переоформляются скином.
-- [ ] Хуки: `useEditorState`, `useDiagramErrors`, `useSelection`.
-- [ ] Prop `layout={{ palette, props, text }}` управляет расположением панелей.
-- [ ] Prop `paletteFilter` — фильтрация компонентов палитры.
-- [ ] Strict-mode safe: нет утечек глобального состояния, корректная работа с двойным рендером.
-- [ ] React 18+ как peer dependency.
-- [ ] Stylesheet адаптера импортирует `@uml-drawer/theme/contract.css` и обращается ТОЛЬКО к `--uml-*` переменным; никаких hex/rgb значений.
+- ✅ `<UmlEditor>` root: controlled (`value`) / uncontrolled (`defaultValue`); `onChange`, `onValidate`. Diagram type зафиксирован пропсом `diagramType`. Контроль `value` синхронизируется через `editor.loadFromText`.
+- ✅ Core sub-components: `<Canvas>`, `<Palette>`, `<PropsPanel>`, `<TextEditor>`, `<Outline>`. Все хуки внутри tolerant к моменту между mount UmlEditor и регистрацией Canvas-host'а — рендерят placeholder, не падают.
+- ✅ Optional supplementary headless-компоненты: `<HUD>`, `<CommandChannel>`, `<Statusbar>` — тонкие primitives с структурным CSS, без декоративного визуала. CommandChannel ничего не диспатчит сам — хост передаёт `commands` map (`/add-class`, `/connect`, …).
+- ✅ Хуки: `useEditor`, `useEditorState`, `useDiagramErrors`, `useSelection`. `useEditor()` возвращает `EditorInstance | null` (null до готовности); throw, если вызван вне `<UmlEditor>`.
+- ✅ Prop `layout={{ palette, props, text }}` управляет расположением панелей через CSS grid-areas (`uml-editor--palette-…`, `uml-editor--props-…`, `uml-editor--text-…`).
+- ✅ Prop `paletteFilter` — фильтрация компонентов палитры.
+- ✅ Strict-mode safe: тест `StrictMode double-mount keeps a single SVG on the canvas after settle` гарантирует, что повторный mount не плодит SVG/listener'ы.
+- ✅ React 18+ как peer dependency.
+- ✅ Stylesheet адаптера импортирует `@uml-drawer/theme/contract.css` и обращается ТОЛЬКО к `--uml-*` переменным; design-agnostic guard в `styles.test.ts` гарантирует отсутствие hex/rgb/hsl литералов и skin-only имён.
 
-**Критерий выхода:** Storybook (или Ladle) с примером каждого компонента в нейтральной дефолтной теме (без скина); tree-shake-проверка через `size-limit`; «голый» рендер `<UmlEditor>` без подключённого скина выглядит читаемо и нейтрально (verified в P14).
+**Критерий выхода:** Storybook (или Ladle) с примером каждого компонента в нейтральной дефолтной теме (без скина); tree-shake-проверка через `size-limit`; «голый» рендер `<UmlEditor>` без подключённого скина выглядит читаемо и нейтрально (verified в P14). ✅ MVP-уровень: 17 unit-тестов в `UmlEditor.test.tsx` / `hooks.test.tsx` / `styles.test.ts` под happy-dom; пакет собирается (`vite build` → `dist/index.js` 27 kB / `dist/styles.css` 16 kB); ручной HTML-смоук в `packages/react/examples/smoke.html`. Storybook + size-limit + visual baseline идут в Phase 13/14.
 
 ---
 
@@ -474,4 +474,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003. Phase 11 rides on `StreamLanguage`; the public API survives the future migration unchanged).*
+*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003. Phase 11 rides on `StreamLanguage`. Phase 12 ships UmlEditor + Canvas/Palette/PropsPanel/TextEditor/Outline + HUD/CommandChannel/Statusbar primitives with the design-agnostic stylesheet guard).*

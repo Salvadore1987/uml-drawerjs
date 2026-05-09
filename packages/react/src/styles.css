@@ -1,0 +1,400 @@
+/**
+ * @uml-drawer/react — adapter stylesheet.
+ *
+ * Structural CSS only. Every declaration that has a colour, font, radius,
+ * or shadow value resolves through the `--uml-*` theming contract from
+ * @uml-drawer/theme. No hex literals, no skin specifics — see the
+ * design-agnostic guard test in `styles.test.ts`.
+ *
+ * Skin authors override appearance by reassigning the same `--uml-*`
+ * tokens (or the few component-scoped tokens declared below) inside a
+ * more specific selector.
+ */
+
+@import "@uml-drawer/theme/contract.css";
+
+.uml-editor {
+  display: grid;
+  grid-template-areas:
+    "palette canvas props"
+    "text    text   text";
+  grid-template-columns: minmax(200px, 240px) 1fr minmax(240px, 320px);
+  grid-template-rows: 1fr minmax(120px, 200px);
+  width: 100%;
+  height: 100%;
+  min-height: 480px;
+  gap: 1px;
+  background-color: var(--uml-border-subtle);
+  color: var(--uml-text);
+  font-family: var(--uml-font-sans);
+  font-size: var(--uml-font-size-base);
+}
+
+.uml-editor--palette-hidden {
+  grid-template-columns: 0 1fr minmax(240px, 320px);
+}
+
+.uml-editor--props-hidden {
+  grid-template-columns: minmax(200px, 240px) 1fr 0;
+}
+
+.uml-editor--palette-hidden.uml-editor--props-hidden {
+  grid-template-columns: 0 1fr 0;
+}
+
+.uml-editor--palette-right {
+  grid-template-areas:
+    "canvas props palette"
+    "text   text  text";
+}
+
+.uml-editor--props-left {
+  grid-template-areas:
+    "props canvas palette"
+    "text  text   text";
+}
+
+.uml-editor--text-top {
+  grid-template-areas:
+    "text    text   text"
+    "palette canvas props";
+  grid-template-rows: minmax(120px, 200px) 1fr;
+}
+
+.uml-editor--text-hidden {
+  grid-template-areas: "palette canvas props";
+  grid-template-rows: 1fr;
+}
+
+/* === panels ============================================ */
+
+.uml-palette,
+.uml-props-panel,
+.uml-outline,
+.uml-text-editor {
+  background-color: var(--uml-bg);
+  color: var(--uml-text);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.uml-palette {
+  grid-area: palette;
+}
+
+.uml-props-panel {
+  grid-area: props;
+}
+
+.uml-text-editor {
+  grid-area: text;
+  border-top: 1px solid var(--uml-border-subtle);
+}
+
+.uml-canvas-host {
+  grid-area: canvas;
+  background-color: var(--uml-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.uml-palette__header,
+.uml-props-panel__header,
+.uml-outline__header,
+.uml-text-editor__header {
+  font-size: var(--uml-font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--uml-text-muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--uml-border-subtle);
+}
+
+.uml-palette__list,
+.uml-props-panel__body,
+.uml-outline {
+  overflow: auto;
+  flex: 1 1 auto;
+  padding: 8px 12px;
+}
+
+.uml-palette__category,
+.uml-outline__category {
+  font-size: var(--uml-font-size-sm);
+  margin: 12px 0 4px;
+  color: var(--uml-text-muted);
+}
+
+.uml-palette__items,
+.uml-outline__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.uml-palette__button,
+.uml-outline__button {
+  width: 100%;
+  text-align: left;
+  background-color: var(--uml-bg-elevated);
+  color: var(--uml-text);
+  border: 1px solid var(--uml-border);
+  border-radius: var(--uml-radius-sm);
+  padding: 6px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.uml-palette__button:hover,
+.uml-outline__button:hover {
+  border-color: var(--uml-border-strong);
+}
+
+.uml-outline__button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.uml-outline__button--selected {
+  border-color: var(--uml-accent);
+  outline: 2px solid var(--uml-focus-ring);
+  outline-offset: -2px;
+}
+
+.uml-outline__detail {
+  color: var(--uml-text-muted);
+  font-size: var(--uml-font-size-sm);
+}
+
+.uml-palette__empty,
+.uml-outline__empty {
+  color: var(--uml-text-muted);
+  font-size: var(--uml-font-size-sm);
+  padding: 8px 0;
+}
+
+/* === props panel form ============================ */
+
+.uml-props-panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.uml-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--uml-font-size-sm);
+  color: var(--uml-text-muted);
+}
+
+.uml-field input,
+.uml-field textarea {
+  font: inherit;
+  font-size: var(--uml-font-size-base);
+  background-color: var(--uml-bg-elevated);
+  color: var(--uml-text);
+  border: 1px solid var(--uml-border);
+  border-radius: var(--uml-radius-sm);
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.uml-field input:focus,
+.uml-field textarea:focus {
+  outline: 2px solid var(--uml-focus-ring);
+  outline-offset: 1px;
+  border-color: var(--uml-accent);
+}
+
+.uml-button {
+  font: inherit;
+  background-color: var(--uml-bg-elevated);
+  color: var(--uml-text);
+  border: 1px solid var(--uml-border);
+  border-radius: var(--uml-radius-sm);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.uml-button--danger {
+  border-color: var(--uml-danger);
+  color: var(--uml-danger);
+}
+
+.uml-props-panel__empty,
+.uml-props-panel__multi {
+  color: var(--uml-text-muted);
+  font-size: var(--uml-font-size-sm);
+}
+
+/* === text editor =================================== */
+
+.uml-text-editor__textarea {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 12px;
+  font: inherit;
+  font-family: var(--uml-font-mono);
+  font-size: var(--uml-font-size-base);
+  background-color: var(--uml-bg);
+  color: var(--uml-text);
+  border: none;
+  resize: none;
+  outline: none;
+}
+
+.uml-text-editor__textarea:focus {
+  outline: 2px solid var(--uml-focus-ring);
+  outline-offset: -2px;
+}
+
+/* === HUD ============================================ */
+
+.uml-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  padding: 12px;
+}
+
+.uml-hud__slot {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+}
+
+.uml-hud__slot--tl {
+  grid-area: 1 / 1;
+  justify-content: flex-start;
+}
+
+.uml-hud__slot--tr {
+  grid-area: 1 / 2;
+  justify-content: flex-end;
+}
+
+.uml-hud__slot--bl {
+  grid-area: 2 / 1;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+
+.uml-hud__slot--br {
+  grid-area: 2 / 2;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+/* === command channel =============================== */
+
+.uml-command-channel {
+  background-color: var(--uml-bg);
+  color: var(--uml-text);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--uml-border-subtle);
+  border-radius: var(--uml-radius-md);
+  overflow: hidden;
+}
+
+.uml-command-channel__header {
+  font-size: var(--uml-font-size-sm);
+  color: var(--uml-text-muted);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--uml-border-subtle);
+}
+
+.uml-command-channel__transcript {
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow: auto;
+  font-family: var(--uml-font-mono);
+  font-size: var(--uml-font-size-sm);
+}
+
+.uml-command-channel__entry {
+  display: flex;
+  gap: 6px;
+}
+
+.uml-command-channel__entry--error {
+  color: var(--uml-danger);
+}
+
+.uml-command-channel__entry--system {
+  color: var(--uml-text-muted);
+}
+
+.uml-command-channel__role {
+  width: 1ch;
+  text-align: center;
+  color: var(--uml-text-muted);
+}
+
+.uml-command-channel__form {
+  padding: 6px 10px;
+  border-top: 1px solid var(--uml-border-subtle);
+}
+
+.uml-command-channel__input {
+  width: 100%;
+  font: inherit;
+  font-family: var(--uml-font-mono);
+  background-color: var(--uml-bg-elevated);
+  color: var(--uml-text);
+  border: 1px solid var(--uml-border);
+  border-radius: var(--uml-radius-sm);
+  padding: 4px 8px;
+}
+
+/* === statusbar ===================================== */
+
+.uml-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 12px;
+  background-color: var(--uml-bg-elevated);
+  color: var(--uml-text-muted);
+  border-top: 1px solid var(--uml-border-subtle);
+  font-size: var(--uml-font-size-sm);
+}
+
+.uml-statusbar__metric--error {
+  color: var(--uml-danger);
+}
+
+.uml-statusbar__metric--warning {
+  color: var(--uml-warning);
+}
+
+.uml-statusbar__metric--info {
+  color: var(--uml-info);
+}
+
+.uml-statusbar__divider {
+  width: 1px;
+  height: 12px;
+  background-color: var(--uml-border-subtle);
+}
+
+.uml-statusbar__trailing {
+  margin-left: auto;
+}
