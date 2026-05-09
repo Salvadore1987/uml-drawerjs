@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@uml-drawer/codemirror-plantuml — smoke test</title>
+    <link rel="stylesheet" href="../../theme/dist/index.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: var(--uml-font-sans, system-ui, sans-serif);
+        background: var(--uml-bg);
+        color: var(--uml-text);
+      }
+
+      header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--uml-border);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        gap: 16px;
+        padding: 24px;
+      }
+
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 12px;
+        font-size: var(--uml-font-size-sm);
+      }
+
+      select {
+        background: var(--uml-bg-elevated);
+        color: var(--uml-text);
+        border: 1px solid var(--uml-border);
+        border-radius: var(--uml-radius-sm);
+        padding: 6px 8px;
+        font: inherit;
+      }
+
+      .editor {
+        border: 1px solid var(--uml-border);
+        border-radius: var(--uml-radius-md);
+        min-height: 480px;
+        overflow: auto;
+        background: var(--uml-bg-elevated);
+      }
+
+      .cm-editor {
+        height: 100%;
+      }
+
+      /* Map highlight classes onto theming-contract tokens. */
+      .uml-cm-keyword {
+        color: var(--uml-accent);
+      }
+      .uml-cm-control-keyword {
+        color: var(--uml-accent);
+        font-weight: 600;
+      }
+      .uml-cm-type {
+        color: var(--uml-info);
+      }
+      .uml-cm-string {
+        color: var(--uml-success);
+      }
+      .uml-cm-number {
+        color: var(--uml-warning);
+      }
+      .uml-cm-comment,
+      .uml-cm-meta {
+        color: var(--uml-text-muted);
+        font-style: italic;
+      }
+      .uml-cm-arrow,
+      .uml-cm-operator {
+        color: var(--uml-text-muted);
+      }
+      .uml-cm-identifier {
+        color: var(--uml-text);
+      }
+      .uml-cm-invalid {
+        color: var(--uml-danger);
+        text-decoration: underline wavy;
+      }
+    </style>
+  </head>
+  <body data-uml-host data-theme="dark">
+    <header>
+      <h1>@uml-drawer/codemirror-plantuml — smoke test</h1>
+      <p>
+        Switch the diagram type to see how snippets, keywords, and diagnostics
+        adapt. Diagnostics show up after the default 750&nbsp;ms debounce.
+      </p>
+    </header>
+    <div class="grid">
+      <aside>
+        <label>
+          Diagram type
+          <select id="type">
+            <option value="class">class</option>
+            <option value="c4-context">c4-context</option>
+            <option value="c4-container">c4-container</option>
+            <option value="c4-component">c4-component</option>
+            <option value="er">er</option>
+            <option value="sequence">sequence</option>
+          </select>
+        </label>
+      </aside>
+      <main>
+        <div class="editor" id="editor"></div>
+      </main>
+    </div>
+
+    <script type="module">
+      import { EditorState } from "https://esm.sh/@codemirror/state@6.4.0";
+      import { EditorView, lineNumbers, keymap } from "https://esm.sh/@codemirror/view@6.34.0";
+      import { defaultKeymap, history, historyKeymap } from "https://esm.sh/@codemirror/commands@6.6.0";
+      import { lintGutter, lintKeymap } from "https://esm.sh/@codemirror/lint@6.8.0";
+      import { plantUmlSupport } from "../dist/index.js";
+
+      const SAMPLES = {
+        class: `@startuml\nclass Order {\n}\nclass Customer\nOrder --> Customer : owner\n@enduml\n`,
+        "c4-context": `@startuml\nPerson(user, "User")\nSystem(svc, "Service", "Core")\nRel(user, svc, "uses")\n@enduml\n`,
+        "c4-container": `@startuml\nSystem_Boundary(b, "Boundary") {\n  Container(api, "API", "Spring", "REST")\n}\n@enduml\n`,
+        "c4-component": `@startuml\nContainer(api, "API")\nComponent(ctrl, "Controller", "Spring")\n@enduml\n`,
+        er: `@startuml\nentity User\nentity Order\nUser ||--o{ Order : places\n@enduml\n`,
+        sequence: `@startuml\nactor User\nparticipant API\nUser -> API : login\nAPI --> User : token\n@enduml\n`,
+      };
+
+      const root = document.getElementById("editor");
+      const select = document.getElementById("type");
+      let view = null;
+
+      function mount(type) {
+        if (view) view.destroy();
+        view = new EditorView({
+          parent: root,
+          state: EditorState.create({
+            doc: SAMPLES[type],
+            extensions: [
+              lineNumbers(),
+              history(),
+              keymap.of([...defaultKeymap, ...historyKeymap, ...lintKeymap]),
+              lintGutter(),
+              ...plantUmlSupport({ diagramType: type }),
+            ],
+          }),
+        });
+      }
+
+      select.addEventListener("change", (event) => {
+        mount(event.target.value);
+      });
+
+      mount(select.value);
+    </script>
+  </body>
+</html>

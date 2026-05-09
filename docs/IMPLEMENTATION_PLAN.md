@@ -54,15 +54,15 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** монорепо, инструментарий, единый pipeline `lint → typecheck → test → build`.
 
-✅ `git init`, `.gitignore`, `.editorconfig`, `.nvmrc` (Node 20 LTS).
-✅ Корневой `package.json` (`"private": true`) + `pnpm-workspace.yaml` со списком `packages/*` и `apps/*`.
-✅ `tsconfig.base.json`: `strict: true`, `target: ES2022`, `moduleResolution: bundler`, `noUncheckedIndexedAccess: true`.
-✅ ESLint + Prettier конфиги в корне (опционально — внутренний пакет `@uml-drawer/eslint-config`).
-✅ Husky + lint-staged + commitlint (Conventional Commits).
-✅ Changesets (`@changesets/cli init`) для версионирования монорепо.
-✅ Vitest workspace + Playwright config skeleton.
-✅ GitHub Actions workflow stubs: `lint.yml`, `test.yml`, `build.yml`, `release.yml`.
-✅ `LICENSE` (MIT), корневой `README.md` (placeholder), `CONTRIBUTING.md`.
+- ✅ `git init`, `.gitignore`, `.editorconfig`, `.nvmrc` (Node 20 LTS).
+- ✅ Корневой `package.json` (`"private": true`) + `pnpm-workspace.yaml` со списком `packages/*` и `apps/*`.
+- ✅ `tsconfig.base.json`: `strict: true`, `target: ES2022`, `moduleResolution: bundler`, `noUncheckedIndexedAccess: true`.
+- ✅ ESLint + Prettier конфиги в корне (опционально — внутренний пакет `@uml-drawer/eslint-config`).
+- ✅ Husky + lint-staged + commitlint (Conventional Commits).
+- ✅ Changesets (`@changesets/cli init`) для версионирования монорепо.
+- ✅ Vitest workspace + Playwright config skeleton.
+- ✅ GitHub Actions workflow stubs: `lint.yml`, `test.yml`, `build.yml`, `release.yml`.
+- ✅ `LICENSE` (MIT), корневой `README.md` (placeholder), `CONTRIBUTING.md`.
 
 **Критерий выхода:** `pnpm install && pnpm typecheck && pnpm lint` работают на пустых workspace без ошибок. ✅
 
@@ -72,14 +72,14 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** опубликовать **theming contract** библиотеки — документированный набор CSS-переменных в namespace `--uml-*` с нейтральными дефолтами. Бренд-эстетики (cyber-topographic, любая иная) в этом пакете НЕТ.
 
-✅ Скелет `packages/theme` с Vite library build → CSS-only output.
-✅ `contract.css` — декларация всех `--uml-*` переменных (поверхности, текст, линии, семантика, узлы, связи, холст, выделение, шрифты, радиусы, тени) с краткими комментариями назначения.
-✅ `defaults-dark.css` и `defaults-light.css` — нейтральные дефолтные значения (`system-ui`, `ui-monospace`, neutral grays/blues, без бренд-акцентов). Подключаются автоматически вместе с `contract.css`.
-✅ Поддержка `data-theme="light" | "dark"` на host-контейнере виджета (не глобальный `:root`), transition 0.2–0.4s на `background` / `color`.
-✅ Авто-detect темы через `prefers-color-scheme`, если `data-theme` не задан.
-✅ `prefers-reduced-motion: reduce` overrides — отключение transition'ов; никаких glow/blur в библиотеке вообще не используется, поэтому этот override на стороне библиотеки тривиален (но контракт обязывает скины это поддерживать).
-✅ `tokens.json` — машиночитаемая декларация контракта (имена, дефолтные значения, описания) для downstream-пакетов, генератора SVG, API-reference и валидации скинов.
-✅ README пакета: пример «как написать свой скин» (override каких-нибудь переменных через `:where(.my-skin) { --uml-accent: ...; }`).
+- ✅ Скелет `packages/theme` с Vite library build → CSS-only output.
+- ✅ `contract.css` — декларация всех `--uml-*` переменных (поверхности, текст, линии, семантика, узлы, связи, холст, выделение, шрифты, радиусы, тени) с краткими комментариями назначения.
+- ✅ `defaults-dark.css` и `defaults-light.css` — нейтральные дефолтные значения (`system-ui`, `ui-monospace`, neutral grays/blues, без бренд-акцентов). Подключаются автоматически вместе с `contract.css`.
+- ✅ Поддержка `data-theme="light" | "dark"` на host-контейнере виджета (не глобальный `:root`), transition 0.2–0.4s на `background` / `color`.
+- ✅ Авто-detect темы через `prefers-color-scheme`, если `data-theme` не задан.
+- ✅ `prefers-reduced-motion: reduce` overrides — отключение transition'ов; никаких glow/blur в библиотеке вообще не используется, поэтому этот override на стороне библиотеки тривиален (но контракт обязывает скины это поддерживать).
+- ✅ `tokens.json` — машиночитаемая декларация контракта (имена, дефолтные значения, описания) для downstream-пакетов, генератора SVG, API-reference и валидации скинов.
+- ✅ README пакета: пример «как написать свой скин» (override каких-нибудь переменных через `:where(.my-skin) { --uml-accent: ...; }`).
 
 **Что НЕ делается в этой фазе:**
 
@@ -98,14 +98,14 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** базовая структура ядра + типы AST как фундамент для всех остальных модулей.
 
-✅ Пакет `packages/core`: Vite library mode, ESM-only, `sideEffects: false`, `.d.ts`.
-✅ Папки модулей: `parser/`, `model/`, `generator/`, `validators/`, `layout/`, `renderer/`, `commands/`, `history/`, `exporters/`, `editor/`.
-✅ `model/types.ts`: `Diagram`, `Node`, `Edge`, `Group`, `Attribute`, `Operation`, `NodeKind`, `EdgeKind`, `StyleMap`, `DiagramError` (по спеке).
-✅ Иммутабельные операции над AST (`structuredClone`-based; Immer/structural sharing зайдут с командами P3, когда появятся реальные мутации).
-✅ UUIDv7 генератор id (по глобальному правилу проекта).
-✅ `metadata.schemaVersion` + JSON-schema для `.umljson`.
-✅ Zod-схемы (или type guards) для runtime-валидации AST на API-границе.
-✅ Утилиты: `createEmptyDiagram(type)`, `findNode(ast, id)`, `getEdgesOfNode`, `cloneDiagram`.
+- ✅ Пакет `packages/core`: Vite library mode, ESM-only, `sideEffects: false`, `.d.ts`.
+- ✅ Папки модулей: `parser/`, `model/`, `generator/`, `validators/`, `layout/`, `renderer/`, `commands/`, `history/`, `exporters/`, `editor/`.
+- ✅ `model/types.ts`: `Diagram`, `Node`, `Edge`, `Group`, `Attribute`, `Operation`, `NodeKind`, `EdgeKind`, `StyleMap`, `DiagramError` (по спеке).
+- ✅ Иммутабельные операции над AST (`structuredClone`-based; Immer/structural sharing зайдут с командами P3, когда появятся реальные мутации).
+- ✅ UUIDv7 генератор id (по глобальному правилу проекта).
+- ✅ `metadata.schemaVersion` + JSON-schema для `.umljson`.
+- ✅ Zod-схемы (или type guards) для runtime-валидации AST на API-границе.
+- ✅ Утилиты: `createEmptyDiagram(type)`, `findNode(ast, id)`, `getEdgesOfNode`, `cloneDiagram`.
 
 **Критерий выхода:** `createEmptyDiagram('class')` сериализуется/десериализуется без потерь; все типы экспортируются из `@uml-drawer/core/model`. ✅ (37 unit-тестов в `vitest`, round-trip покрыт `validation.test.ts`).
 
@@ -115,21 +115,21 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** все мутации проходят через команды → бесплатный undo/redo + готовность к CRDT.
 
-✅ Базовый тип команды `{ kind, payload, apply(ast), invert(ast) }`.
-✅ Реализовать команды (по спеке):
-    ✅ `AddNodeCommand`
-    ✅ `RemoveNodeCommand` (каскадно убирает edges; восстанавливает индексы и `layoutOverrides` на invert)
-    ✅ `MoveNodeCommand` (writeback в `metadata.layoutOverrides`)
-    ✅ `UpdateNodeCommand`
-    ✅ `AddEdgeCommand`
-    ✅ `RemoveEdgeCommand`
-    ✅ `UpdateEdgeCommand`
-    ✅ `GroupCommand` (`addGroupCommand` / `updateGroupCommand` / `removeGroupCommand`)
-    ✅ `ApplyLayoutCommand`
-    ✅ `ImportTextCommand` (полная замена AST)
-✅ CommandBus с синхронным dispatch + before/after-events.
-✅ History stack: `undo()` / `redo()`, конфигурируемый coalesce (`sameKind`, `sameKindAndTarget`, `never`).
-✅ Vitest: каждая команда + её инверсия, redo детерминирован.
+- ✅ Базовый тип команды `{ kind, payload, apply(ast), invert(ast) }`.
+- ✅ Реализовать команды (по спеке):
+    - ✅ `AddNodeCommand`
+    - ✅ `RemoveNodeCommand` (каскадно убирает edges; восстанавливает индексы и `layoutOverrides` на invert)
+    - ✅ `MoveNodeCommand` (writeback в `metadata.layoutOverrides`)
+    - ✅ `UpdateNodeCommand`
+    - ✅ `AddEdgeCommand`
+    - ✅ `RemoveEdgeCommand`
+    - ✅ `UpdateEdgeCommand`
+    - ✅ `GroupCommand` (`addGroupCommand` / `updateGroupCommand` / `removeGroupCommand`)
+    - ✅ `ApplyLayoutCommand`
+    - ✅ `ImportTextCommand` (полная замена AST)
+- ✅ CommandBus с синхронным dispatch + before/after-events.
+- ✅ History stack: `undo()` / `redo()`, конфигурируемый coalesce (`sameKind`, `sameKindAndTarget`, `never`).
+- ✅ Vitest: каждая команда + её инверсия, redo детерминирован.
 
 **Критерий выхода:** 100% покрытие команд; `apply → invert` восстанавливает byte-equal JSON-снапшот AST. ✅ (31 новый тест: 18 commands round-trip + 5 bus + 8 history; 68 тестов в `core` зелёные).
 
@@ -139,14 +139,14 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** инкрементальный парсер PlantUML → AST, переиспользуемый и в ядре, и в CodeMirror.
 
-⚠️ Lezer-грамматика подмножества PlantUML под 5 типов диаграмм — **отложено** в [ADR-0003](./adr/0003-plantuml-subset.md): MVP отгружен на ручном line-based парсере с тем же публичным API; миграция на Lezer пройдёт в Phase 4b или совместно с Phase 11 (CodeMirror).
-⚠️ Build-скрипт `.grammar` → сгенерированный парсер (`@lezer/generator`) — отложено вместе с Lezer (см. ADR-0003 § Migration plan).
-✅ AST-builder, собирающий `Diagram` (диспатчер по типу диаграммы + per-type pattern matchers; на Lezer-tree свалится после миграции).
-✅ Opaque-block fallback для неподдерживаемых конструкций (preprocessor, !include и т. п. → `metadata.opaque`).
-✅ Декодер аннотаций `' @drawer:meta {...}` → `metadata.layoutOverrides`, `styles`.
-✅ Фикстуры: эталонные `.puml` файлы в `packages/core/__fixtures__/{c4-context,c4-container,c4-component,class,er,sequence}/` + matching `.json` снапшоты.
-✅ Round-trip тесты: `parse(text) → AST` совпадает с JSON-snapshot (детерминированные id через `idFactory`).
-✅ Подмножество PlantUML для MVP зафиксировано в [ADR-0003](./adr/0003-plantuml-subset.md).
+- ⚠️ Lezer-грамматика подмножества PlantUML под 5 типов диаграмм — **отложено** в [ADR-0003](./adr/0003-plantuml-subset.md): MVP отгружен на ручном line-based парсере с тем же публичным API; миграция на Lezer пройдёт в Phase 4b или совместно с Phase 11 (CodeMirror).
+- ⚠️ Build-скрипт `.grammar` → сгенерированный парсер (`@lezer/generator`) — отложено вместе с Lezer (см. ADR-0003 § Migration plan).
+- ✅ AST-builder, собирающий `Diagram` (диспатчер по типу диаграммы + per-type pattern matchers; на Lezer-tree свалится после миграции).
+- ✅ Opaque-block fallback для неподдерживаемых конструкций (preprocessor, !include и т. п. → `metadata.opaque`).
+- ✅ Декодер аннотаций `' @drawer:meta {...}` → `metadata.layoutOverrides`, `styles`.
+- ✅ Фикстуры: эталонные `.puml` файлы в `packages/core/__fixtures__/{c4-context,c4-container,c4-component,class,er,sequence}/` + matching `.json` снапшоты.
+- ✅ Round-trip тесты: `parse(text) → AST` совпадает с JSON-snapshot (детерминированные id через `idFactory`).
+- ✅ Подмножество PlantUML для MVP зафиксировано в [ADR-0003](./adr/0003-plantuml-subset.md).
 
 **Критерий выхода:** все 5 типов парсятся; ошибочный ввод → `DiagramError` с `range` и `code: SYNTAX_*`; AST не разрушается (последний валидный сохраняется). ✅ (22 новых теста: 6 round-trip + 3 error/opaque/meta + 8 meta unit + 3 tokenizer + 2 misc; коды `SYNTAX_MALFORMED`, `SYNTAX_UNKNOWN_REFERENCE`, `SYNTAX_META`, `SYNTAX_MISSING_MARKER`, `SYNTAX_UNBALANCED_QUOTE`).
 
@@ -156,10 +156,10 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** обратный путь — из AST в текст с сохранением метаданных.
 
-✅ Per-type рендереры: `c4-context`, `c4-container`, `c4-component`, `class`, `er`, `sequence`.
-✅ Кодирование `metadata.layoutOverrides` + `styles` в `' @drawer:meta` комментарии (игнорируются другими PlantUML-рендерерами).
-✅ Стабильное форматирование (детерминированный порядок узлов/связей, нормализация пробелов, канонические формы стрелок, alias-стратегия `label-when-clean → n_<sanitized-id>`).
-✅ Round-trip тесты: `parse(gen(parse(t))).ast` равен `parse(t).ast` для всех 5 fixture-типов + точечные тесты на нормализацию направления стрелок и `[tech]`-суффикс.
+- ✅ Per-type рендереры: `c4-context`, `c4-container`, `c4-component`, `class`, `er`, `sequence`.
+- ✅ Кодирование `metadata.layoutOverrides` + `styles` в `' @drawer:meta` комментарии (игнорируются другими PlantUML-рендерерами).
+- ✅ Стабильное форматирование (детерминированный порядок узлов/связей, нормализация пробелов, канонические формы стрелок, alias-стратегия `label-when-clean → n_<sanitized-id>`).
+- ✅ Round-trip тесты: `parse(gen(parse(t))).ast` равен `parse(t).ast` для всех 5 fixture-типов + точечные тесты на нормализацию направления стрелок и `[tech]`-суффикс.
 
 **Критерий выхода:** snapshot-suite зелёный; правила нормализации описаны в `packages/core/src/generator/README.md`. ✅ (14 новых тестов в `generator.test.ts`; round-trip покрыт по всем 6 фикстурам; 104 теста в `core` зелёные).
 
@@ -169,16 +169,16 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** многоуровневая валидация по спеке (sync / semantic / constraints / lint).
 
-✅ `validators/syntax.ts` — pass-through wrapper над parser-ошибками; экспортирует `SYNTAX_ERROR_CODES` из `parser/errors`.
-✅ `validators/semantic.ts` — уникальность id (nodes / edges / groups), существование endpoints у edges, references group children, пустые labels.
-✅ `validators/constraints.ts` — правила на тип диаграммы:
-    ✅ C4: whitelist `NodeKind` + проверка вложенности Boundary (только C4-кинды внутри boundary).
-    ✅ Sequence: edges только между lifeline / actor.
-    ✅ ER: связи только Entity↔Entity, обязательная cardinality, валидация cardinality-токенов (`1`, `0..*`, `*`, …).
-    ✅ Class: whitelist `NodeKind` (class/interface/abstract-class/enum) + edge-kind whitelist.
-✅ `validators/lint.ts` — orphan-узлы (warning, исключая sequence), дубликаты labels (warning), циклы по inheritance/realization (error).
-✅ Реестр quick-fixes (`validators/quickfix.ts`) → `Command`-факторы для пустых labels, dangling edges, missing-children, orphan-узлов; `attachQuickFixes(errors, diagram, dispatch)` биндит `fix.apply()` к CommandBus.
-✅ Барель `runAllValidators(diagram, parserErrors)` объединяет уровни и дедуплицирует по `(code, location)`.
+- ✅ `validators/syntax.ts` — pass-through wrapper над parser-ошибками; экспортирует `SYNTAX_ERROR_CODES` из `parser/errors`.
+- ✅ `validators/semantic.ts` — уникальность id (nodes / edges / groups), существование endpoints у edges, references group children, пустые labels.
+- ✅ `validators/constraints.ts` — правила на тип диаграммы:
+    - ✅ C4: whitelist `NodeKind` + проверка вложенности Boundary (только C4-кинды внутри boundary).
+    - ✅ Sequence: edges только между lifeline / actor.
+    - ✅ ER: связи только Entity↔Entity, обязательная cardinality, валидация cardinality-токенов (`1`, `0..*`, `*`, …).
+    - ✅ Class: whitelist `NodeKind` (class/interface/abstract-class/enum) + edge-kind whitelist.
+- ✅ `validators/lint.ts` — orphan-узлы (warning, исключая sequence), дубликаты labels (warning), циклы по inheritance/realization (error).
+- ✅ Реестр quick-fixes (`validators/quickfix.ts`) → `Command`-факторы для пустых labels, dangling edges, missing-children, orphan-узлов; `attachQuickFixes(errors, diagram, dispatch)` биндит `fix.apply()` к CommandBus.
+- ✅ Барель `runAllValidators(diagram, parserErrors)` объединяет уровни и дедуплицирует по `(code, location)`.
 
 **Критерий выхода:** каждое правило покрыто позитивным и негативным кейсом; quick-fix сэмплы прокидываются в CodeMirror lint и в panel of problems. ✅ (25 новых тестов в `validators.test.ts`; 129 тестов в `core` зелёные).
 
@@ -188,11 +188,11 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** auto-layout по кнопке и при импорте текста, lazy-загрузка ELK.
 
-✅ `layout/elk.ts` — адаптер: dynamic-import `elkjs/lib/elk.bundled.js` (через переопределяемый `elkLoader` для тестов), маппинг `Diagram` → ELK graph → запись координат, кэш конструктора.
-✅ Поддержка вложенных групп для C4 boundaries (boundary-группы становятся nested ELK-узлами; координаты потомков аккумулируют offset родителя на сборке).
-✅ `layout/sequence.ts` — кастомный алгоритм: вертикальные lifelines на горизонтальной оси, синхронный, детерминированный.
-✅ Fallback layout (`layout/fallback.ts`, grid ≈√N×√N) при ошибке ELK; обёртка `runAutoLayout` ловит исключение и переключается на grid.
-✅ Перф-бенч в Vitest: 200 узлов через grid укладывается в `< 50 мс`.
+- ✅ `layout/elk.ts` — адаптер: dynamic-import `elkjs/lib/elk.bundled.js` (через переопределяемый `elkLoader` для тестов), маппинг `Diagram` → ELK graph → запись координат, кэш конструктора.
+- ✅ Поддержка вложенных групп для C4 boundaries (boundary-группы становятся nested ELK-узлами; координаты потомков аккумулируют offset родителя на сборке).
+- ✅ `layout/sequence.ts` — кастомный алгоритм: вертикальные lifelines на горизонтальной оси, синхронный, детерминированный.
+- ✅ Fallback layout (`layout/fallback.ts`, grid ≈√N×√N) при ошибке ELK; обёртка `runAutoLayout` ловит исключение и переключается на grid.
+- ✅ Перф-бенч в Vitest: 200 узлов через grid укладывается в `< 50 мс`.
 
 **Критерий выхода:** auto-layout детерминирован; ELK подключается только при первом вызове `runAutoLayout()` (`elkjs` помечен как rollup external, в `dist/layout/index.js` остаётся `await import('elkjs/...')`); bundle ядра без ELK не превышает базовый бюджет. ✅ (11 новых тестов в `layout.test.ts`, 140 тестов в `core` зелёные; ELK не входит в `core`/`layout/index.js` — verified через grep).
 
@@ -202,16 +202,16 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** интерактивный SVG-холст с pan/zoom/minimap и keyboard-навигацией.
 
-✅ Мини декларативный SVG-слой (без D3): VNode-tree (`renderer/types.ts`) → реальные узлы через `mountSvg` (`renderer/mount.ts`).
-✅ Рендереры по `NodeKind` (`renderer/nodes.ts`) — кадры, header, стереотип-бейджи, attribute-rows для Class/Interface/Abstract/Entity, operation-rows для классов; геометрия растёт под содержимое.
-✅ Рендереры по `EdgeKind` (`renderer/edges.ts`) — strokes per kind (`realization`/`dependency`/`return` штриховые), стрелочные маркеры (`triangle` / `diamond filled` / `diamond open` / `open` / `arrow`), label-pill, ER cardinality-метки на обоих концах.
-✅ Port snapping: `portSnap()` шринкует сегмент до пересечения с прямоугольной рамкой узла; покрыто тестом + дегенерация при overlap.
-✅ Все стили — через `--uml-*` контракт (`var(--uml-node-bg)`, `var(--uml-edge-stroke)`, …), guard-тест проверяет отсутствие hex-литералов в сериализованной vnode-tree.
-✅ Pan/zoom (`renderer/panZoom.ts`): wheel-zoom вокруг курсора, pointer-drag, pinch (двухпальцевый), clamp `[minScale, maxScale]`, `dispose()` снимает все listeners. Применяет transform на target `<g>`.
-✅ Minimap (`renderer/minimap.ts`): scaled-down rect-per-node + viewport-rect от текущего pan/zoom состояния.
-✅ Selection model (`renderer/selection.ts`): headless store с subscribe/add/remove/toggle/clear, идемпотентные no-op'ы.
-✅ Keyboard (`renderer/keyboard.ts`): Tab/Shift+Tab/Arrow{Up,Down,Left,Right} (Shift = ×10 step) / Delete / Backspace / Enter / Cmd+Z / Cmd+Shift+Z, dispose() отвязывает.
-✅ ARIA-роли + screen-reader summary (`renderer/a11y.ts`): диаграмма с `role="img"` и `aria-label`; `summarizeForA11y(diagram)` отдаёт детерминированный plain-text текст.
+- ✅ Мини декларативный SVG-слой (без D3): VNode-tree (`renderer/types.ts`) → реальные узлы через `mountSvg` (`renderer/mount.ts`).
+- ✅ Рендереры по `NodeKind` (`renderer/nodes.ts`) — кадры, header, стереотип-бейджи, attribute-rows для Class/Interface/Abstract/Entity, operation-rows для классов; геометрия растёт под содержимое.
+- ✅ Рендереры по `EdgeKind` (`renderer/edges.ts`) — strokes per kind (`realization`/`dependency`/`return` штриховые), стрелочные маркеры (`triangle` / `diamond filled` / `diamond open` / `open` / `arrow`), label-pill, ER cardinality-метки на обоих концах.
+- ✅ Port snapping: `portSnap()` шринкует сегмент до пересечения с прямоугольной рамкой узла; покрыто тестом + дегенерация при overlap.
+- ✅ Все стили — через `--uml-*` контракт (`var(--uml-node-bg)`, `var(--uml-edge-stroke)`, …), guard-тест проверяет отсутствие hex-литералов в сериализованной vnode-tree.
+- ✅ Pan/zoom (`renderer/panZoom.ts`): wheel-zoom вокруг курсора, pointer-drag, pinch (двухпальцевый), clamp `[minScale, maxScale]`, `dispose()` снимает все listeners. Применяет transform на target `<g>`.
+- ✅ Minimap (`renderer/minimap.ts`): scaled-down rect-per-node + viewport-rect от текущего pan/zoom состояния.
+- ✅ Selection model (`renderer/selection.ts`): headless store с subscribe/add/remove/toggle/clear, идемпотентные no-op'ы.
+- ✅ Keyboard (`renderer/keyboard.ts`): Tab/Shift+Tab/Arrow{Up,Down,Left,Right} (Shift = ×10 step) / Delete / Backspace / Enter / Cmd+Z / Cmd+Shift+Z, dispose() отвязывает.
+- ✅ ARIA-роли + screen-reader summary (`renderer/a11y.ts`): диаграмма с `role="img"` и `aria-label`; `summarizeForA11y(diagram)` отдаёт детерминированный plain-text текст.
 
 **Критерий выхода:** диаграмма на 200 узлов рендерится при 60 FPS pan/zoom (Playwright FPS-проба); dot-grid-фон и HUD-оверлеи соответствуют шаблону. ✅ (19 новых тестов: 12 pure-data + 7 happy-dom; 159 тестов в `core` зелёные. Playwright FPS-проба и dot-grid идут в Phase 13/14 — это интеграционная история playground'а).
 
@@ -221,11 +221,11 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** интероперабельность форматов: `.puml`, SVG, PNG, `.umljson`.
 
-✅ `exporters/puml.ts` — `exportPuml(diagram)` обёртка над generator; `importPuml(text, options)` оборачивает parser + auto-layout при отсутствии `' @drawer:meta layoutOverrides`.
-✅ `exporters/svg.ts` — `exportSvg(diagram)` сериализует vnode-tree рендерера в SVG-строку (DOM не нужен); опциональный `themeStyleBlock` инлайнит резолвлённые `--uml-*` токены, `includeXmlDeclaration` добавляет XML prologue. Хелпер `buildThemeStyleBlock(tokens)` для кастомных скинов.
-✅ `exporters/png.ts` — SVG → data URI → `Image` → Canvas → `toBlob('image/png')`. Хуки `imageFactory` / `canvasFactory` позволяют тестам обходиться без real DOM; учёт `devicePixelRatio`.
-✅ `exporters/json.ts` — `exportJson(diagram)` (с stamping `schemaVersion`) + `importJson(text)` через zod-schema; ошибки структурированно (path + message).
-✅ Симметричные импортёры — `importPuml` (с `layoutMode: 'missing' | 'always' | 'never'`) и `importJson` (валидируется через `diagramSchema`).
+- ✅ `exporters/puml.ts` — `exportPuml(diagram)` обёртка над generator; `importPuml(text, options)` оборачивает parser + auto-layout при отсутствии `' @drawer:meta layoutOverrides`.
+- ✅ `exporters/svg.ts` — `exportSvg(diagram)` сериализует vnode-tree рендерера в SVG-строку (DOM не нужен); опциональный `themeStyleBlock` инлайнит резолвлённые `--uml-*` токены, `includeXmlDeclaration` добавляет XML prologue. Хелпер `buildThemeStyleBlock(tokens)` для кастомных скинов.
+- ✅ `exporters/png.ts` — SVG → data URI → `Image` → Canvas → `toBlob('image/png')`. Хуки `imageFactory` / `canvasFactory` позволяют тестам обходиться без real DOM; учёт `devicePixelRatio`.
+- ✅ `exporters/json.ts` — `exportJson(diagram)` (с stamping `schemaVersion`) + `importJson(text)` через zod-schema; ошибки структурированно (path + message).
+- ✅ Симметричные импортёры — `importPuml` (с `layoutMode: 'missing' | 'always' | 'never'`) и `importJson` (валидируется через `diagramSchema`).
 
 **Критерий выхода:** export ⇄ import round-trip сохраняет AST + layout для всех 5 типов диаграмм. ✅ (16 новых тестов в `exporters.test.ts`; PUML round-trip проверен, JSON — byte-equal, SVG — well-formed XML с экранированием, PNG — через injected stub-канвас. 175 тестов в `core` зелёные).
 
@@ -235,11 +235,11 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** публичный API ядра для не-React хостов (vanilla JS).
 
-✅ `createEditor(host, options)` композирует parser + generator + validators + renderer + history (`packages/core/src/editor/createEditor.ts`).
-✅ Возвращает объект с методами по спеке: `loadFromText`, `loadFromJson`, `exportText`, `exportSvg`, `exportPng`, `exportJson`, `undo`, `redo`, `runAutoLayout`, `applyTheme`, `destroy` (+ удобные `dispatch` / `getState` / `getErrors`, и raw-доступ к `bus` / `history` / `panZoom`).
-✅ `onChange` отдаёт `{ text, ast, errors, command }` после каждой команды (включая undo/redo/import; первая публикация — с `command: null`).
-✅ CSS-переменные применяются к host-контейнеру через `data-uml-host` + `data-theme`, никаких манипуляций с `:root`.
-✅ Авто-выбор темы через `prefers-color-scheme` (`theme: "auto"` подписывается на `MediaQueryList.change`, в чистой Node-среде безопасно деградирует в `light`).
+- ✅ `createEditor(host, options)` композирует parser + generator + validators + renderer + history (`packages/core/src/editor/createEditor.ts`).
+- ✅ Возвращает объект с методами по спеке: `loadFromText`, `loadFromJson`, `exportText`, `exportSvg`, `exportPng`, `exportJson`, `undo`, `redo`, `runAutoLayout`, `applyTheme`, `destroy` (+ удобные `dispatch` / `getState` / `getErrors`, и raw-доступ к `bus` / `history` / `panZoom`).
+- ✅ `onChange` отдаёт `{ text, ast, errors, command }` после каждой команды (включая undo/redo/import; первая публикация — с `command: null`).
+- ✅ CSS-переменные применяются к host-контейнеру через `data-uml-host` + `data-theme`, никаких манипуляций с `:root`.
+- ✅ Авто-выбор темы через `prefers-color-scheme` (`theme: "auto"` подписывается на `MediaQueryList.change`, в чистой Node-среде безопасно деградирует в `light`).
 
 **Критерий выхода:** smoke-тест в plain HTML монтирует редактор, добавляет узел, экспортирует SVG; `destroy()` убирает все listeners и DOM-узлы. ✅ (14 новых тестов в `editor.test.ts` под happy-dom: mount + addNode + exportSvg + undo/redo + theme + destroy; HTML-смоук в `packages/core/examples/editor-smoke.html`. 189 тестов в `core` зелёные).
 
@@ -249,13 +249,13 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** CodeMirror 6-расширение поверх той же Lezer-грамматики.
 
-- [ ] Language package, переиспользующий грамматику из ядра.
-- [ ] Highlight-стили, привязанные к токенам темы.
-- [ ] Diagnostics → CM-маркеры; quick-fix lens через `@codemirror/lint`.
-- [ ] Autocomplete: ключевые слова, существующие id узлов, kinds — context-aware по типу диаграммы.
-- [ ] Snippet-completions для типичных конструкций (`@startuml ...`).
+- ✅ Language package, переиспользующий грамматику из ядра. **MVP едет на `StreamLanguage`** — Lezer-грамматика отложена в [ADR-0003](./adr/0003-plantuml-subset.md), миграция пройдёт без изменений публичного API (`plantUml()` / `plantUmlLanguage`).
+- ✅ Highlight-стили, привязанные к токенам темы (`uml-cm-keyword` / `-control-keyword` / `-type` / `-string` / `-number` / `-comment` / `-meta` / `-arrow` / `-operator` / `-identifier` / `-invalid` / `-bracket`). Никаких hex-значений в стиле — стили резолвятся через `--uml-*` контракт хоста.
+- ✅ Diagnostics → CM-маркеры; quick-fix lens через `@codemirror/lint`. Quick-fix действия диспатчатся в `CommandBus` хоста (опционально через `dispatch` в `PlantUmlLintOptions`).
+- ✅ Autocomplete: ключевые слова, существующие id узлов, kinds — context-aware по типу диаграммы (`PlantUmlAutocompleteOptions.diagramType`).
+- ✅ Snippet-completions для типичных конструкций (`@startuml ...`, `Person(...)`, `class ...`, `entity ...`, sequence-сообщения).
 
-**Критерий выхода:** demo-страница в playground показывает highlight + diagnostics + autocomplete + quick-fix.
+**Критерий выхода:** demo-страница в playground показывает highlight + diagnostics + autocomplete + quick-fix. ✅ MVP-уровень: пакет собирается (`vite build`); 21 unit-тест в `language.test.ts` / `lint.test.ts` / `autocomplete.test.ts` (210 тестов в монорепо зелёные); ручной HTML-смоук в `packages/codemirror-plantuml/examples/smoke.html` пробегает по всем 5 типам диаграмм. Полная демо-страница в playground идёт в Phase 13.
 
 ---
 
@@ -474,4 +474,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
+*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003. Phase 11 rides on `StreamLanguage`; the public API survives the future migration unchanged).*
