@@ -114,6 +114,52 @@ describe("renderer/groups — boundary layer", () => {
     expect(attrs?.height).toBe(250);
   });
 
+  it("emits tabindex='0' and 8 resize handles on every boundary", () => {
+    // Arrange
+    const diagram = diagramWith({
+      groups: [{ id: "g", kind: "boundary", label: "B", children: [] }],
+      metadata: {
+        schemaVersion: "1.0.0",
+        layoutOverrides: { g: { x: 0, y: 0, width: 320, height: 200 } },
+      },
+    });
+
+    // Act
+    const rendered = renderDiagram(diagram, { coordinates: {} });
+    const groupNode = findGroupVNode(rendered.root, "g");
+
+    // Assert
+    expect((groupNode?.attrs as Record<string, unknown> | undefined)?.tabindex).toBe(0);
+    const handles = (groupNode?.children ?? []).filter(
+      (c) =>
+        c.tag === "rect" &&
+        (c.attrs as Record<string, unknown> | undefined)?.["data-resize-handle"],
+    );
+    expect(handles).toHaveLength(8);
+    const sides = handles.map((h) => (h.attrs as Record<string, unknown>)["data-resize-handle"]);
+    expect(sides.sort()).toEqual(["e", "n", "ne", "nw", "s", "se", "sw", "w"]);
+  });
+
+  it("frame rect uses pointer-events='stroke' so clicks pass through to children", () => {
+    // Arrange
+    const diagram = diagramWith({
+      groups: [{ id: "g", kind: "boundary", label: "B", children: [] }],
+    });
+
+    // Act
+    const rendered = renderDiagram(diagram, { coordinates: {} });
+    const groupNode = findGroupVNode(rendered.root, "g");
+    const frameRect = groupNode?.children?.find(
+      (c) =>
+        c.tag === "rect" && Array.isArray(c.classes) && c.classes.includes("uml-group-boundary"),
+    );
+
+    // Assert
+    expect((frameRect?.attrs as Record<string, unknown> | undefined)?.["pointer-events"]).toBe(
+      "stroke",
+    );
+  });
+
   it("renders a default-sized empty boundary when there are no children", () => {
     // Arrange — boundary just dropped from the palette
     const diagram = diagramWith({

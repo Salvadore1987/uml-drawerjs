@@ -115,8 +115,14 @@ export interface RenderGroupLayerArgs extends ComputeGroupBoxesArgs {
 
 /**
  * Build the `<g data-uml-layer="groups">` VNode containing one rect +
- * label per boundary. Sits at the bottom of the content stack so edges
- * and nodes still draw on top.
+ * label + 8 resize handles per boundary. Sits at the bottom of the
+ * content stack so edges and nodes still draw on top.
+ *
+ * The frame `<rect>` uses `pointer-events: stroke` so pointerdown is
+ * captured only when the user grabs the dashed border (or the label
+ * row), never when they click "through" the rectangle into a child
+ * node — that would otherwise hijack every node click on a boundary
+ * that contains them.
  */
 export function renderGroupLayer(args: RenderGroupLayerArgs): VNode {
   const boxes = computeGroupBoxes(args);
@@ -128,6 +134,7 @@ export function renderGroupLayer(args: RenderGroupLayerArgs): VNode {
       {
         "data-group-id": box.id,
         "data-uml-group": "boundary",
+        tabindex: 0,
       },
       [
         v(
@@ -144,9 +151,27 @@ export function renderGroupLayer(args: RenderGroupLayerArgs): VNode {
             stroke: "var(--uml-border, var(--uml-text-muted))",
             "stroke-width": "1.5",
             "stroke-dasharray": "10 6",
+            "pointer-events": "stroke",
           },
           undefined,
           { classes: ["uml-group", "uml-group-boundary"] },
+        ),
+        // Label band rect — invisible fill, captures pointerdown so the
+        // user can grab the boundary by its title bar without having to
+        // aim at the dashed stroke. Same `data-uml-group-handle` hook
+        // lets interactions detect it as a move-target.
+        v(
+          "rect",
+          {
+            x: box.x,
+            y: box.y,
+            width: box.width,
+            height: 32,
+            fill: "transparent",
+            "data-uml-group-handle": "label",
+          },
+          undefined,
+          { classes: ["uml-group__label-band"] },
         ),
         v(
           "text",
@@ -157,6 +182,7 @@ export function renderGroupLayer(args: RenderGroupLayerArgs): VNode {
             "font-size": "var(--uml-font-size-sm)",
             "font-weight": "600",
             fill: "var(--uml-text-muted)",
+            "pointer-events": "none",
           },
           undefined,
           {
@@ -172,6 +198,7 @@ export function renderGroupLayer(args: RenderGroupLayerArgs): VNode {
             "font-family": "var(--uml-font-sans)",
             "font-size": "var(--uml-font-size-sm)",
             fill: "var(--uml-text-muted)",
+            "pointer-events": "none",
           },
           undefined,
           {
@@ -179,8 +206,51 @@ export function renderGroupLayer(args: RenderGroupLayerArgs): VNode {
             classes: ["uml-group__type-tag"],
           },
         ),
+        ...renderGroupResizeHandles(box),
       ],
     );
   });
   return v("g", { "data-uml-layer": "groups" }, children);
+}
+
+/**
+ * Eight resize handles arranged at the corners and side midpoints of
+ * the boundary rectangle. CSS hides them unless the boundary itself is
+ * `data-selected="true"`, mirroring the per-node behaviour. The
+ * `data-resize-handle` attribute is the same one `interactions.ts`
+ * already detects, so resize-mode entry stays uniform.
+ */
+function renderGroupResizeHandles(box: GroupBox): VNode[] {
+  type Side = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+  const positions: ReadonlyArray<{ side: Side; x: number; y: number; cursor: string }> = [
+    { side: "nw", x: box.x, y: box.y, cursor: "nwse-resize" },
+    { side: "n", x: box.x + box.width / 2, y: box.y, cursor: "ns-resize" },
+    { side: "ne", x: box.x + box.width, y: box.y, cursor: "nesw-resize" },
+    { side: "e", x: box.x + box.width, y: box.y + box.height / 2, cursor: "ew-resize" },
+    { side: "se", x: box.x + box.width, y: box.y + box.height, cursor: "nwse-resize" },
+    { side: "s", x: box.x + box.width / 2, y: box.y + box.height, cursor: "ns-resize" },
+    { side: "sw", x: box.x, y: box.y + box.height, cursor: "nesw-resize" },
+    { side: "w", x: box.x, y: box.y + box.height / 2, cursor: "ew-resize" },
+  ];
+  const HALF = 4;
+  return positions.map((p) =>
+    v(
+      "rect",
+      {
+        x: p.x - HALF,
+        y: p.y - HALF,
+        width: HALF * 2,
+        height: HALF * 2,
+        fill: "var(--uml-selection-handle, var(--uml-accent))",
+        stroke: "var(--uml-bg)",
+        "stroke-width": "1",
+        "data-resize-handle": p.side,
+      },
+      undefined,
+      {
+        style: `cursor: ${p.cursor}`,
+        classes: ["uml-group-resize-handle", `uml-group-resize-handle--${p.side}`],
+      },
+    ),
+  );
 }

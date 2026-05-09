@@ -32,6 +32,12 @@ export type { MoveNodeCommand, MoveNodePayload } from "./moveNode.js";
 export { resizeNodeCommand } from "./resizeNode.js";
 export type { ResizeNodeCommand, ResizeNodePayload, NodeRect } from "./resizeNode.js";
 
+export { moveGroupCommand } from "./moveGroup.js";
+export type { MoveGroupCommand, MoveGroupPayload } from "./moveGroup.js";
+
+export { resizeGroupCommand } from "./resizeGroup.js";
+export type { ResizeGroupCommand, ResizeGroupPayload } from "./resizeGroup.js";
+
 export { updateNodeCommand } from "./updateNode.js";
 export type { UpdateNodeCommand, UpdateNodePayload, NodePatch } from "./updateNode.js";
 

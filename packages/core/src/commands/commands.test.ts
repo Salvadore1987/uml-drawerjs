@@ -13,6 +13,8 @@ import {
   removeNodeFromGroupCommand,
   updateGroupCommand,
 } from "./group.js";
+import { moveGroupCommand } from "./moveGroup.js";
+import { resizeGroupCommand } from "./resizeGroup.js";
 import { importTextCommand } from "./importText.js";
 import { moveNodeCommand } from "./moveNode.js";
 import { removeEdgeCommand } from "./removeEdge.js";
@@ -277,6 +279,79 @@ describe("group commands", () => {
     const after = cmd!.apply(diagram);
     expect(after.groups[0]?.children).toEqual(["n2"]);
     expect(removeNodeFromGroupCommand("n1", group.id, after)).toBeNull();
+  });
+
+  it("addGroupCommand with layout writes layoutOverrides[groupId] in the same frame", () => {
+    // Arrange
+    const initial = createEmptyDiagram("c4-context");
+
+    // Act
+    const cmd = addGroupCommand(
+      { id: "g1", kind: "boundary", label: "B", children: [] },
+      { x: 100, y: 200, width: 320, height: 200 },
+    );
+    const after = cmd.apply(initial);
+
+    // Assert
+    expect(after.groups[0]?.id).toBe("g1");
+    expect(after.metadata.layoutOverrides?.["g1"]).toEqual({
+      x: 100,
+      y: 200,
+      width: 320,
+      height: 200,
+    });
+
+    // Invert restores the empty state
+    const reverted = cmd.invert(after);
+    expect(reverted.groups).toEqual([]);
+    expect(reverted.metadata.layoutOverrides?.["g1"]).toBeUndefined();
+  });
+
+  it("moveGroupCommand round-trip writes/restores layoutOverrides[groupId]", () => {
+    // Arrange — group already in diagram, no override yet
+    const group = makeGroup("g", []);
+    const initial: Diagram = { ...createEmptyDiagram("c4-context"), groups: [group] };
+
+    // Act
+    const cmd = moveGroupCommand(group.id, { x: 50, y: 60 }, initial);
+    const after = cmd.apply(initial);
+
+    // Assert
+    expect(after.metadata.layoutOverrides?.[group.id]).toEqual({ x: 50, y: 60 });
+    const reverted = cmd.invert(after);
+    expect(reverted.metadata.layoutOverrides?.[group.id]).toBeUndefined();
+  });
+
+  it("resizeGroupCommand persists the full rect and inverts cleanly", () => {
+    // Arrange
+    const group = makeGroup("g", []);
+    const initial: Diagram = {
+      ...createEmptyDiagram("c4-context"),
+      groups: [group],
+      metadata: {
+        schemaVersion: "1.0.0",
+        layoutOverrides: { [group.id]: { x: 0, y: 0, width: 320, height: 200 } },
+      },
+    };
+
+    // Act
+    const cmd = resizeGroupCommand(group.id, { x: 0, y: 0, width: 640, height: 400 }, initial);
+    const after = cmd.apply(initial);
+
+    // Assert
+    expect(after.metadata.layoutOverrides?.[group.id]).toEqual({
+      x: 0,
+      y: 0,
+      width: 640,
+      height: 400,
+    });
+    const reverted = cmd.invert(after);
+    expect(reverted.metadata.layoutOverrides?.[group.id]).toEqual({
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 200,
+    });
   });
 });
 

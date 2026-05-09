@@ -154,12 +154,17 @@ export function Palette({
     if (!editor) return;
     if (item.target === "group") {
       editor.dispatch(
-        addGroupCommand({
-          id: uuidv7(),
-          kind: item.kind as GroupKind,
-          label: `New ${item.label}`,
-          children: [],
-        }),
+        addGroupCommand(
+          {
+            id: uuidv7(),
+            kind: item.kind as GroupKind,
+            label: `New ${item.label}`,
+            children: [],
+          },
+          // Default rect so the freshly-added boundary appears at a
+          // known place; the user can drag/resize it from there.
+          { x: 0, y: 0, width: 320, height: 200 },
+        ),
       );
       return;
     }

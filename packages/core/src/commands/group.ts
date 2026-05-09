@@ -1,24 +1,43 @@
 import { findGroup } from "../model/query.js";
-import type { Diagram, DiagramGroup } from "../model/types.js";
-import { applyPatch, appendGroup, dropGroup, replaceGroup } from "./base.js";
+import type { Diagram, DiagramGroup, LayoutCoordinate } from "../model/types.js";
+import { applyPatch, appendGroup, dropGroup, replaceGroup, setLayoutOverride } from "./base.js";
 import type { Command } from "./base.js";
 
 export interface AddGroupPayload {
   readonly group: DiagramGroup;
+  /**
+   * Optional initial rectangle for the group. When set, gets written into
+   * `metadata.layoutOverrides[group.id]` as part of the same command, so
+   * a freshly-added boundary appears at a known position instead of
+   * relying on auto-fit (which collapses to a default for empty groups).
+   */
+  readonly layout?: LayoutCoordinate;
 }
 
 export type AddGroupCommand = Command<"AddGroup", AddGroupPayload>;
 
-export function addGroupCommand(group: DiagramGroup): AddGroupCommand {
-  const payload: AddGroupPayload = { group: structuredClone(group) };
+export function addGroupCommand(group: DiagramGroup, layout?: LayoutCoordinate): AddGroupCommand {
+  const payload: AddGroupPayload = {
+    group: structuredClone(group),
+    ...(layout ? { layout: { ...layout } } : {}),
+  };
   return {
     kind: "AddGroup",
     payload,
     apply(diagram: Diagram): Diagram {
-      return appendGroup(diagram, payload.group);
+      const withGroup = appendGroup(diagram, payload.group);
+      if (payload.layout) {
+        return setLayoutOverride(withGroup, payload.group.id, { ...payload.layout });
+      }
+      return withGroup;
     },
     invert(diagram: Diagram): Diagram {
-      return dropGroup(diagram, payload.group.id);
+      // The user has no expectation of an override outliving an undone
+      // creation, so we drop the layout entry alongside the group itself.
+      const cleaned = payload.layout
+        ? setLayoutOverride(diagram, payload.group.id, undefined)
+        : diagram;
+      return dropGroup(cleaned, payload.group.id);
     },
   };
 }

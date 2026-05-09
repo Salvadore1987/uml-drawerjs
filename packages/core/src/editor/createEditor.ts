@@ -2,6 +2,7 @@ import {
   applyLayoutCommand,
   importTextCommand,
   moveNodeCommand,
+  removeGroupCommand,
   removeNodeCommand,
 } from "../commands/index.js";
 import { CommandBus } from "../commands/index.js";
@@ -557,10 +558,14 @@ function bootstrapKeyboard(
         const ids = [...selection.get()];
         if (ids.length === 0) return;
         const diagram = bus.getState();
-        const known = new Set(diagram.nodes.map((n) => n.id));
+        const knownNodes = new Set(diagram.nodes.map((n) => n.id));
+        const knownGroups = new Set(diagram.groups.map((g) => g.id));
         for (const id of ids) {
-          if (!known.has(id)) continue;
-          history.dispatch(removeNodeCommand(id, bus.getState()));
+          if (knownNodes.has(id)) {
+            history.dispatch(removeNodeCommand(id, bus.getState()));
+          } else if (knownGroups.has(id)) {
+            history.dispatch(removeGroupCommand(id, bus.getState()));
+          }
         }
         selection.clear();
       }),

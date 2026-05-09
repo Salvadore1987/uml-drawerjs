@@ -505,6 +505,37 @@
   pointer-events: auto;
 }
 
+/* Boundary group: highlight stroke + handles when selected. The frame
+   uses pointer-events:stroke so click only registers on the dashed
+   border or the label band — clicks on enclosed nodes still reach
+   them. The label band rect is invisible but receives pointerdown
+   so the user can grab the boundary by its title. */
+[data-group-id] .uml-group-boundary:hover {
+  stroke: var(--uml-accent);
+}
+
+[data-group-id][data-selected="true"] .uml-group-boundary {
+  stroke: var(--uml-accent);
+  stroke-width: 2;
+}
+
+.uml-group-resize-handle {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+[data-uml-content][data-selected-count="single"]
+  [data-group-id][data-selected="true"]
+  .uml-group-resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.uml-group__label-band {
+  cursor: move;
+}
+
 .uml-edge-ghost {
   pointer-events: none;
   opacity: 0.7;
