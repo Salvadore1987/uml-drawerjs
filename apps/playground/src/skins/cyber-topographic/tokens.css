@@ -51,7 +51,7 @@
   --input-bg: rgba(6, 8, 12, 0.5);
   --icon-btn-bg: rgba(15, 21, 30, 0.6);
   --tree-hover: rgba(120, 200, 255, 0.05);
-  --grid-dot: rgba(120, 200, 255, 0.1);
+  --grid-dot: rgba(120, 200, 255, 0.45);
 
   /* topographic + scanline */
   --topo-color: #78c8ff;
@@ -110,7 +110,7 @@
   --input-bg: rgba(255, 255, 255, 0.75);
   --icon-btn-bg: rgba(255, 252, 244, 0.7);
   --tree-hover: rgba(13, 47, 79, 0.05);
-  --grid-dot: rgba(13, 47, 79, 0.1);
+  --grid-dot: rgba(13, 47, 79, 0.4);
 
   /* topographic + scanline */
   --topo-color: #1a3b6b;

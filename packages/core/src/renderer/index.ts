@@ -16,10 +16,13 @@
  */
 import { renderEdge, renderArrowMarkerDefs } from "./edges.js";
 import { computeNodeGeometry, renderNode } from "./nodes.js";
+import { renderGridLayer } from "./grid.js";
 import { layoutGrid } from "../layout/fallback.js";
 import type { Diagram } from "../model/types.js";
 import { resolveRendererDefaults, v } from "./types.js";
 import type { NodeGeometry, RenderedDiagram, RendererOptions, VNode } from "./types.js";
+
+const DEFAULT_GRID_STEP = 24;
 
 export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): RenderedDiagram {
   const defaults = resolveRendererDefaults(options);
@@ -36,12 +39,18 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
 
   for (const node of diagram.nodes) {
     const coordinate = coordinates[node.id] ?? { x: 0, y: 0 };
+    // Per-node dimensions ride alongside x/y in `LayoutCoordinate`. The
+    // user-resize path persists `width`/`height` here so subsequent
+    // re-renders restore the same rectangle. Auto-layout never writes
+    // size, so the default applies whenever the user hasn't resized.
+    const widthHint = coordinate.width ?? defaults.nodeWidth;
+    const heightHint = coordinate.height ?? defaults.nodeHeight;
     const geom = computeNodeGeometry({
       node,
       x: coordinate.x,
       y: coordinate.y,
-      width: defaults.nodeWidth,
-      height: defaults.nodeHeight,
+      width: widthHint,
+      height: heightHint,
     });
     geometry.set(node.id, geom);
     nodeVNodes.push(
@@ -59,6 +68,10 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
 
   const bbox = boundingBoxOf(geometry, defaults.canvasPadding);
 
+  const gridVisible = options.grid?.visible ?? true;
+  const gridStep = options.grid?.step ?? DEFAULT_GRID_STEP;
+  const gridLayer = renderGridLayer({ visible: gridVisible, step: gridStep, bbox });
+
   const root: VNode = v(
     "svg",
     {
@@ -73,6 +86,8 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
     [
       renderArrowMarkerDefs(),
       v("g", { "data-uml-content": "true" }, [
+        // Grid sits behind edges and nodes so it never occludes content.
+        gridLayer,
         // Edges go behind nodes so node frames cover edge endpoints.
         v("g", { "data-uml-layer": "edges" }, edgeVNodes),
         v("g", { "data-uml-layer": "nodes" }, nodeVNodes),
@@ -117,6 +132,12 @@ function boundingBoxOf(
   };
 }
 
+export { renderGridLayer } from "./grid.js";
+export type { GridLayerOptions } from "./grid.js";
+export { snapValue, snapPoint, snapRect, DEFAULT_SNAP } from "./snap.js";
+export type { SnapOptions } from "./snap.js";
+export { computeResizeRect } from "./resizeGeometry.js";
+export type { ResizeSide, Rect, ResizeOptions } from "./resizeGeometry.js";
 export { mountSvg, rerenderSvg } from "./mount.js";
 export type { MountResult } from "./mount.js";
 export { renderArrowMarkerDefs, renderEdge, portSnap } from "./edges.js";

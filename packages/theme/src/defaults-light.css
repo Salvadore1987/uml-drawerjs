@@ -44,7 +44,7 @@
 
   /* canvas */
   --uml-canvas-bg: #f8fafc;
-  --uml-canvas-grid: #e2e8f0;
+  --uml-canvas-grid: #cbd5e1;
 
   /* selection / focus */
   --uml-selection-fill: rgba(37, 99, 235, 0.1);
@@ -112,7 +112,7 @@
     --uml-edge-label-text: #475569;
 
     --uml-canvas-bg: #f8fafc;
-    --uml-canvas-grid: #e2e8f0;
+    --uml-canvas-grid: #cbd5e1;
 
     --uml-selection-fill: rgba(37, 99, 235, 0.1);
     --uml-selection-stroke: #2563eb;

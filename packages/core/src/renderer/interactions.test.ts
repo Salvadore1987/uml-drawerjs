@@ -265,4 +265,50 @@ describe("renderer/interactions — pointer flow", () => {
     expect(mount.root.querySelector(".uml-marquee")).toBeNull();
     controller.dispose();
   });
+
+  it("pointerdown on a [data-resize-handle] enters resize mode and dispatches ResizeNodeCommand on up", () => {
+    // Arrange — single node selected, drag SE handle by (+24, +24).
+    const { mount, history, controller, bus, selection } = setup();
+    selection.set(["a"]);
+    const handle = mount.root.querySelector(
+      '[data-node-id="a"] [data-resize-handle="se"]',
+    ) as Element | null;
+    expect(handle).not.toBeNull();
+
+    const dispatchedKinds: string[] = [];
+    const unsubscribe = bus.on("after", ({ command }) => {
+      dispatchedKinds.push(command.kind);
+    });
+
+    // Act — fire the resize-handle pointer flow.
+    handle!.dispatchEvent(
+      pointerEvent("pointerdown", { target: handle!, clientX: 200, clientY: 80 }),
+    );
+    mount.root.dispatchEvent(pointerEvent("pointermove", { clientX: 220, clientY: 100 }));
+    mount.root.dispatchEvent(pointerEvent("pointerup", { clientX: 220, clientY: 100 }));
+
+    // Assert — exactly one ResizeNode command landed.
+    expect(dispatchedKinds.filter((k) => k === "ResizeNode").length).toBe(1);
+    expect(dispatchedKinds.filter((k) => k === "MoveNode").length).toBe(0);
+    void history;
+    unsubscribe();
+    controller.dispose();
+  });
+
+  it("move-drag snaps the delta to the grid step (default 24 px)", () => {
+    // Arrange — drag node A by (+13, +13). Snap should round the delta
+    // to (24, 24), so the final coordinate becomes (24, 24) from (0, 0).
+    const { mount, controller, bus } = setup();
+    const nodeA = mount.root.querySelector('[data-node-id="a"]') as Element;
+
+    // Act
+    nodeA.dispatchEvent(pointerEvent("pointerdown", { target: nodeA, clientX: 50, clientY: 30 }));
+    mount.root.dispatchEvent(pointerEvent("pointermove", { clientX: 63, clientY: 43 }));
+    mount.root.dispatchEvent(pointerEvent("pointerup", { clientX: 63, clientY: 43 }));
+
+    // Assert — final coordinate is the original + snapped delta.
+    const overrides = bus.getState().metadata.layoutOverrides ?? {};
+    expect(overrides["a"]).toEqual({ x: 24, y: 24 });
+    controller.dispose();
+  });
 });

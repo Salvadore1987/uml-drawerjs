@@ -32,6 +32,8 @@ export interface KeyboardNavigationCallbacks {
   readonly onFitToView?: () => void;
   readonly onToggleLock?: () => void;
   readonly onSelectAll?: () => void;
+  /** Cmd/Ctrl+Shift+G toggles the SVG grid layer (snap stays active). */
+  readonly onToggleGrid?: () => void;
 }
 
 export interface KeyboardNavigationOptions extends KeyboardNavigationCallbacks {
@@ -124,6 +126,16 @@ export function attachKeyboardNavigation(
       if (!options.onSelectAll) return;
       event.preventDefault();
       options.onSelectAll();
+      return;
+    }
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      event.shiftKey &&
+      (event.key === "g" || event.key === "G")
+    ) {
+      if (!options.onToggleGrid) return;
+      event.preventDefault();
+      options.onToggleGrid();
     }
   };
 

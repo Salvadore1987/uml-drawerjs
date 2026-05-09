@@ -70,6 +70,18 @@ export interface CreateEditorOptions {
      * resolution as `panZoom` — enabled when interactivity is enabled.
      */
     readonly pointer?: boolean;
+    /**
+     * Snap-to-grid for move and resize gestures. Holding `Alt` during a
+     * gesture temporarily disables snap regardless of `enabled`. Step
+     * defaults to 24 px (matches `--uml-canvas-grid-density`).
+     */
+    readonly snap?: { readonly enabled?: boolean; readonly step?: number };
+    /**
+     * Initial grid visibility. Toggle via `editor.toggleGrid()`,
+     * `editor.setGridVisible(b)`, or the Cmd+Shift+G shortcut. Defaults
+     * to `true`.
+     */
+    readonly grid?: { readonly visible?: boolean };
   };
   /** Fires after every command (including undo / redo / import). */
   readonly onChange?: (event: EditorChangeEvent) => void;
@@ -110,9 +122,21 @@ export interface EditorInstance {
   zoomReset(): void;
   /** Frame the diagram so it fits the viewport. */
   fitToView(padding?: number): void;
+  /**
+   * Centre the diagram in the viewport at 100% (scale=1). Different from
+   * `fitToView`, which scales to fit; `centerView` keeps pixel-faithful
+   * coordinates so resize/snap remain predictable.
+   */
+  centerView(): void;
   /** Toggle canvas-side editing. Pan/zoom remain active when locked. */
   setLocked(flag: boolean): void;
   isLocked(): boolean;
+  /** Show/hide the SVG grid layer. Snap remains active even when hidden. */
+  setGridVisible(flag: boolean): void;
+  toggleGrid(): boolean;
+  isGridVisible(): boolean;
+  /** Subscribe to grid-visibility changes. Returns an unsubscribe fn. */
+  onGridChange(listener: (visible: boolean) => void): () => void;
   /** Dispatch a command and return the resulting AST. */
   dispatch(command: Command): Diagram;
   /** Current AST snapshot. */

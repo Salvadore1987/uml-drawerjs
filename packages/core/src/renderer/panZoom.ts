@@ -47,6 +47,16 @@ export interface PanZoomController {
     viewport?: { width: number; height: number },
     padding?: number,
   ): void;
+  /**
+   * Centre a content bounding box in the host viewport at scale 1.0.
+   * Use this when the desired default is 100% zoom (e.g. on first paint)
+   * — `fitToContent` would shrink/grow the diagram to fit, which is the
+   * wrong default when consumers want pixel-faithful coordinates.
+   */
+  centerContent(
+    bbox: { x: number; y: number; width: number; height: number },
+    viewport?: { width: number; height: number },
+  ): void;
   /** Subscribe to state changes — fires after every wheel/drag/setState. */
   onChange(listener: (state: PanZoomState) => void): () => void;
   /** Replace the SVG group the transform is written onto (post-rerender). */
@@ -233,6 +243,26 @@ export function createPanZoomController(
       const tx = (vp.width - bbox.width * fitScale) / 2 - bbox.x * fitScale;
       const ty = (vp.height - bbox.height * fitScale) / 2 - bbox.y * fitScale;
       state = { scale: fitScale, translateX: tx, translateY: ty };
+      apply();
+    },
+    centerContent(
+      bbox: { x: number; y: number; width: number; height: number },
+      viewport?: { width: number; height: number },
+    ): void {
+      const vp =
+        viewport ??
+        (() => {
+          const rect = host.getBoundingClientRect?.();
+          return { width: rect?.width ?? 0, height: rect?.height ?? 0 };
+        })();
+      if (vp.width <= 0 || vp.height <= 0) return;
+      // Identity scale, translate so the bbox centre lands on the
+      // viewport centre. If the diagram is bigger than the viewport
+      // the user can pan — we deliberately don't shrink.
+      const scale = 1;
+      const tx = vp.width / 2 - (bbox.x + bbox.width / 2) * scale;
+      const ty = vp.height / 2 - (bbox.y + bbox.height / 2) * scale;
+      state = { scale, translateX: tx, translateY: ty };
       apply();
     },
     onChange(listener: (state: PanZoomState) => void): () => void {

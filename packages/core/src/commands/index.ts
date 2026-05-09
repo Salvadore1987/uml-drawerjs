@@ -29,6 +29,9 @@ export type { RemoveNodeCommand, RemoveNodePayload } from "./removeNode.js";
 export { moveNodeCommand } from "./moveNode.js";
 export type { MoveNodeCommand, MoveNodePayload } from "./moveNode.js";
 
+export { resizeNodeCommand } from "./resizeNode.js";
+export type { ResizeNodeCommand, ResizeNodePayload, NodeRect } from "./resizeNode.js";
+
 export { updateNodeCommand } from "./updateNode.js";
 export type { UpdateNodeCommand, UpdateNodePayload, NodePatch } from "./updateNode.js";
 

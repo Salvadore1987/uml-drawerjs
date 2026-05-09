@@ -148,10 +148,17 @@ export interface EdgeCardinality {
 /**
  * Layout coordinates for a single node, encoded into PlantUML
  * `' @drawer:meta {...}` comments and survived in `.umljson`.
+ *
+ * `width` / `height` are optional and only present when a user has
+ * explicitly resized the node — auto-layout writes only `x` / `y`. The
+ * renderer falls back to `RENDERER_DEFAULTS` when the size fields are
+ * absent, so older diagrams without dimensions render unchanged.
  */
 export interface LayoutCoordinate {
   x: number;
   y: number;
+  width?: number;
+  height?: number;
 }
 
 /** Per-AST metadata — versioning + persisted layout overrides. */

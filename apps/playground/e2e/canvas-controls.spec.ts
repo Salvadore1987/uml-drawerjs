@@ -293,6 +293,125 @@ test.describe("Canvas controls — interactive diagnosis", () => {
     });
   });
 
+  test("grid layer renders inside content group and toggles via toolbar", async ({ page }) => {
+    // Initial state — grid layer should be visible (default).
+    const gridRect = page.locator('[data-uml-layer="grid"] rect');
+    await expect(gridRect).toBeAttached();
+
+    // Toolbar grid button toggles visibility.
+    const gridButton = page.getByRole("button", { name: /^(Hide|Show) grid$/ });
+    await expect(gridButton).toHaveAttribute("aria-pressed", "true");
+
+    await gridButton.click();
+    await page.waitForTimeout(150);
+    await expect(gridButton).toHaveAttribute("aria-pressed", "false");
+    // Hidden mode keeps the layer slot but drops the rect.
+    await expect(page.locator('[data-uml-layer="grid"] rect')).toHaveCount(0);
+
+    await gridButton.click();
+    await page.waitForTimeout(150);
+    await expect(gridButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('[data-uml-layer="grid"] rect')).toBeAttached();
+    await page.screenshot({
+      path: "apps/playground/e2e/screenshots/09-grid-toggle.png",
+      fullPage: true,
+    });
+  });
+
+  test("resize handles appear when a single node is selected and dispatch ResizeNode on drag", async ({
+    page,
+  }) => {
+    // Select a single node by clicking it.
+    const result = await page.evaluate(() => {
+      const node = document.querySelector("[data-node-id]") as Element | null;
+      if (!node) return { ok: false, count: 0, dispatched: false };
+      const rect = (node as SVGGraphicsElement).getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const fire = (type: string, target: Element, x: number, y: number): void => {
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX: x,
+            clientY: y,
+            pointerId: 1,
+            pointerType: "mouse",
+          }),
+        );
+      };
+      fire("pointerdown", node, cx, cy);
+      fire("pointerup", node, cx, cy);
+      return {
+        ok: true,
+        count: document.querySelectorAll('[data-selected="true"]').length,
+        nodeId: node.getAttribute("data-node-id"),
+      };
+    });
+    expect(result.ok).toBe(true);
+    expect(result.count).toBe(1);
+
+    // After single-select, eight resize handles must be present.
+    const handles = page.locator(`[data-node-id="${result.nodeId}"] [data-resize-handle]`);
+    await expect(handles).toHaveCount(8);
+
+    // Drag the SE handle to enlarge the node by ~24 px.
+    const drag = await page.evaluate((nodeId) => {
+      const handle = document.querySelector(
+        `[data-node-id="${nodeId}"] [data-resize-handle="se"]`,
+      ) as Element | null;
+      if (!handle) return { ok: false };
+      const r = (handle as SVGGraphicsElement).getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const svg = document.querySelector(".uml-canvas-host svg")!;
+      const fire = (type: string, target: Element, x: number, y: number): void => {
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX: x,
+            clientY: y,
+            pointerId: 1,
+            pointerType: "mouse",
+          }),
+        );
+      };
+      fire("pointerdown", handle, cx, cy);
+      fire("pointermove", svg, cx + 30, cy + 20);
+      fire("pointerup", svg, cx + 30, cy + 20);
+      return { ok: true };
+    }, result.nodeId);
+    expect(drag.ok).toBe(true);
+    await page.waitForTimeout(200);
+
+    // After resize, the node's frame rect should have grown by a
+    // multiple of the grid step (24). Snap is applied to the *delta* —
+    // the same rule as move-drag — so the absolute width is `original
+    // + N×step`. Asserting the delta-mod proves snap fired without
+    // depending on the original (default) width staying at 200 forever.
+    const frameWidth = await page.evaluate((nodeId) => {
+      const node = document.querySelector(`[data-node-id="${nodeId}"]`);
+      if (!node) return null;
+      const rects = Array.from(node.querySelectorAll("rect")).filter(
+        (r) => !r.hasAttribute("data-resize-handle"),
+      );
+      const widths = rects.map((r) => Number(r.getAttribute("width") ?? 0));
+      return widths.length > 0 ? Math.max(...widths) : null;
+    }, result.nodeId);
+    expect(frameWidth).not.toBeNull();
+    // The default width is 200; after a +30 px drag snapped to step 24,
+    // the new width is 224. Both 200 and 224 are valid (in case the
+    // playground default changes), so we check growth + delta-mod.
+    expect(frameWidth!).toBeGreaterThan(200);
+    expect((frameWidth! - 200) % 24).toBe(0);
+
+    await page.screenshot({
+      path: "apps/playground/e2e/screenshots/10-after-resize.png",
+      fullPage: true,
+    });
+  });
+
   test("pan: dragging on the canvas background changes the transform", async ({ page }) => {
     const host = page.locator(".uml-canvas-host");
     const contentGroup = page.locator('[data-uml-content="true"]').first();

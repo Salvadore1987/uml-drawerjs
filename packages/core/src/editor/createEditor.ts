@@ -38,7 +38,9 @@ import type {
   PanZoomController,
   PanZoomOptions,
   SelectionModel,
+  SnapOptions,
 } from "../renderer/index.js";
+import { DEFAULT_SNAP } from "../renderer/index.js";
 import type {
   CreateEditorOptions,
   EditorChangeEvent,
@@ -78,8 +80,49 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
   themeMql?.addEventListener("change", themeMqlListener);
   writeThemeAttribute(host, activeTheme, themeMql);
 
-  // Render pipeline.
-  let mount: MountResult | null = mountInitialRender(host, bus.getState(), options);
+  // Optional interactivity — every controller is disposed in `destroy()`.
+  const interactive = options.interactive ?? {};
+  const selection: SelectionModel = interactive.selection ?? createSelectionModel();
+  let locked = false;
+  const getLocked = (): boolean => locked;
+
+  // Snap config — interactions consult this on every pointermove. We
+  // expose it as a getter so future runtime updates (e.g. a "Step: 8"
+  // toggle in the toolbar) do not require rebinding listeners.
+  const snapState: { enabled: boolean; step: number } = {
+    enabled: interactive.snap?.enabled ?? DEFAULT_SNAP.enabled,
+    step: interactive.snap?.step ?? DEFAULT_SNAP.step,
+  };
+  const getSnap = (): SnapOptions => ({ enabled: snapState.enabled, step: snapState.step });
+
+  // Grid visibility — toolbar/keyboard toggles flip this and trigger a
+  // silent rerender that swaps the grid layer. Snap is independent.
+  let gridVisible = interactive.grid?.visible ?? true;
+  const gridListeners = new Set<(visible: boolean) => void>();
+  const notifyGridListeners = (): void => {
+    for (const listener of [...gridListeners]) listener(gridVisible);
+  };
+
+  // Render pipeline. The initial mount has to wait until grid state is
+  // known so the first SVG already reflects user-supplied visibility.
+  let mount: MountResult | null = mountSvg(
+    host,
+    renderDiagram(bus.getState(), currentRendererOptions(bus.getState())).root,
+  );
+  syncViewportViewBox();
+
+  // Keep viewBox aligned with host pixels so `panZoom.scale = 1` truly
+  // means "1 layout px = 1 screen px" — otherwise `preserveAspectRatio
+  // = xMidYMid meet` over a small bbox would shrink the canvas content
+  // below 1:1 and the grid pattern (1 px circles) would render
+  // sub-pixel and disappear. Re-runs on host resize.
+  let resizeObserver: ResizeObserver | null = null;
+  const ResizeObserverCtor = (globalThis as { ResizeObserver?: typeof ResizeObserver })
+    .ResizeObserver;
+  if (typeof ResizeObserverCtor === "function") {
+    resizeObserver = new ResizeObserverCtor(() => syncViewportViewBox());
+    resizeObserver.observe(host);
+  }
 
   // Cached snapshot of latest validator errors — recomputed on every change.
   let errors: readonly DiagramError[] = collectErrors(bus.getState(), []);
@@ -88,11 +131,9 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
 
   const unsubscribeBus = bus.on("after", ({ command, nextState }) => {
     if (mount) {
-      const rendered = renderDiagram(
-        nextState,
-        withLayoutOverrides(nextState, options.rendererOptions),
-      );
+      const rendered = renderDiagram(nextState, currentRendererOptions(nextState));
       mount = rerenderSvg(mount, host, rendered.root);
+      syncViewportViewBox();
       rebindInteractions();
     }
     errors = collectErrors(nextState, []);
@@ -100,11 +141,6 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
     options.onChange?.(snapshotChangeEvent(nextState, errors, command));
   });
 
-  // Optional interactivity — every controller is disposed in `destroy()`.
-  const interactive = options.interactive ?? {};
-  const selection: SelectionModel = interactive.selection ?? createSelectionModel();
-  let locked = false;
-  const getLocked = (): boolean => locked;
   const panZoom = bootstrapPanZoom(host, mount?.root ?? null, interactive.panZoom);
 
   const fitToViewport = (padding: number = 24): void => {
@@ -112,6 +148,13 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
     const bbox = computeContentBoundingBox(bus.getState(), options.rendererOptions);
     if (!bbox) return;
     panZoom.fitToContent(bbox, undefined, padding);
+  };
+
+  const centerInViewport = (): void => {
+    if (!panZoom || !mount) return;
+    const bbox = computeContentBoundingBox(bus.getState(), options.rendererOptions);
+    if (!bbox) return;
+    panZoom.centerContent(bbox);
   };
 
   const toggleLock = (): boolean => {
@@ -155,6 +198,7 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
     toggleLock,
     undoAndRerender,
     redoAndRerender,
+    () => toggleGridFlag(),
   );
   let interactions: InteractionsController | null = bootstrapInteractions(
     interactive.pointer,
@@ -164,7 +208,19 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
     selection,
     options.idFactory,
     getLocked,
+    getSnap,
   );
+
+  const setGridVisibleFlag = (value: boolean): void => {
+    if (gridVisible === value) return;
+    gridVisible = value;
+    rerenderForGrid();
+    notifyGridListeners();
+  };
+  const toggleGridFlag = (): boolean => {
+    setGridVisibleFlag(!gridVisible);
+    return gridVisible;
+  };
 
   const instance: EditorInstance = {
     async loadFromText(text: string): Promise<EditorChangeEvent> {
@@ -275,11 +331,29 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
     fitToView(padding?: number): void {
       fitToViewport(padding);
     },
+    centerView(): void {
+      centerInViewport();
+    },
     setLocked(flag: boolean): void {
       setLockedFlag(flag);
     },
     isLocked(): boolean {
       return locked;
+    },
+    setGridVisible(flag: boolean): void {
+      setGridVisibleFlag(flag);
+    },
+    toggleGrid(): boolean {
+      return toggleGridFlag();
+    },
+    isGridVisible(): boolean {
+      return gridVisible;
+    },
+    onGridChange(listener: (visible: boolean) => void): () => void {
+      gridListeners.add(listener);
+      return () => {
+        gridListeners.delete(listener);
+      };
     },
 
     bus,
@@ -290,6 +364,8 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
     destroy(): void {
       unsubscribeBus();
       themeMql?.removeEventListener("change", themeMqlListener);
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       interactions?.dispose();
       interactions = null;
       keyboard?.dispose();
@@ -305,14 +381,49 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
 
   function handleSilentStateChange(next: Diagram, previousState: Diagram): void {
     if (mount) {
-      const rendered = renderDiagram(next, withLayoutOverrides(next, options.rendererOptions));
+      const rendered = renderDiagram(next, currentRendererOptions(next));
       mount = rerenderSvg(mount, host, rendered.root);
+      syncViewportViewBox();
       rebindInteractions();
     }
     errors = collectErrors(next, []);
     options.onValidate?.(errors);
     void previousState;
     options.onChange?.(snapshotChangeEvent(next, errors, null));
+  }
+
+  function currentRendererOptions(diagram: Diagram): CreateEditorOptions["rendererOptions"] {
+    const merged = withLayoutOverrides(diagram, options.rendererOptions);
+    return { ...(merged ?? {}), grid: { visible: gridVisible } };
+  }
+
+  function rerenderForGrid(): void {
+    if (!mount) return;
+    const next = bus.getState();
+    const rendered = renderDiagram(next, currentRendererOptions(next));
+    mount = rerenderSvg(mount, host, rendered.root);
+    syncViewportViewBox();
+    rebindInteractions();
+  }
+
+  /**
+   * Replace the renderer-emitted viewBox (which tightly frames the
+   * diagram's bbox) with one that matches the host's pixel rectangle.
+   * This makes `panZoom.scale = 1` correspond to a true 1:1 mapping
+   * between layout coords and screen pixels — the renderer's default
+   * uses `preserveAspectRatio = xMidYMid meet`, which over a small
+   * diagram would shrink content below 1:1 and erase the 1 px grid
+   * dots. The exporter (`exportSvg`) re-renders without this override,
+   * so static output keeps a tight bbox.
+   */
+  function syncViewportViewBox(): void {
+    if (!mount) return;
+    const root = mount.root;
+    const rect = host.getBoundingClientRect?.();
+    const w = Math.max(rect?.width ?? 0, 1);
+    const h = Math.max(rect?.height ?? 0, 1);
+    root.setAttribute("viewBox", `0 0 ${w} ${h}`);
+    root.setAttribute("preserveAspectRatio", "xMinYMin meet");
   }
 
   function rebindInteractions(): void {
@@ -342,15 +453,6 @@ function resolveInitialDiagram(options: CreateEditorOptions): Diagram {
   // only path that calls the parser. The constructor stays synchronous so
   // hosts can rely on `getState()` returning a non-null Diagram immediately.
   return createEmptyDiagram(options.diagramType);
-}
-
-function mountInitialRender(
-  host: Element,
-  diagram: Diagram,
-  options: CreateEditorOptions,
-): MountResult {
-  const rendered = renderDiagram(diagram, withLayoutOverrides(diagram, options.rendererOptions));
-  return mountSvg(host, rendered.root);
 }
 
 /**
@@ -404,6 +506,7 @@ function bootstrapInteractions(
   selection: SelectionModel,
   idFactory: (() => string) | undefined,
   getLocked: () => boolean,
+  getSnap: () => SnapOptions,
 ): InteractionsController | null {
   if (flag === false) return null;
   if (flag === undefined) return null;
@@ -417,6 +520,7 @@ function bootstrapInteractions(
     bus,
     selection,
     getLocked,
+    getSnap,
     ...(idFactory ? { idFactory } : {}),
   });
 }
@@ -432,6 +536,7 @@ function bootstrapKeyboard(
   toggleLock: () => boolean,
   doUndo: () => void,
   doRedo: () => void,
+  doToggleGrid: () => void,
 ): KeyboardNavigationController | null {
   if (flag === false) return null;
   if (flag === undefined) return null;
@@ -488,6 +593,11 @@ function bootstrapKeyboard(
       ((): void => {
         const ids = bus.getState().nodes.map((n) => n.id);
         selection.set(ids);
+      }),
+    onToggleGrid:
+      baseOptions.onToggleGrid ??
+      ((): void => {
+        doToggleGrid();
       }),
   };
   return attachKeyboardNavigation(host as HTMLElement, merged);

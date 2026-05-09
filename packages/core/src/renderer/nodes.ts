@@ -92,6 +92,12 @@ export function renderNode(args: RenderNodeArgs): VNode {
   // distance-from-border heuristics.
   children.push(...renderPortHandles(geometry));
 
+  // Resize handles — eight small squares (NW/N/NE/E/SE/S/SW/W) shown
+  // only when the node is the sole element in the selection. Cursor
+  // and `data-resize-handle` attribute let `interactions.ts` enter
+  // resize mode without distance heuristics.
+  children.push(...renderResizeHandles(geometry));
+
   return v(
     "g",
     {
@@ -150,6 +156,56 @@ function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
         "stroke-width": "1.5",
       });
   }
+}
+
+/**
+ * Eight resize handles arranged at the corners and side midpoints of
+ * the node rectangle. Hidden by CSS unless the node is the only element
+ * in the selection — when several nodes are selected, group-resize is
+ * intentionally not offered, so showing handles would be misleading.
+ *
+ * Coordinate system mirrors `renderPortHandles`: the handles live in
+ * the node's local space (origin at top-left of the frame), so the
+ * outer `<g transform="translate(x,y)">` positions them correctly.
+ */
+function renderResizeHandles(geom: NodeGeometry): VNode[] {
+  type Side = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+  const positions: ReadonlyArray<{
+    side: Side;
+    x: number;
+    y: number;
+    cursor: string;
+  }> = [
+    { side: "nw", x: 0, y: 0, cursor: "nwse-resize" },
+    { side: "n", x: geom.width / 2, y: 0, cursor: "ns-resize" },
+    { side: "ne", x: geom.width, y: 0, cursor: "nesw-resize" },
+    { side: "e", x: geom.width, y: geom.height / 2, cursor: "ew-resize" },
+    { side: "se", x: geom.width, y: geom.height, cursor: "nwse-resize" },
+    { side: "s", x: geom.width / 2, y: geom.height, cursor: "ns-resize" },
+    { side: "sw", x: 0, y: geom.height, cursor: "nesw-resize" },
+    { side: "w", x: 0, y: geom.height / 2, cursor: "ew-resize" },
+  ];
+  const HALF = 4;
+  return positions.map((p) =>
+    v(
+      "rect",
+      {
+        x: p.x - HALF,
+        y: p.y - HALF,
+        width: HALF * 2,
+        height: HALF * 2,
+        fill: "var(--uml-selection-handle, var(--uml-accent))",
+        stroke: "var(--uml-bg)",
+        "stroke-width": "1",
+        "data-resize-handle": p.side,
+      },
+      undefined,
+      {
+        style: `cursor: ${p.cursor}`,
+        classes: ["uml-node-resize-handle", `uml-node-resize-handle--${p.side}`],
+      },
+    ),
+  );
 }
 
 /**

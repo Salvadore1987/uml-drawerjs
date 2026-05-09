@@ -160,10 +160,13 @@ export function UmlEditor({
               }
             }
           }
-          // Frame whatever ended up in the AST so the user sees the
-          // whole diagram on first paint, even when consumers supplied
-          // their own `layoutOverrides`.
-          requestAnimationFrame(() => instance.fitToView());
+          // Centre the diagram in the viewport at 100% so the user
+          // sees pixel-faithful coordinates from first paint. We
+          // deliberately don't `fitToView` (which would scale): users
+          // expect "100%" by default — resize, snap, and the grid step
+          // are all stated in layout pixels, so a non-1 scale on entry
+          // would mismatch the grid visual cue.
+          requestAnimationFrame(() => instance.centerView());
         })
         .catch(() => {
           /* validator surfaces the error */

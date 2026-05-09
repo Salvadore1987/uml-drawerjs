@@ -58,6 +58,13 @@ export interface RendererOptions {
   readonly nodeHeight?: number;
   /** Optional override for the canvas size — useful for snapshot tests. */
   readonly canvasPadding?: number;
+  /**
+   * Optional grid layer drawn inside `<g data-uml-content>`. Defaults to
+   * visible with a 24 px step. Set `visible: false` to suppress (the
+   * playground's grid-toggle drives this; snap continues to work even
+   * when the grid is hidden).
+   */
+  readonly grid?: { readonly visible?: boolean; readonly step?: number };
 }
 
 /** Resolved (defaulted) form of `RendererOptions`. */

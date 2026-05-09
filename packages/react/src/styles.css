@@ -97,8 +97,11 @@
 .uml-canvas-host {
   grid-area: canvas;
   background-color: var(--uml-canvas-bg);
-  background-image: radial-gradient(circle at center, var(--uml-canvas-grid) 1px, transparent 1px);
-  background-size: var(--uml-canvas-grid-density) var(--uml-canvas-grid-density);
+  /* Grid is rendered as an SVG <pattern> inside the content group so it
+     pans / zooms with the diagram (the old CSS radial-gradient was
+     fixed to the host viewport, which made it useless as a snap
+     reference). The grid layer itself reads the same `--uml-canvas-grid`
+     token, so the visual is identical at scale 1:1. */
   border: 1px solid var(--uml-border);
   position: relative;
   overflow: hidden;
@@ -482,6 +485,24 @@
 
 .uml-node-port:hover {
   r: 7;
+}
+
+/* Resize handles — eight 8×8 squares around the selected node. Only
+   visible when the diagram has exactly one selected node (the
+   `data-selected-count="single"` attribute is written by `paintSelection`
+   in interactions.ts). Multi-select hides the handles to avoid implying
+   group-resize support, which the editor does not offer. */
+.uml-node-resize-handle {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+[data-uml-content][data-selected-count="single"]
+  .uml-node[data-selected="true"]
+  .uml-node-resize-handle {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .uml-edge-ghost {

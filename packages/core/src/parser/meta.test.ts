@@ -68,4 +68,28 @@ describe("formatMetaComment", () => {
       expect(parsed.payload).toEqual(payload);
     }
   });
+
+  it("preserves optional width/height alongside x/y", () => {
+    // Arrange — user-resized node carries dimensions in `LayoutCoordinate`
+    // so subsequent re-renders (or re-imports of the same PUML) restore
+    // the same rectangle.
+    const payload = {
+      layoutOverrides: { a1: { x: 240, y: 120, width: 264, height: 96 } },
+    };
+
+    // Act
+    const text = formatMetaComment(payload);
+    const parsed = parseMetaComment(text);
+
+    // Assert
+    expect(parsed?.ok).toBe(true);
+    if (parsed?.ok) {
+      expect(parsed.payload.layoutOverrides?.["a1"]).toEqual({
+        x: 240,
+        y: 120,
+        width: 264,
+        height: 96,
+      });
+    }
+  });
 });

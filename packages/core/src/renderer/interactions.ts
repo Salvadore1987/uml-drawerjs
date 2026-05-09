@@ -26,12 +26,21 @@
  * `runAutoLayout` is never called from this module.
  */
 
-import { addEdgeCommand, moveNodeCommand, updateNodeCommand } from "../commands/index.js";
+import {
+  addEdgeCommand,
+  moveNodeCommand,
+  resizeNodeCommand,
+  updateNodeCommand,
+} from "../commands/index.js";
 import type { CommandBus } from "../commands/index.js";
 import type { History } from "../history/index.js";
 import { uuidv7 } from "../model/index.js";
 import type { DiagramType, EdgeKind } from "../model/types.js";
 import type { SelectionModel } from "./selection.js";
+import { DEFAULT_SNAP, snapValue } from "./snap.js";
+import type { SnapOptions } from "./snap.js";
+import { computeResizeRect } from "./resizeGeometry.js";
+import type { Rect, ResizeSide } from "./resizeGeometry.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const HTML_NS = "http://www.w3.org/1999/xhtml";
@@ -59,6 +68,12 @@ export interface InteractionsOptions {
    * remain functional.
    */
   readonly getLocked?: () => boolean;
+  /**
+   * Snap-to-grid options for both move-drag and resize-drag. Defaults to
+   * the renderer's `DEFAULT_SNAP` (24 px step, enabled). The `Alt` key
+   * temporarily disables snap during a gesture for fine adjustment.
+   */
+  readonly getSnap?: () => SnapOptions;
 }
 
 export interface InteractionsController {
@@ -73,7 +88,7 @@ interface MovingNode {
 }
 
 interface DragState {
-  readonly mode: "select" | "move" | "connect" | "marquee";
+  readonly mode: "select" | "move" | "connect" | "marquee" | "resize";
   /** Primary node id for the gesture (irrelevant in marquee mode). */
   readonly nodeId: string;
   readonly pointerId: number;
@@ -91,6 +106,12 @@ interface DragState {
   ghostLine: SVGLineElement | null;
   /** Live SVG rect for marquee mode. */
   marqueeRect: SVGRectElement | null;
+  /** Resize-only: which handle was grabbed. */
+  readonly resizeSide: ResizeSide | null;
+  /** Resize-only: original node rectangle in layout coords at pointerdown. */
+  readonly resizeOriginalRect: Rect | null;
+  /** Resize-only: most recent ephemeral rect; used for the dispatch on up. */
+  resizeLastRect: Rect | null;
 }
 
 export function attachInteractions(initial: InteractionsOptions): InteractionsController {
@@ -99,6 +120,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
   const { history, bus, selection } = initial;
   const idFactory = initial.idFactory ?? uuidv7;
   const isLocked = (): boolean => initial.getLocked?.() === true;
+  const getSnap = (): SnapOptions => initial.getSnap?.() ?? DEFAULT_SNAP;
 
   let drag: DragState | null = null;
   let renameOverlay: { foreignObject: SVGForeignObjectElement; input: HTMLInputElement } | null =
@@ -163,6 +185,107 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     const tx = match ? Number(match[1]) : 0;
     const ty = match ? Number(match[2]) : 0;
     return { x: tx + bbox.x, y: ty + bbox.y, width: bbox.width, height: bbox.height };
+  }
+
+  /**
+   * Apply an ephemeral resize to a node's DOM (transform + frame width
+   * /height + handle positions) without dispatching a command. Edges
+   * are not updated here — they snap into place on the full re-render
+   * triggered by the `ResizeNodeCommand` dispatch on pointerup.
+   *
+   * The function rewrites the same attributes that the renderer would
+   * have produced, so the visual matches what `renderDiagram` outputs
+   * once the command lands.
+   */
+  function applyEphemeralRect(
+    contentGroupEl: SVGGraphicsElement,
+    nodeId: string,
+    next: Rect,
+  ): void {
+    const escaped = nodeId.replaceAll('"', '\\"');
+    const node = contentGroupEl.querySelector(`[data-node-id="${escaped}"]`);
+    if (!(node instanceof SVGGraphicsElement)) return;
+    node.setAttribute("transform", `translate(${next.x}, ${next.y})`);
+
+    // Resize the primary frame element. Different node kinds use either
+    // a top-level <rect> or a <path>; for paths we rebuild the database
+    // cylinder geometry on the fly. The frame is always either the
+    // first <rect>/<path>/<g[data-uml-frame]> child of the node group.
+    const frame = node.querySelector(":scope > rect, :scope > g[data-uml-frame]");
+    if (frame instanceof SVGRectElement) {
+      frame.setAttribute("width", String(next.width));
+      frame.setAttribute("height", String(next.height));
+    } else if (frame && frame instanceof SVGGElement) {
+      const innerRect = frame.querySelector("rect");
+      if (innerRect) {
+        innerRect.setAttribute("width", String(next.width));
+        innerRect.setAttribute("height", String(next.height));
+      }
+    }
+
+    // Reposition the eight resize handles + four port handles.
+    const handles = node.querySelectorAll<SVGRectElement>("[data-resize-handle]");
+    handles.forEach((handle) => {
+      const side = handle.getAttribute("data-resize-handle");
+      const pos = handlePosition(side, next.width, next.height);
+      if (!pos) return;
+      handle.setAttribute("x", String(pos.x - 4));
+      handle.setAttribute("y", String(pos.y - 4));
+    });
+    const ports = node.querySelectorAll<SVGCircleElement>("[data-port-handle]");
+    ports.forEach((port) => {
+      const side = port.getAttribute("data-port-handle");
+      const pos = portPosition(side, next.width, next.height);
+      if (!pos) return;
+      port.setAttribute("cx", String(pos.x));
+      port.setAttribute("cy", String(pos.y));
+    });
+  }
+
+  function handlePosition(
+    side: string | null,
+    w: number,
+    h: number,
+  ): { x: number; y: number } | null {
+    switch (side) {
+      case "nw":
+        return { x: 0, y: 0 };
+      case "n":
+        return { x: w / 2, y: 0 };
+      case "ne":
+        return { x: w, y: 0 };
+      case "e":
+        return { x: w, y: h / 2 };
+      case "se":
+        return { x: w, y: h };
+      case "s":
+        return { x: w / 2, y: h };
+      case "sw":
+        return { x: 0, y: h };
+      case "w":
+        return { x: 0, y: h / 2 };
+      default:
+        return null;
+    }
+  }
+
+  function portPosition(
+    side: string | null,
+    w: number,
+    h: number,
+  ): { x: number; y: number } | null {
+    switch (side) {
+      case "n":
+        return { x: w / 2, y: 0 };
+      case "e":
+        return { x: w, y: h / 2 };
+      case "s":
+        return { x: w / 2, y: h };
+      case "w":
+        return { x: 0, y: h / 2 };
+      default:
+        return null;
+    }
   }
 
   function intersects(
@@ -323,6 +446,41 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     if (!node) return;
     const startLayout = clientToLayout(event.clientX, event.clientY);
     const rect = nodeRectInLayout(group);
+    const overrides = diagram.metadata.layoutOverrides ?? {};
+
+    // Resize mode wins over everything else: a click that landed inside
+    // a `[data-resize-handle]` rect should never be confused with a
+    // connect or a move, even if the handle happens to lie within
+    // `BORDER_GRAB_PX` of the frame edge.
+    const handleEl =
+      event.target instanceof Element ? event.target.closest("[data-resize-handle]") : null;
+    if (handleEl) {
+      // Selection: a resize gesture should leave the node selected (so
+      // the handles stay visible while dragging). Force single-select on
+      // the resized node.
+      selection.set([nodeId]);
+      const side = handleEl.getAttribute("data-resize-handle") as ResizeSide | null;
+      if (side) {
+        drag = {
+          mode: "resize",
+          nodeId,
+          pointerId: event.pointerId,
+          startClient: { x: event.clientX, y: event.clientY },
+          startLayout,
+          movingNodes: [],
+          hasMoved: false,
+          ghostLine: null,
+          marqueeRect: null,
+          resizeSide: side,
+          resizeOriginalRect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+          resizeLastRect: null,
+        };
+        svg.setPointerCapture?.(event.pointerId);
+        event.stopPropagation();
+        return;
+      }
+    }
+
     const distance = distanceToBorder(rect, startLayout);
     // Connect mode triggers when:
     //   * The pointer landed on an explicit `[data-port-handle]` circle
@@ -331,7 +489,6 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     const isPortHandle =
       event.target instanceof Element && event.target.closest("[data-port-handle]") !== null;
     const onBorder = isPortHandle || distance <= BORDER_GRAB_PX;
-    const overrides = diagram.metadata.layoutOverrides ?? {};
 
     // Selection update:
     //   * Shift+click → toggle (additive multi-select).
@@ -367,6 +524,9 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       hasMoved: false,
       ghostLine: null,
       marqueeRect: null,
+      resizeSide: null,
+      resizeOriginalRect: null,
+      resizeLastRect: null,
     };
 
     svg.setPointerCapture?.(event.pointerId);
@@ -397,6 +557,9 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       hasMoved: false,
       ghostLine: null,
       marqueeRect: rect,
+      resizeSide: null,
+      resizeOriginalRect: null,
+      resizeLastRect: null,
     };
     const host = svg.parentElement;
     host?.setAttribute("data-marquee-active", "true");
@@ -423,9 +586,16 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
 
     if (drag.mode === "move") {
       const cursor = clientToLayout(event.clientX, event.clientY);
-      const ddx = cursor.x - drag.startLayout.x;
-      const ddy = cursor.y - drag.startLayout.y;
-      // Translate every moving node in lock-step. DOM-only — no AST writes.
+      const rawDx = cursor.x - drag.startLayout.x;
+      const rawDy = cursor.y - drag.startLayout.y;
+      // Snap the delta — not the absolute coord — so a node that
+      // started off-grid still moves by integer multiples of the step
+      // and won't twitch on the first frame. Alt holds free-form mode
+      // for fine adjustment, mirroring Figma / draw.io.
+      const snap = getSnap();
+      const useSnap = snap.enabled && !event.altKey;
+      const ddx = useSnap ? snapValue(rawDx, snap) : rawDx;
+      const ddy = useSnap ? snapValue(rawDy, snap) : rawDy;
       for (const moving of drag.movingNodes) {
         const node = contentGroup.querySelector(`[data-node-id="${moving.id}"]`);
         if (node instanceof SVGGraphicsElement) {
@@ -435,6 +605,20 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
           );
         }
       }
+      return;
+    }
+
+    if (drag.mode === "resize" && drag.resizeOriginalRect && drag.resizeSide) {
+      const cursor = clientToLayout(event.clientX, event.clientY);
+      const rawDx = cursor.x - drag.startLayout.x;
+      const rawDy = cursor.y - drag.startLayout.y;
+      const snap = getSnap();
+      const useSnap = snap.enabled && !event.altKey;
+      const ddx = useSnap ? snapValue(rawDx, snap) : rawDx;
+      const ddy = useSnap ? snapValue(rawDy, snap) : rawDy;
+      const next = computeResizeRect(drag.resizeOriginalRect, drag.resizeSide, ddx, ddy);
+      drag.resizeLastRect = next;
+      applyEphemeralRect(contentGroup, drag.nodeId, next);
       return;
     }
 
@@ -486,8 +670,12 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
 
     if (finished.mode === "move") {
       const cursor = clientToLayout(event.clientX, event.clientY);
-      const ddx = cursor.x - finished.startLayout.x;
-      const ddy = cursor.y - finished.startLayout.y;
+      const rawDx = cursor.x - finished.startLayout.x;
+      const rawDy = cursor.y - finished.startLayout.y;
+      const snap = getSnap();
+      const useSnap = snap.enabled && !event.altKey;
+      const ddx = useSnap ? snapValue(rawDx, snap) : rawDx;
+      const ddy = useSnap ? snapValue(rawDy, snap) : rawDy;
       // One MoveNodeCommand per moving node, batched into a single
       // history frame so Cmd+Z reverts the whole gesture.
       const diagram = bus.getState();
@@ -499,6 +687,17 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       } else if (moves.length > 1) {
         history.dispatchAll(moves);
       }
+      return;
+    }
+
+    if (finished.mode === "resize" && finished.resizeOriginalRect) {
+      // The last ephemeral rect already reflects snap (or its absence
+      // when Alt was held). If the pointer moved but no `resizeLastRect`
+      // landed, fall back to the original — defensive only; pointermove
+      // always sets it once `hasMoved` is true.
+      const finalRect = finished.resizeLastRect ?? finished.resizeOriginalRect;
+      const diagram = bus.getState();
+      history.dispatch(resizeNodeCommand(finished.nodeId, finalRect, diagram));
       return;
     }
 
@@ -580,5 +779,15 @@ function paintSelection(contentGroup: SVGGraphicsElement, ids: ReadonlySet<strin
     const escaped = id.replaceAll('"', '\\"');
     const node = contentGroup.querySelector(`[data-node-id="${escaped}"]`);
     if (node) node.setAttribute("data-selected", "true");
+  }
+  // Mark the cardinality of the selection on the content group so
+  // `.uml-node-resize-handle` CSS can show handles only for single-select
+  // (group-resize is intentionally not offered).
+  if (ids.size === 1) {
+    contentGroup.setAttribute("data-selected-count", "single");
+  } else if (ids.size === 0) {
+    contentGroup.removeAttribute("data-selected-count");
+  } else {
+    contentGroup.setAttribute("data-selected-count", "multiple");
   }
 }

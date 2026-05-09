@@ -42,7 +42,16 @@
  *   --uml-font-mono            ← Azeret Mono
  */
 
-.cyber-topographic-skin {
+/*
+ * Selectors target [data-uml-host] directly (instead of just the skin
+ * wrapper) so the mapping wins ties with the library's theme defaults
+ * — `[data-uml-host][data-theme="…"]` in defaults-light/dark.css carries
+ * the same 0,2,0 specificity as `.cyber-topographic-skin [data-uml-host]`,
+ * so source order decides; the skin import lands AFTER the library CSS,
+ * so the skin wins as intended.
+ */
+.cyber-topographic-skin,
+.cyber-topographic-skin [data-uml-host] {
   --uml-bg: var(--bg-0);
   --uml-bg-elevated: var(--bg-2);
   --uml-bg-overlay: var(--hud-bg);
@@ -85,7 +94,8 @@
   --uml-shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.6);
 }
 
-.cyber-topographic-skin[data-theme="light"] {
+.cyber-topographic-skin[data-theme="light"],
+.cyber-topographic-skin [data-uml-host][data-theme="light"] {
   --uml-shadow-sm: 0 1px 2px rgba(13, 47, 79, 0.08);
   --uml-shadow-md: 0 6px 18px rgba(13, 47, 79, 0.12);
   --uml-shadow-lg: 0 16px 36px rgba(13, 47, 79, 0.18);

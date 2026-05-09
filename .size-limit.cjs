@@ -29,7 +29,10 @@ module.exports = [
     name: "@uml-drawer/core/renderer",
     path: "packages/core/dist/renderer/index.js",
     import: "*",
-    limit: "10 KB",
+    // 12 KB covers the SVG grid layer, snap utility, resize geometry,
+    // and 8 resize handles per node added in the resize-with-snap
+    // feature. Stays well within the 500 KB total NFR for core+react+ELK.
+    limit: "12 KB",
   },
   {
     name: "@uml-drawer/core/layout",

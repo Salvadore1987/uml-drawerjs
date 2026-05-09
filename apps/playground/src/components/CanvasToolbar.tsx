@@ -11,16 +11,22 @@ export function CanvasToolbar(): JSX.Element | null {
   const editor = useEditor();
   const [scale, setScale] = useState<number>(1);
   const [locked, setLocked] = useState<boolean>(false);
+  const [gridVisible, setGridVisible] = useState<boolean>(true);
 
   useEffect(() => {
     if (!editor) return;
     setScale(editor.panZoom?.getState().scale ?? 1);
     setLocked(editor.isLocked());
-    const unsubscribe = editor.panZoom?.onChange((state) => {
+    setGridVisible(editor.isGridVisible());
+    const unsubscribePanZoom = editor.panZoom?.onChange((state) => {
       setScale(state.scale);
     });
+    const unsubscribeGrid = editor.onGridChange((visible) => {
+      setGridVisible(visible);
+    });
     return () => {
-      unsubscribe?.();
+      unsubscribePanZoom?.();
+      unsubscribeGrid();
     };
   }, [editor]);
 
@@ -32,6 +38,11 @@ export function CanvasToolbar(): JSX.Element | null {
     const next = !locked;
     editor.setLocked(next);
     setLocked(next);
+  };
+
+  const toggleGrid = (): void => {
+    const next = editor.toggleGrid();
+    setGridVisible(next);
   };
 
   return (
@@ -71,6 +82,16 @@ export function CanvasToolbar(): JSX.Element | null {
         aria-label="Fit to view"
       >
         ⤢
+      </button>
+      <button
+        type="button"
+        className="uml-canvas-toolbar__button"
+        aria-pressed={gridVisible}
+        onClick={toggleGrid}
+        title={gridVisible ? "Hide grid (⌘⇧G)" : "Show grid (⌘⇧G)"}
+        aria-label={gridVisible ? "Hide grid" : "Show grid"}
+      >
+        ▦
       </button>
       <button
         type="button"
