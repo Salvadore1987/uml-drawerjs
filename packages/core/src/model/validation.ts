@@ -36,11 +36,15 @@ const diagramTypeSchema = z.enum([
 
 const nodeKindSchema = z.enum([
   "person",
+  "person-external",
   "system",
   "system-external",
   "container",
+  "container-external",
   "component",
+  "component-external",
   "database",
+  "queue",
   "class",
   "interface",
   "abstract-class",
@@ -170,6 +174,7 @@ const groupSchema = z
     id: z.string(),
     kind: groupKindSchema,
     label: z.string(),
+    alias: z.string().optional(),
     children: z.array(z.string()),
     description: z.string().optional(),
     style: nodeStyleSchema.optional(),

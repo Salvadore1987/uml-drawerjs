@@ -107,6 +107,7 @@ const C4_NODE_KINDS = new Set<NodeKind>([
   "container",
   "container-external",
   "component",
+  "component-external",
   "database",
   "queue",
 ]);

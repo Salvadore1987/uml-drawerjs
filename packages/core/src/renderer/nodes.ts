@@ -34,6 +34,7 @@ const C4_KINDS = new Set<NodeKind>([
   "container",
   "container-external",
   "component",
+  "component-external",
   "database",
   "queue",
 ]);
@@ -140,6 +141,8 @@ function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
       return renderC4Rect(geom, "external", { dashed: true });
     case "component":
       return renderC4Rect(geom, "component");
+    case "component-external":
+      return renderC4Rect(geom, "external", { dashed: true });
     case "database":
       return renderDatabaseFrame(geom);
     case "queue":
@@ -502,6 +505,7 @@ function c4TextColor(kind: NodeKind): string {
   if (kind === "container") return "var(--uml-c4-container-text, var(--uml-node-text))";
   if (kind === "container-external") return "var(--uml-c4-external-text, var(--uml-node-text))";
   if (kind === "component") return "var(--uml-c4-component-text, var(--uml-node-text))";
+  if (kind === "component-external") return "var(--uml-c4-external-text, var(--uml-node-text))";
   if (kind === "database") return "var(--uml-c4-database-text, var(--uml-node-text))";
   if (kind === "queue") return "var(--uml-c4-database-text, var(--uml-node-text))";
   return "var(--uml-node-text)";
@@ -522,6 +526,7 @@ function formatTypeTag(node: DiagramNode): string {
     container: "Container",
     "container-external": "Container",
     component: "Component",
+    "component-external": "Component",
     database: "Database",
     queue: "Queue",
   };

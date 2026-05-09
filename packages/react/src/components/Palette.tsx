@@ -87,6 +87,12 @@ const PALETTE_ITEMS: readonly PaletteItem[] = [
     category: "C4 Components",
     diagramTypes: ["c4-component"],
   },
+  {
+    kind: "component-external",
+    label: "Component (External)",
+    category: "C4 Components",
+    diagramTypes: ["c4-component"],
+  },
 
   // Class
   { kind: "class", label: "Class", category: "Class", diagramTypes: ["class"] },

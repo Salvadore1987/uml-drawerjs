@@ -106,7 +106,15 @@ const NODE_MACROS: NodeMacroSpec[] = [
     kind: "container",
     shape: "containerLike",
   },
-  // Component / ComponentDb: (alias, "label", "tech"?, "description"?)
+  // Component variants — Db / Queue (+ _Ext) first so the longer
+  // prefixes win, then Component_Ext, then plain Component.
+  // (alias, "label", "tech"?, "description"?)
+  {
+    pattern:
+      /^ComponentDb_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "database",
+    shape: "containerLike",
+  },
   {
     pattern:
       /^ComponentDb\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
@@ -115,8 +123,21 @@ const NODE_MACROS: NodeMacroSpec[] = [
   },
   {
     pattern:
+      /^ComponentQueue_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
+    shape: "containerLike",
+  },
+  {
+    pattern:
       /^ComponentQueue\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
     kind: "queue",
+    shape: "containerLike",
+  },
+  // Component_Ext is matched BEFORE Component so the longer prefix wins.
+  {
+    pattern:
+      /^Component_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "component-external",
     shape: "containerLike",
   },
   {
@@ -128,7 +149,7 @@ const NODE_MACROS: NodeMacroSpec[] = [
 ];
 
 const BOUNDARY =
-  /^(?:System_Boundary|Enterprise_Boundary|Boundary)\(\s*(\w+)\s*,\s*"([^"]*)"\s*\)\s*\{?$/u;
+  /^(?:System_Boundary|Enterprise_Boundary|Container_Boundary|Boundary)\(\s*(\w+)\s*,\s*"([^"]*)"\s*\)\s*\{?$/u;
 const REL = /^Rel(?:_[UDLR])?\(\s*(\w+)\s*,\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u;
 
 export function handleC4Line(ctx: ParseContext, line: SourceLine): boolean {

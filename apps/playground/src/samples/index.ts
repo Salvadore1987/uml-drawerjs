@@ -44,15 +44,26 @@ Rel(api, mail, "Sends notifications via", "SMTP")
 @enduml
 `,
   "c4-component": `@startuml
-title Online Banking — Components
+title Online Banking — API Components
 
-Container(api, "API")
-Component(controller, "AccountsController", "Spring MVC", "REST endpoint")
-Component(service, "AccountService", "Spring Bean", "Business rules")
-ComponentDb(repo, "AccountRepository", "Spring Data JPA")
+Person(customer, "Customer", "Personal banking customer")
+ContainerDb(db, "Database", "PostgreSQL", "Stores accounts, transactions")
+Container_Boundary(api, "API Application") {
+  Component(controller, "Accounts Controller", "Spring MVC", "REST endpoint for accounts")
+  Component(security, "Security Component", "Spring", "Authenticates users")
+  Component(service, "Account Service", "Spring Bean", "Business rules")
+  ComponentDb(repo, "Account Repository", "Spring Data JPA", "Persistence")
+  ComponentQueue(events, "Event Publisher", "Kafka", "Publishes domain events")
+}
+Component_Ext(payments, "Payments Gateway Client", "REST", "Wraps third-party API")
 
-Rel(controller, service, "uses")
-Rel(service, repo, "reads / writes")
+Rel(customer, controller, "Uses", "JSON/HTTPS")
+Rel(controller, security, "Uses")
+Rel(controller, service, "Uses")
+Rel(service, repo, "Reads/Writes")
+Rel(service, events, "Publishes to")
+Rel(service, payments, "Charges via", "HTTPS")
+Rel(repo, db, "Reads/Writes", "JDBC")
 @enduml
 `,
   class: `@startuml
