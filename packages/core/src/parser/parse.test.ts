@@ -97,6 +97,54 @@ describe("parsePlantUml — error handling", () => {
     expect(error?.range?.to).toBeGreaterThan(error?.range?.from ?? 0);
   });
 
+  it("silently swallows PlantUML preprocessor directives (e.g. !include <C4/...>) without polluting opaque", () => {
+    // Arrange — the canonical C4 stdlib include the generator now emits.
+    const text =
+      `@startuml\n` +
+      `!include <C4/C4_Container>\n` +
+      `Person(Customer, "Customer")\n` +
+      `Container(api, "API")\n` +
+      `Rel(Customer, api, "Uses")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — include line is dropped (NOT added to opaque), and the AST
+    // is otherwise complete. Round-trip is covered separately by the
+    // generator suite (the generator re-emits the canonical include).
+    expect(errors).toEqual([]);
+    expect(ast.metadata.opaque ?? []).not.toContain("!include <C4/C4_Container>");
+    expect(ast.nodes).toHaveLength(2);
+    expect(ast.edges).toHaveLength(1);
+  });
+
+  it("accepts Rel(a, b) without the third (label) argument", () => {
+    // Arrange — the cleaned-up form the generator emits for empty-label edges.
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s)\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — edge exists with no label.
+    expect(errors).toEqual([]);
+    expect(ast.edges).toHaveLength(1);
+    expect(ast.edges[0]?.label).toBeUndefined();
+  });
+
   it("captures unrecognised lines into metadata.opaque (not destroyed)", () => {
     // Arrange — `note left of Foo` is not modelled in the MVP
     const text = `@startuml\nclass Foo\nnote left of Foo : a note\n@enduml\n`;

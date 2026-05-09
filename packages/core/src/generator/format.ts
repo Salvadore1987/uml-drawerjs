@@ -68,7 +68,7 @@ export function buildAliasIndex(diagram: Diagram): Map<string, string> {
     result.set(id, alias);
     taken.add(alias);
   };
-  for (const node of diagram.nodes) assign(node.id, node.label);
+  for (const node of diagram.nodes) assign(node.id, node.label, node.alias);
   for (const group of diagram.groups) assign(group.id, group.label, group.alias);
   return result;
 }

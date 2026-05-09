@@ -1,4 +1,4 @@
-import type { Diagram } from "../model/types.js";
+import type { Diagram, DiagramType } from "../model/types.js";
 import { renderC4 } from "./c4.js";
 import { renderClass } from "./class.js";
 import { renderEr } from "./er.js";
@@ -21,6 +21,14 @@ export function generatePlantUml(diagram: Diagram): string {
   const aliases = buildAliasIndex(diagram);
   const lines: string[] = ["@startuml"];
 
+  // C4 macros (Person / System / Container / Component / Boundary / Rel)
+  // are not built-in PlantUML keywords — they live in the C4-PlantUML
+  // stdlib. Emitting the matching `!include` makes the output portable to
+  // any standard PlantUML renderer (plantuml.com, IntelliJ, vscode-plantuml,
+  // GitHub render). Without it the output is unusable outside our editor.
+  const includeLine = c4StdlibInclude(diagram.type);
+  if (includeLine !== null) lines.push(includeLine);
+
   if (diagram.title !== undefined && diagram.title !== "") {
     lines.push(`title ${diagram.title}`);
   }
@@ -36,6 +44,19 @@ export function generatePlantUml(diagram: Diagram): string {
 
   lines.push("@enduml");
   return `${lines.join("\n")}\n`;
+}
+
+function c4StdlibInclude(type: DiagramType): string | null {
+  switch (type) {
+    case "c4-context":
+      return "!include <C4/C4_Context>";
+    case "c4-container":
+      return "!include <C4/C4_Container>";
+    case "c4-component":
+      return "!include <C4/C4_Component>";
+    default:
+      return null;
+  }
 }
 
 function renderBody(diagram: Diagram, aliases: Map<string, string>): string[] {

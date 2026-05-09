@@ -354,6 +354,65 @@ describe("validateConstraints — diagram-type rules", () => {
     // Assert
     expect(codes).not.toContain(CONSTRAINT_ERROR_CODES.C4ContextKindMismatch);
   });
+
+  it("warns when a Software System sits inside a Container-tier System_Boundary", () => {
+    // Arrange — the canonical "user dragged System into the boundary"
+    // mistake the upstream `02 Containers` import bug exposed.
+    const diagram: Diagram = {
+      ...createEmptyDiagram("c4-container"),
+      nodes: [
+        { id: "s", kind: "system", label: "Bank" },
+        { id: "c", kind: "container", label: "API" },
+      ],
+      groups: [{ id: "b", kind: "boundary", label: "Bank", children: ["s", "c"] }],
+    };
+
+    // Act
+    const result = validateConstraints(diagram);
+    const tier = result.find((e) => e.code === CONSTRAINT_ERROR_CODES.C4BoundaryTierMismatch);
+
+    // Assert — only the System inside the boundary trips the rule.
+    expect(tier).toBeDefined();
+    expect(tier?.severity).toBe("warning");
+    expect(tier?.nodeId).toBe("s");
+    expect(tier?.groupId).toBe("b");
+  });
+
+  it("warns when a Container sits inside a Component-tier boundary (analogous tier rule)", () => {
+    // Arrange
+    const diagram: Diagram = {
+      ...createEmptyDiagram("c4-component"),
+      nodes: [
+        { id: "c", kind: "container", label: "API" },
+        { id: "comp", kind: "component", label: "Controller" },
+      ],
+      groups: [{ id: "b", kind: "boundary", label: "API", children: ["c", "comp"] }],
+    };
+
+    // Act
+    const tier = validateConstraints(diagram).find(
+      (e) => e.code === CONSTRAINT_ERROR_CODES.C4BoundaryTierMismatch,
+    );
+
+    // Assert
+    expect(tier).toBeDefined();
+    expect(tier?.nodeId).toBe("c");
+  });
+
+  it("does not flag boundary-tier mismatch on a c4-context diagram", () => {
+    // Arrange — Context-tier boundary children may be anything tier-0; the
+    // rule deliberately stays silent so it doesn't fight `C4ContextKindMismatch`.
+    const diagram = c4DiagramWith({
+      nodes: [{ id: "s", kind: "system", label: "Bank" }],
+      groups: [{ id: "b", kind: "boundary", label: "Org", children: ["s"] }],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).not.toContain(CONSTRAINT_ERROR_CODES.C4BoundaryTierMismatch);
+  });
 });
 
 describe("validateLint — soft warnings", () => {
@@ -408,6 +467,45 @@ describe("validateLint — soft warnings", () => {
 
     // Assert
     expect(dupes.map((e) => e.nodeId).sort()).toEqual(["a", "b"]);
+  });
+
+  it("flags C4 Rel edges with empty labels at info severity (c4model verb-phrase guidance)", () => {
+    // Arrange — two C4 edges, one with a label, one without.
+    const diagram: Diagram = {
+      ...createEmptyDiagram("c4-container"),
+      nodes: [
+        { id: "p", kind: "person", label: "Customer" },
+        { id: "c", kind: "container", label: "API" },
+      ],
+      edges: [
+        { id: "e1", source: "p", target: "c", kind: "uses" },
+        { id: "e2", source: "c", target: "p", kind: "uses", label: "Notifies" },
+      ],
+    };
+
+    // Act
+    const empty = validateLint(diagram).filter((e) => e.code === LINT_ERROR_CODES.C4EmptyRelLabel);
+
+    // Assert — only the unlabelled edge surfaces, at info severity.
+    expect(empty).toHaveLength(1);
+    expect(empty[0]).toMatchObject({ edgeId: "e1", severity: "info" });
+  });
+
+  it("does not flag empty Rel labels on non-C4 diagrams (rule is C4-scoped)", () => {
+    // Arrange
+    const diagram = classDiagramWith({
+      nodes: [
+        { id: "a", kind: "class", label: "A" },
+        { id: "b", kind: "class", label: "B" },
+      ],
+      edges: [{ id: "e", source: "a", target: "b", kind: "association" }],
+    });
+
+    // Act
+    const codes = validateLint(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).not.toContain(LINT_ERROR_CODES.C4EmptyRelLabel);
   });
 
   it("detects an inheritance cycle and reports each node on the cycle", () => {

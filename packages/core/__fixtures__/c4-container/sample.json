@@ -1,14 +1,24 @@
 {
   "id": "diagram-fixture",
   "type": "c4-container",
-  "title": "Internet Banking Containers",
   "nodes": [
-    { "id": "id-1", "kind": "person", "label": "Customer" },
-    { "id": "id-2", "kind": "system-external", "label": "E-mail System" },
+    {
+      "id": "id-1",
+      "kind": "person",
+      "label": "Customer",
+      "alias": "customer"
+    },
+    {
+      "id": "id-2",
+      "kind": "system-external",
+      "label": "E-mail System",
+      "alias": "email"
+    },
     {
       "id": "id-3",
       "kind": "container",
       "label": "SPA",
+      "alias": "spa",
       "technology": "JavaScript",
       "description": "Provides banking functionality to customers"
     },
@@ -16,6 +26,7 @@
       "id": "id-4",
       "kind": "container",
       "label": "API Application",
+      "alias": "api",
       "technology": "Java + Spring",
       "description": "Provides banking functionality"
     },
@@ -23,6 +34,7 @@
       "id": "id-5",
       "kind": "database",
       "label": "Database",
+      "alias": "db",
       "technology": "Oracle",
       "description": "Stores account information"
     }
@@ -58,5 +70,8 @@
     }
   ],
   "groups": [],
-  "metadata": { "schemaVersion": "0.1.0" }
+  "metadata": {
+    "schemaVersion": "0.1.0"
+  },
+  "title": "Internet Banking Containers"
 }

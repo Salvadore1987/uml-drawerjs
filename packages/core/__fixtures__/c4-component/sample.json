@@ -1,12 +1,12 @@
 {
   "id": "diagram-fixture",
   "type": "c4-component",
-  "title": "API Application Components",
   "nodes": [
     {
       "id": "id-2",
       "kind": "component",
       "label": "Sign In Controller",
+      "alias": "signin",
       "technology": "Spring MVC",
       "description": "Handles authentication"
     },
@@ -14,6 +14,7 @@
       "id": "id-3",
       "kind": "component",
       "label": "Accounts Controller",
+      "alias": "accounts",
       "technology": "Spring MVC",
       "description": "Handles account requests"
     },
@@ -21,6 +22,7 @@
       "id": "id-4",
       "kind": "component",
       "label": "Security Component",
+      "alias": "security",
       "technology": "Spring",
       "description": "Authenticates users"
     },
@@ -28,6 +30,7 @@
       "id": "id-5",
       "kind": "database",
       "label": "Account Repository",
+      "alias": "repo",
       "technology": "Spring Data",
       "description": "Persistence"
     },
@@ -35,6 +38,7 @@
       "id": "id-6",
       "kind": "queue",
       "label": "Event Publisher",
+      "alias": "events",
       "technology": "Kafka",
       "description": "Publishes domain events"
     },
@@ -42,13 +46,21 @@
       "id": "id-7",
       "kind": "person",
       "label": "Customer",
+      "alias": "customer",
       "description": "Personal banking customer"
     },
-    { "id": "id-8", "kind": "database", "label": "Database", "technology": "Oracle" },
+    {
+      "id": "id-8",
+      "kind": "database",
+      "label": "Database",
+      "alias": "db",
+      "technology": "Oracle"
+    },
     {
       "id": "id-9",
       "kind": "component-external",
       "label": "Payments Gateway Client",
+      "alias": "payments",
       "technology": "REST",
       "description": "Third-party processor"
     }
@@ -68,10 +80,34 @@
       "kind": "uses",
       "label": "Requests accounts [JSON/HTTPS]"
     },
-    { "id": "id-12", "source": "id-2", "target": "id-4", "kind": "uses", "label": "Uses" },
-    { "id": "id-13", "source": "id-3", "target": "id-4", "kind": "uses", "label": "Uses" },
-    { "id": "id-14", "source": "id-3", "target": "id-5", "kind": "uses", "label": "Reads" },
-    { "id": "id-15", "source": "id-3", "target": "id-6", "kind": "uses", "label": "Publishes to" },
+    {
+      "id": "id-12",
+      "source": "id-2",
+      "target": "id-4",
+      "kind": "uses",
+      "label": "Uses"
+    },
+    {
+      "id": "id-13",
+      "source": "id-3",
+      "target": "id-4",
+      "kind": "uses",
+      "label": "Uses"
+    },
+    {
+      "id": "id-14",
+      "source": "id-3",
+      "target": "id-5",
+      "kind": "uses",
+      "label": "Reads"
+    },
+    {
+      "id": "id-15",
+      "source": "id-3",
+      "target": "id-6",
+      "kind": "uses",
+      "label": "Publishes to"
+    },
     {
       "id": "id-16",
       "source": "id-3",
@@ -96,5 +132,8 @@
       "children": ["id-2", "id-3", "id-4", "id-5", "id-6"]
     }
   ],
-  "metadata": { "schemaVersion": "0.1.0" }
+  "metadata": {
+    "schemaVersion": "0.1.0"
+  },
+  "title": "API Application Components"
 }

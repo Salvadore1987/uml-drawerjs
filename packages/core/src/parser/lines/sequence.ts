@@ -58,7 +58,10 @@ function consumeParticipant(ctx: ParseContext, match: RegExpExecArray): void {
   const kind: NodeKind = keyword === "actor" ? "actor" : "lifeline";
   const id = resolveAlias(ctx, alias, "create");
   if (id === null) return;
-  ctx.nodes.push({ id, kind, label });
+  // Persist the original `as`-alias (or bare identifier) so the generator
+  // round-trips `participant "Web App" as web` instead of regenerating the
+  // alias from the label.
+  ctx.nodes.push({ id, kind, label, alias });
 }
 
 function consumeArrow(

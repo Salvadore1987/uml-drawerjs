@@ -142,6 +142,7 @@ const nodeSchema = z
     id: z.string(),
     kind: nodeKindSchema,
     label: z.string(),
+    alias: z.string().optional(),
     stereotype: z.string().optional(),
     technology: z.string().optional(),
     description: z.string().optional(),

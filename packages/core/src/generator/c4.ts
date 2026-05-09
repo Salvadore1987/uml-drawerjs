@@ -146,7 +146,16 @@ function formatC4Edge(edge: DiagramEdge, aliases: Map<string, string>): string {
   const to = lookupAlias(aliases, edge.target);
   const { label, technology } = splitTechSuffix(edge.label ?? "");
   if (technology !== null) {
+    // C4-PlantUML's Rel macro requires the third (label) argument when a
+    // fourth (technology) is present, so we keep the empty string only in
+    // this branch.
     return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}", "${escapeStringLiteral(technology)}")`;
+  }
+  if (label === "") {
+    // Drop the empty third argument entirely — `Rel(a, b)` is valid in
+    // C4-PlantUML and avoids the "" label that some downstream linters
+    // (and our own LINT_C4_EMPTY_REL_LABEL) flag.
+    return `Rel(${from}, ${to})`;
   }
   return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}")`;
 }

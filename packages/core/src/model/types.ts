@@ -181,6 +181,14 @@ export interface DiagramNode {
   id: string;
   kind: NodeKind;
   label: string;
+  /**
+   * Optional PlantUML alias — the symbolic name authors use as the first
+   * argument of macros like `Person(customer, "Customer")` or in sequence
+   * `as` clauses (`participant "Web App" as web`). When set, the generator
+   * round-trips this name so authored aliases survive parse → generate
+   * cycles; when absent, the generator derives one from the label or id.
+   */
+  alias?: string;
   stereotype?: string;
   technology?: string;
   description?: string;

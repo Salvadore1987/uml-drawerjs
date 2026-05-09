@@ -150,7 +150,8 @@ const NODE_MACROS: NodeMacroSpec[] = [
 
 const BOUNDARY =
   /^(?:System_Boundary|Enterprise_Boundary|Container_Boundary|Boundary)\(\s*(\w+)\s*,\s*"([^"]*)"\s*\)\s*\{?$/u;
-const REL = /^Rel(?:_[UDLR])?\(\s*(\w+)\s*,\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u;
+const REL =
+  /^Rel(?:_[UDLR])?\(\s*(\w+)\s*,\s*(\w+)(?:\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?)?\s*\)$/u;
 
 export function handleC4Line(ctx: ParseContext, line: SourceLine): boolean {
   const text = line.text.trim();
@@ -209,7 +210,10 @@ function consumeNodeMacro(
   const id = resolveAlias(ctx, alias, "create");
   if (id === null) return;
 
-  const node: DiagramNode = { id, kind: spec.kind, label };
+  // Persist the original PlantUML alias on the node so the generator can
+  // round-trip authored names (`Person(customer, ...)` survives instead of
+  // collapsing to `Person(Customer, ...)` or `Person(n_<uuid>, ...)`).
+  const node: DiagramNode = { id, kind: spec.kind, label, alias };
   if (spec.shape === "personLike") {
     const description = match[3];
     if (description !== undefined && description !== "") node.description = description;
@@ -243,9 +247,11 @@ function consumeBoundary(ctx: ParseContext, match: RegExpExecArray): void {
 function consumeRel(ctx: ParseContext, line: SourceLine, match: RegExpExecArray): void {
   const fromAlias = match[1];
   const toAlias = match[2];
-  const label = match[3];
+  // Both `label` and `tech` are optional now — the new grammar accepts
+  // `Rel(a, b)` (no third arg) as well as `Rel(a, b, "label", "tech"?)`.
+  const label = match[3] ?? "";
   const tech = match[4];
-  if (fromAlias === undefined || toAlias === undefined || label === undefined) return;
+  if (fromAlias === undefined || toAlias === undefined) return;
 
   const sourceId = resolveAlias(ctx, fromAlias, "lookup");
   const targetId = resolveAlias(ctx, toAlias, "lookup");

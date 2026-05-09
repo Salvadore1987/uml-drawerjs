@@ -14,8 +14,37 @@ export function validateLint(diagram: Diagram): DiagramError[] {
   reportOrphanNodes(diagram, errors);
   reportDuplicateLabels(diagram, errors);
   reportInheritanceCycles(diagram, errors);
+  reportEmptyC4RelLabels(diagram, errors);
 
   return errors;
+}
+
+/**
+ * c4model.com guidance asks every Rel to carry a verb-phrase label so the
+ * diagram reads as prose ("Customer USES Online Banking"). Empty labels
+ * survive the renderer but make the diagram self-documenting only by
+ * accident; surface this as `severity: "info"` so it nudges authors
+ * without blocking export.
+ */
+function reportEmptyC4RelLabels(diagram: Diagram, errors: DiagramError[]): void {
+  if (
+    diagram.type !== "c4-context" &&
+    diagram.type !== "c4-container" &&
+    diagram.type !== "c4-component"
+  ) {
+    return;
+  }
+  for (const edge of diagram.edges) {
+    const label = edge.label?.trim() ?? "";
+    if (label === "") {
+      errors.push({
+        severity: "info",
+        code: LINT_ERROR_CODES.C4EmptyRelLabel,
+        message: `Rel '${edge.id}' has no label — c4model.com recommends a verb phrase like "Uses" or "Sends payment to".`,
+        edgeId: edge.id,
+      });
+    }
+  }
 }
 
 function reportOrphanNodes(diagram: Diagram, errors: DiagramError[]): void {
