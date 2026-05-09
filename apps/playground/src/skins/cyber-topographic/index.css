@@ -1,0 +1,17 @@
+/**
+ * cyber-topographic — entry stylesheet.
+ *
+ * Import order matters: tokens declare the skin's internal palette,
+ * mapping rewires it onto the library `--uml-*` contract, fonts switch
+ * the type stacks, then bg + decorations layer the visual chrome.
+ *
+ * Activate by adding `.cyber-topographic-skin` to the playground root
+ * (typically the `<body>` element). Removing the class drops the
+ * playground back to the library's neutral defaults.
+ */
+
+@import "./tokens.css";
+@import "./mapping.css";
+@import "./fonts.css";
+@import "./bg.css";
+@import "./decorations.css";

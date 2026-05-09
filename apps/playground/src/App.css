@@ -1,0 +1,120 @@
+/**
+ * Playground-only layout.
+ *
+ * Imported AFTER `@uml-drawer/react/styles.css` so the rules below win
+ * by source order. Selectors are scoped to `.uml-playground` so the
+ * library defaults remain authoritative outside of this composition.
+ */
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100vh;
+  background: var(--uml-bg, #06080c);
+  color: var(--uml-text, #c9d7e6);
+  overflow: hidden;
+}
+
+.uml-playground {
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+}
+
+.uml-playground__editor-wrap {
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.uml-playground__editor-wrap > .uml-editor {
+  width: 100%;
+  height: 100%;
+  /* Three-column, three-row grid. The library's default areas are
+     overridden so we can host Palette+Outline together on the left,
+     PropsPanel+CommandChannel together on the right, the text editor
+     directly under the canvas, and the status bar across the foot. */
+  grid-template-areas:
+    "anchors canvas rightcol"
+    "anchors text rightcol"
+    "status status status";
+  grid-template-columns: minmax(240px, 280px) 1fr minmax(300px, 360px);
+  grid-template-rows: 1fr 220px 30px;
+  gap: 1px;
+}
+
+.uml-playground__anchors {
+  grid-area: anchors;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.uml-playground__anchors > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.uml-playground__rightcol {
+  grid-area: rightcol;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  gap: 1px;
+}
+
+.uml-playground__rightcol > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.uml-playground .uml-canvas-host {
+  grid-area: canvas;
+}
+
+.uml-playground .uml-text-editor {
+  grid-area: text;
+}
+
+.uml-playground .uml-statusbar {
+  grid-area: status;
+}
+
+/* Topbar buttons (defaults — skin embellishes). */
+.uml-playground__topbar {
+  display: grid;
+  grid-template-columns: minmax(280px, auto) 1fr auto;
+  align-items: center;
+  padding: 0 18px;
+  gap: 24px;
+  border-bottom: 1px solid var(--uml-border-subtle, rgba(120, 200, 255, 0.18));
+}
+
+.uml-playground__breadcrumb-button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.uml-playground__breadcrumb-button:hover b,
+.uml-playground__breadcrumb-button:hover {
+  color: var(--uml-accent, #b8ff3d);
+}
+
+.uml-playground__build-tag {
+  font-family: var(--uml-font-mono, ui-monospace);
+  letter-spacing: 0.1em;
+}
+
+/* Canvas hosts the HUD as a relatively-positioned overlay. */
+.uml-playground .uml-canvas-host {
+  position: relative;
+}

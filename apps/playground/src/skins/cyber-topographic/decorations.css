@@ -1,0 +1,387 @@
+/**
+ * cyber-topographic — playground decorations.
+ *
+ * Styles only the playground-specific chrome (`.uml-playground` and its
+ * descendants). Library components (`<UmlEditor>`, `<Palette>`, …)
+ * are visually retuned through the `--uml-*` mapping in `mapping.css`,
+ * not by reaching into their internals from here.
+ *
+ * All selectors live under `.cyber-topographic-skin` so removing the
+ * class returns the playground to a neutral, contract-only look.
+ */
+
+/* === topbar ============================================ */
+
+.cyber-topographic-skin .uml-playground {
+  display: grid;
+  grid-template-rows: 56px 1fr 30px;
+  height: 100vh;
+  color: var(--ink);
+  font-family: "Azeret Mono", monospace;
+}
+
+.cyber-topographic-skin .uml-playground__topbar {
+  display: grid;
+  grid-template-columns: minmax(280px, auto) 1fr auto;
+  align-items: center;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--topbar-grad);
+  backdrop-filter: blur(10px);
+  gap: 24px;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.cyber-topographic-skin .uml-playground__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "Sora", sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.cyber-topographic-skin .uml-playground__brand-glyph {
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--phos);
+  box-shadow:
+    0 0 12px rgba(184, 255, 61, 0.45),
+    inset 0 0 12px rgba(184, 255, 61, 0.18);
+  display: grid;
+  place-items: center;
+  font-family: "Azeret Mono", monospace;
+  color: var(--phos);
+  font-size: 14px;
+}
+
+.cyber-topographic-skin[data-theme="light"] .uml-playground__brand-glyph {
+  box-shadow:
+    0 2px 8px rgba(79, 140, 0, 0.22),
+    inset 0 0 8px rgba(79, 140, 0, 0.1);
+}
+
+.cyber-topographic-skin .uml-playground__brand-name {
+  font-size: 18px;
+}
+
+.cyber-topographic-skin .uml-playground__brand-name span {
+  color: var(--phos);
+  text-shadow: var(--glow-phos-text);
+}
+
+.cyber-topographic-skin .uml-playground__brand-tag {
+  font-family: "Azeret Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  padding-left: 12px;
+  margin-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+.cyber-topographic-skin .uml-playground__breadcrumb {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.cyber-topographic-skin .uml-playground__breadcrumb b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.cyber-topographic-skin .uml-playground__breadcrumb-sep {
+  color: var(--ink-dim);
+}
+
+.cyber-topographic-skin .uml-playground__live {
+  margin-left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--phos);
+  background: var(--phos-soft);
+  color: var(--phos);
+  font-size: 10px;
+  border-radius: 999px;
+}
+
+.cyber-topographic-skin .uml-playground__live-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--phos);
+  border-radius: 50%;
+  box-shadow: var(--glow-phos-sm);
+  animation: uml-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes uml-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cyber-topographic-skin .uml-playground__live-dot {
+    animation: none;
+  }
+}
+
+.cyber-topographic-skin .uml-playground__topbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cyber-topographic-skin .uml-playground__icon-btn {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--icon-btn-bg);
+  color: var(--ink-soft);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s;
+  font: inherit;
+  font-size: 11px;
+}
+
+.cyber-topographic-skin .uml-playground__icon-btn:hover {
+  color: var(--phos);
+  border-color: var(--phos);
+  box-shadow: 0 0 0 3px var(--phos-soft);
+}
+
+.cyber-topographic-skin .uml-playground__cta {
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--phos);
+  background: var(--phos-soft);
+  color: var(--phos);
+  font-weight: 600;
+  font-family: "Sora", sans-serif;
+  letter-spacing: 0.02em;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: var(--glow-cta);
+  font-size: 12px;
+}
+
+.cyber-topographic-skin .uml-playground__cta:hover {
+  background: var(--phos);
+  color: var(--bg-0);
+}
+
+/* segmented theme switch */
+.cyber-topographic-skin .uml-playground__theme-switch {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--icon-btn-bg);
+  padding: 3px;
+}
+
+.cyber-topographic-skin .uml-playground__theme-button {
+  background: transparent;
+  border: none;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0 12px;
+}
+
+.cyber-topographic-skin .uml-playground__theme-button[aria-pressed="true"] {
+  background: var(--phos-soft);
+  color: var(--phos);
+}
+
+/* === panels (override structural CSS in @uml-drawer/react) ===== */
+
+.cyber-topographic-skin .uml-editor {
+  background: transparent;
+  gap: 0;
+}
+
+.cyber-topographic-skin .uml-palette,
+.cyber-topographic-skin .uml-props-panel,
+.cyber-topographic-skin .uml-text-editor,
+.cyber-topographic-skin .uml-canvas-host {
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+}
+
+.cyber-topographic-skin .uml-palette__header,
+.cyber-topographic-skin .uml-props-panel__header,
+.cyber-topographic-skin .uml-text-editor__header {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-family: "Sora", sans-serif;
+  font-size: 10px;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--line);
+}
+
+.cyber-topographic-skin .uml-palette__category {
+  color: var(--cyan);
+  font-family: "Sora", sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.cyber-topographic-skin .uml-palette__button,
+.cyber-topographic-skin .uml-outline__button {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 0;
+  font-family: "Azeret Mono", monospace;
+}
+
+.cyber-topographic-skin .uml-palette__button:hover {
+  border-color: var(--phos);
+  box-shadow: 0 0 0 1px var(--phos-soft);
+  color: var(--phos);
+}
+
+/* === HUD =============================================== */
+
+.cyber-topographic-skin .uml-hud__slot > * {
+  background: var(--hud-bg);
+  border: 1px solid var(--line);
+  padding: 8px 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  font-family: "Azeret Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.cyber-topographic-skin .uml-hud__slot strong {
+  color: var(--phos);
+  text-shadow: var(--glow-phos-text);
+  font-weight: 600;
+}
+
+.cyber-topographic-skin .uml-hud__slot dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 2px 12px;
+  margin: 0;
+}
+
+.cyber-topographic-skin .uml-hud__slot dt {
+  color: var(--ink-dim);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.cyber-topographic-skin .uml-hud__slot dd {
+  margin: 0;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.cyber-topographic-skin .uml-hud__legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cyber-topographic-skin .uml-hud__legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* === command channel ==================================== */
+
+.cyber-topographic-skin .uml-command-channel {
+  background: var(--turn-bg, rgba(6, 8, 12, 0.55));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: "Azeret Mono", monospace;
+}
+
+.cyber-topographic-skin .uml-command-channel__header {
+  font-family: "Sora", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--line);
+}
+
+.cyber-topographic-skin .uml-command-channel__entry--user {
+  color: var(--phos);
+}
+
+.cyber-topographic-skin .uml-command-channel__entry--system {
+  color: var(--ink-soft);
+}
+
+.cyber-topographic-skin .uml-command-channel__entry--error {
+  color: var(--magenta);
+}
+
+.cyber-topographic-skin .uml-command-channel__input {
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-family: "Azeret Mono", monospace;
+}
+
+.cyber-topographic-skin .uml-command-channel__input:focus {
+  outline: 2px solid var(--phos-line);
+  outline-offset: 1px;
+  border-color: var(--phos);
+}
+
+/* === statusbar ========================================== */
+
+.cyber-topographic-skin .uml-statusbar {
+  background: var(--statusbar-bg);
+  border-top: 1px solid var(--line);
+  font-family: "Azeret Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.cyber-topographic-skin .uml-statusbar__metric--error {
+  color: var(--magenta);
+}
+
+.cyber-topographic-skin .uml-statusbar__metric--warning {
+  color: var(--warn);
+}
+
+.cyber-topographic-skin .uml-statusbar__metric--info {
+  color: var(--cyan);
+}

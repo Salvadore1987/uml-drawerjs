@@ -1,0 +1,176 @@
+/**
+ * cyber-topographic — internal skin tokens.
+ *
+ * These variables exist ONLY inside the skin's scope (`.cyber-topographic-skin`)
+ * and are mapped onto the library's `--uml-*` contract by `mapping.css`.
+ * They never leak into `packages/*` and aren't part of any public API.
+ *
+ * Two themes: dark (default) and light (`[data-theme="light"]`). Auto-detect
+ * via `prefers-color-scheme` is handled by mapping.css when no explicit
+ * `data-theme` is set on the playground root.
+ */
+
+.cyber-topographic-skin {
+  color-scheme: dark;
+
+  /* surfaces & ink */
+  --bg-0: #06080c;
+  --bg-1: #0a0e14;
+  --bg-2: #11161f;
+  --panel: rgba(15, 21, 30, 0.78);
+  --line: rgba(120, 200, 255, 0.18);
+  --line-strong: rgba(120, 200, 255, 0.32);
+  --ink: #c9d7e6;
+  --ink-soft: #8b9aae;
+  --ink-dim: #54647b;
+
+  /* accents */
+  --phos: #b8ff3d;
+  --phos-2: #97da28;
+  --phos-soft: rgba(184, 255, 61, 0.14);
+  --phos-line: rgba(184, 255, 61, 0.4);
+  --cyan: #4deeea;
+  --cyan-soft: rgba(77, 238, 234, 0.12);
+  --cyan-line: rgba(77, 238, 234, 0.4);
+  --magenta: #ff4d9e;
+  --magenta-soft: rgba(255, 77, 158, 0.12);
+  --magenta-line: rgba(255, 77, 158, 0.4);
+  --warn: #ffb347;
+  --warn-soft: rgba(255, 179, 71, 0.12);
+  --warn-line: rgba(255, 179, 71, 0.4);
+
+  /* layered surfaces */
+  --page-grad:
+    radial-gradient(ellipse at 20% 0%, rgba(77, 238, 234, 0.1), transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(255, 77, 158, 0.08), transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(184, 255, 61, 0.04), transparent 60%), var(--bg-0);
+  --topbar-grad: linear-gradient(180deg, rgba(15, 21, 30, 0.92), rgba(15, 21, 30, 0.6));
+  --canvas-grad: linear-gradient(180deg, rgba(10, 14, 20, 0.5), rgba(6, 8, 12, 0.7));
+  --statusbar-bg: rgba(6, 8, 12, 0.85);
+  --hud-bg: rgba(6, 8, 12, 0.7);
+  --input-bg: rgba(6, 8, 12, 0.5);
+  --icon-btn-bg: rgba(15, 21, 30, 0.6);
+  --tree-hover: rgba(120, 200, 255, 0.05);
+  --grid-dot: rgba(120, 200, 255, 0.1);
+
+  /* topographic + scanline */
+  --topo-color: #78c8ff;
+  --topo-opacity: 0.13;
+  --scan-opacity: 1;
+
+  /* glows (toned-down or removed in light) */
+  --glow-phos-text: 0 0 6px rgba(184, 255, 61, 0.5);
+  --glow-phos-sm: 0 0 8px var(--phos);
+  --glow-phos-lg: 0 0 18px rgba(184, 255, 61, 0.45);
+  --glow-cta: 0 0 18px rgba(184, 255, 61, 0.35);
+  --glow-cyan: 0 0 12px rgba(77, 238, 234, 0.5);
+  --glow-cyan-sm: 0 0 6px var(--cyan);
+}
+
+/* === LIGHT THEME OVERRIDES =================================== */
+
+.cyber-topographic-skin[data-theme="light"] {
+  color-scheme: light;
+
+  /* surfaces & ink */
+  --bg-0: #f0ebdd;
+  --bg-1: #ffffff;
+  --bg-2: #faf6ec;
+  --panel: rgba(255, 252, 244, 0.82);
+  --line: rgba(13, 47, 79, 0.14);
+  --line-strong: rgba(13, 47, 79, 0.28);
+  --ink: #15243a;
+  --ink-soft: #4d5c72;
+  --ink-dim: #7e8b9c;
+
+  /* accents — darker for legibility on light bg, palette-coherent */
+  --phos: #4f8c00;
+  --phos-2: #3d6b00;
+  --phos-soft: rgba(79, 140, 0, 0.1);
+  --phos-line: rgba(79, 140, 0, 0.4);
+  --cyan: #0b6a86;
+  --cyan-soft: rgba(11, 106, 134, 0.1);
+  --cyan-line: rgba(11, 106, 134, 0.4);
+  --magenta: #b8266f;
+  --magenta-soft: rgba(184, 38, 111, 0.1);
+  --magenta-line: rgba(184, 38, 111, 0.4);
+  --warn: #b5631a;
+  --warn-soft: rgba(181, 99, 26, 0.1);
+  --warn-line: rgba(181, 99, 26, 0.4);
+
+  /* layered surfaces */
+  --page-grad:
+    radial-gradient(ellipse at 20% 0%, rgba(11, 106, 134, 0.1), transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(184, 38, 111, 0.08), transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(79, 140, 0, 0.06), transparent 60%), var(--bg-0);
+  --topbar-grad: linear-gradient(180deg, rgba(255, 252, 244, 0.92), rgba(255, 252, 244, 0.65));
+  --canvas-grad: linear-gradient(180deg, rgba(255, 252, 244, 0.55), rgba(245, 239, 226, 0.75));
+  --statusbar-bg: rgba(255, 252, 244, 0.85);
+  --hud-bg: rgba(255, 252, 244, 0.85);
+  --input-bg: rgba(255, 255, 255, 0.75);
+  --icon-btn-bg: rgba(255, 252, 244, 0.7);
+  --tree-hover: rgba(13, 47, 79, 0.05);
+  --grid-dot: rgba(13, 47, 79, 0.1);
+
+  /* topographic + scanline */
+  --topo-color: #1a3b6b;
+  --topo-opacity: 0.16;
+  --scan-opacity: 0;
+
+  /* glows — replaced with subtle drop-shadows on light */
+  --glow-phos-text: none;
+  --glow-phos-sm: 0 1px 0 rgba(79, 140, 0, 0.3);
+  --glow-phos-lg: 0 6px 16px rgba(79, 140, 0, 0.2);
+  --glow-cta: 0 4px 14px rgba(79, 140, 0, 0.22);
+  --glow-cyan: 0 4px 12px rgba(11, 106, 134, 0.25);
+  --glow-cyan-sm: 0 1px 0 rgba(11, 106, 134, 0.35);
+}
+
+/* === reduced-motion + auto color-scheme ======================== */
+
+/* Auto-light when no explicit data-theme attribute is set. */
+@media (prefers-color-scheme: light) {
+  .cyber-topographic-skin:not([data-theme]) {
+    color-scheme: light;
+
+    --bg-0: #f0ebdd;
+    --bg-1: #ffffff;
+    --bg-2: #faf6ec;
+    --panel: rgba(255, 252, 244, 0.82);
+    --line: rgba(13, 47, 79, 0.14);
+    --line-strong: rgba(13, 47, 79, 0.28);
+    --ink: #15243a;
+    --ink-soft: #4d5c72;
+    --ink-dim: #7e8b9c;
+
+    --phos: #4f8c00;
+    --phos-2: #3d6b00;
+    --phos-soft: rgba(79, 140, 0, 0.1);
+    --phos-line: rgba(79, 140, 0, 0.4);
+    --cyan: #0b6a86;
+    --cyan-soft: rgba(11, 106, 134, 0.1);
+    --cyan-line: rgba(11, 106, 134, 0.4);
+    --magenta: #b8266f;
+    --magenta-soft: rgba(184, 38, 111, 0.1);
+    --magenta-line: rgba(184, 38, 111, 0.4);
+
+    --topo-opacity: 0.16;
+    --scan-opacity: 0;
+  }
+}
+
+/* The skin's gloss (topographic, scanline, glows) is gated through
+   `prefers-reduced-motion` even though they don't animate — a user
+   who prefers reduced motion is also signalling "less visual noise". */
+@media (prefers-reduced-motion: reduce) {
+  .cyber-topographic-skin {
+    --topo-opacity: 0;
+    --scan-opacity: 0;
+    --glow-phos-text: none;
+    --glow-phos-sm: none;
+    --glow-phos-lg: none;
+    --glow-cta: none;
+    --glow-cyan: none;
+    --glow-cyan-sm: none;
+  }
+}

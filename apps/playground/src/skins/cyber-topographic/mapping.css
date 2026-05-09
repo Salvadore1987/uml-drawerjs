@@ -1,0 +1,92 @@
+/**
+ * cyber-topographic — `--uml-*` mapping.
+ *
+ * Maps the skin's internal tokens onto the library's design-agnostic
+ * theming contract. This is the ONLY file that should touch
+ * `--uml-*` outside of `@uml-drawer/theme` itself, and it does so
+ * exclusively under the `.cyber-topographic-skin` scope, so removing
+ * the class restores the library's neutral defaults.
+ *
+ * Mapping table:
+ *   --uml-bg                   ← --bg-0
+ *   --uml-bg-elevated          ← --bg-2 / --panel
+ *   --uml-bg-overlay           ← --hud-bg
+ *   --uml-text                 ← --ink
+ *   --uml-text-muted           ← --ink-soft
+ *   --uml-text-faint           ← --ink-dim
+ *   --uml-text-on-accent       ← --bg-0
+ *   --uml-border               ← --line-strong
+ *   --uml-border-subtle        ← --line
+ *   --uml-border-strong        ← --line-strong
+ *   --uml-accent               ← --phos
+ *   --uml-success              ← --phos
+ *   --uml-warning              ← --warn
+ *   --uml-danger               ← --magenta
+ *   --uml-info                 ← --cyan
+ *   --uml-node-bg              ← --bg-2
+ *   --uml-node-text            ← --ink
+ *   --uml-node-border          ← --line-strong
+ *   --uml-node-stereotype      ← --ink-soft
+ *   --uml-edge-stroke          ← --line-strong
+ *   --uml-edge-arrow           ← --cyan
+ *   --uml-edge-label-bg        ← --bg-2
+ *   --uml-edge-label-text      ← --ink-soft
+ *   --uml-canvas-bg            ← --bg-1 (shows topographic grid through panel)
+ *   --uml-canvas-grid          ← --grid-dot
+ *   --uml-selection-fill       ← --phos-soft
+ *   --uml-selection-stroke     ← --phos
+ *   --uml-selection-handle     ← --phos
+ *   --uml-focus-ring           ← --phos-line
+ *   --uml-shadow-sm/md/lg      ← skin-specific shadows
+ *   --uml-font-sans            ← Sora
+ *   --uml-font-mono            ← Azeret Mono
+ */
+
+.cyber-topographic-skin {
+  --uml-bg: var(--bg-0);
+  --uml-bg-elevated: var(--bg-2);
+  --uml-bg-overlay: var(--hud-bg);
+
+  --uml-text: var(--ink);
+  --uml-text-muted: var(--ink-soft);
+  --uml-text-faint: var(--ink-dim);
+  --uml-text-on-accent: var(--bg-0);
+
+  --uml-border: var(--line-strong);
+  --uml-border-subtle: var(--line);
+  --uml-border-strong: var(--line-strong);
+
+  --uml-accent: var(--phos);
+  --uml-success: var(--phos);
+  --uml-warning: var(--warn);
+  --uml-danger: var(--magenta);
+  --uml-info: var(--cyan);
+
+  --uml-node-bg: var(--bg-2);
+  --uml-node-text: var(--ink);
+  --uml-node-border: var(--line-strong);
+  --uml-node-stereotype: var(--ink-soft);
+
+  --uml-edge-stroke: var(--line-strong);
+  --uml-edge-arrow: var(--cyan);
+  --uml-edge-label-bg: var(--bg-2);
+  --uml-edge-label-text: var(--ink-soft);
+
+  --uml-canvas-bg: var(--bg-1);
+  --uml-canvas-grid: var(--grid-dot);
+
+  --uml-selection-fill: var(--phos-soft);
+  --uml-selection-stroke: var(--phos);
+  --uml-selection-handle: var(--phos);
+  --uml-focus-ring: var(--phos-line);
+
+  --uml-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --uml-shadow-md: 0 6px 18px rgba(0, 0, 0, 0.55);
+  --uml-shadow-lg: 0 16px 36px rgba(0, 0, 0, 0.6);
+}
+
+.cyber-topographic-skin[data-theme="light"] {
+  --uml-shadow-sm: 0 1px 2px rgba(13, 47, 79, 0.08);
+  --uml-shadow-md: 0 6px 18px rgba(13, 47, 79, 0.12);
+  --uml-shadow-lg: 0 16px 36px rgba(13, 47, 79, 0.18);
+}

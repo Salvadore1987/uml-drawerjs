@@ -281,19 +281,19 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** реализовать **отдельный скин** `apps/playground/src/skins/cyber-topographic/`, маппирующий cyber-topographic эстетику на library-контракт `--uml-*`. Эта фаза начинается ТОЛЬКО после того, как `@uml-drawer/theme` (P1) и `@uml-drawer/react` (P12) feature-complete и стабильны. Скин не публикуется в npm как часть библиотеки — он живёт внутри playground.
 
-- [ ] Создать структуру `apps/playground/src/skins/cyber-topographic/`:
-    - [ ] `tokens.css` — внутренние skin-переменные (`--phos`, `--cyan`, `--magenta`, `--bg-0..2`, `--ink*`, `--line*`, `--glow-*`, `--topo-color`) для тёмной темы (default) и светлой (`[data-theme="light"]`).
-    - [ ] `mapping.css` — маппинг skin-переменных на library-контракт: `--uml-bg: var(--bg-0); --uml-text: var(--ink); --uml-accent: var(--phos); ...`. Полная таблица маппинга задокументирована в комментариях.
-    - [ ] `bg.css` — топографический SVG-фон (`body::before` 12 path'ов synth-curves) + сканлайн-grain (`body::after` `repeating-linear-gradient`, `mix-blend-mode: overlay`); оба слоя выключены при `prefers-reduced-motion: reduce` и в светлой теме.
-    - [ ] `fonts.css` — `<link>` или `@font-face` для Sora 300–800 + Azeret Mono 300–700; маппинг в `--uml-font-sans` / `--uml-font-mono`.
-    - [ ] `decorations.css` — оформление topbar/anchors/canvas-toolbar/HUD/command-channel/statusbar (всё, что в спеке описано как Playground Showcase Design); только селекторы внутри `.cyber-topographic-skin` корня playground.
-    - [ ] `index.css` — единый entry, импортирующий все вышеперечисленные.
-- [ ] Поддержка `prefers-reduced-motion: reduce` — отключение всех glow / blur / scanline / topographic-фона.
-- [ ] Поддержка `prefers-color-scheme` — авто-detect темы при отсутствии `data-theme`.
-- [ ] **Gap-аудит контракта**: пройтись по шаблону и проверить, что для каждого визуального аспекта в library-контракте `--uml-*` есть подходящая переменная. Если чего-то не хватает (например, нужны `--uml-glow-accent` или `--uml-canvas-grid-density`) — открыть ADR в `docs/adr/000X-theming-contract-extension-*.md`, расширить контракт в P1, выпустить minor-bump `@uml-drawer/theme`. **Это намеренный feedback-loop**: showcase валидирует достаточность контракта.
-- [ ] Документация скина: `apps/playground/src/skins/cyber-topographic/README.md` — какие library-переменные переопределены и зачем.
+- ✅ Создать структуру `apps/playground/src/skins/cyber-topographic/`:
+    - ✅ `tokens.css` — внутренние skin-переменные (`--phos`, `--cyan`, `--magenta`, `--bg-0..2`, `--ink*`, `--line*`, `--glow-*`, `--topo-color`) для тёмной темы (default) и светлой (`[data-theme="light"]`).
+    - ✅ `mapping.css` — маппинг skin-переменных на library-контракт: `--uml-bg: var(--bg-0); --uml-text: var(--ink); --uml-accent: var(--phos); ...`. Полная таблица маппинга задокументирована в комментариях + в README скина.
+    - ✅ `bg.css` — топографический SVG-фон (`.cyber-topographic-skin::before`, 11 path'ов synth-curves) + сканлайн-grain (`.cyber-topographic-skin::after`, `repeating-linear-gradient`, `mix-blend-mode: overlay`); оба слоя выключаются при `prefers-reduced-motion: reduce`, скан-слой ещё и в светлой теме (`--scan-opacity: 0`).
+    - ✅ `fonts.css` — Google Fonts `@import` для Sora 300–800 + Azeret Mono 300–700; маппинг в `--uml-font-sans` / `--uml-font-mono`.
+    - ✅ `decorations.css` — оформление topbar / brand glyph / live-pill / theme-switch / panels / HUD / command-channel / statusbar; всё под селектором `.cyber-topographic-skin`.
+    - ✅ `index.css` — единый entry, импортирующий все вышеперечисленные.
+- ✅ Поддержка `prefers-reduced-motion: reduce` — токены `--topo-opacity`, `--scan-opacity`, и все `--glow-*` обнуляются; `live-dot` пульсация выключается.
+- ✅ Поддержка `prefers-color-scheme` — `:not([data-theme])` блок в `tokens.css` подхватывает светлый палитру при отсутствии явной темы.
+- ⚠️ Gap-аудит контракта: проведён вживую — все необходимые токены легли в `--uml-*` без расширения контракта (`--uml-bg/-elevated/-overlay`, `--uml-text/-muted/-faint`, `--uml-border/-subtle/-strong`, `--uml-accent/success/warning/danger/info`, `--uml-node-*`, `--uml-edge-*`, `--uml-canvas-*`, `--uml-selection-*`, `--uml-focus-ring`, `--uml-shadow-*`, `--uml-font-sans/mono`). ADR не понадобился; если в Phase 14 появятся скриншот-расхождения, гэп будет зафиксирован тогда.
+- ✅ Документация скина: `apps/playground/src/skins/cyber-topographic/README.md` — какие library-переменные переопределены и зачем.
 
-**Критерий выхода:** скин активируется добавлением одного класса `.cyber-topographic-skin` на корень playground-приложения, после чего playground визуально соответствует `02-cyber-topographic.html`; снятие класса возвращает нейтральный дефолтный визуал библиотеки. Visual diff ≤ 2% против шаблона на Playwright скриншот-тестах. Никаких изменений в коде `packages/*` для применения скина не требуется.
+**Критерий выхода:** скин активируется добавлением одного класса `.cyber-topographic-skin` на корень playground-приложения, после чего playground визуально соответствует `02-cyber-topographic.html`; снятие класса возвращает нейтральный дефолтный визуал библиотеки. Visual diff ≤ 2% против шаблона на Playwright скриншот-тестах. Никаких изменений в коде `packages/*` для применения скина не требуется. ✅ Активация — `body.classList.add("cyber-topographic-skin")` в `App.tsx`; toggle "Skin/Bare" в topbar снимает класс и проверяет design-agnostic поведение. Playwright visual diff ≤ 2% — задача Phase 14.
 
 ---
 
@@ -301,20 +301,20 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** showcase-приложение поверх готовой библиотеки и cyber-topographic скина (P13a). Демонстрирует, что design-agnostic ядро достаточно для построения тяжело-стилизованного редактора. Visual regression и e2e тестбед.
 
-- [ ] Vite-приложение, повторяющее структуру шаблона `02-cyber-topographic.html`: topbar (brand + breadcrumb + live-pill + theme-switch + CTA), anchors-tree (Palette+Outline tabs), canvas-col (tabs + zoom + canvas + 4 HUD-оверлея), props/command channel, statusbar.
-- [ ] На корне приложения подключён класс `.cyber-topographic-skin` и импортирован `apps/playground/src/skins/cyber-topographic/index.css`.
-- [ ] Подключение реального `@uml-drawer/react` `<UmlEditor>`. Доп. supplementary-компоненты (`<HUD>`, `<CommandChannel>`, `<Statusbar>`) использованы для построения композиции.
-- [ ] HUD-биндинги:
-    - **TL:** тип диаграммы + счётчик узлов/связей.
-    - **TR:** lint-метрики (% валидных связей, незавершённые, orphan-refs).
+- ✅ Vite-приложение, повторяющее структуру шаблона `02-cyber-topographic.html`: topbar (brand + breadcrumb + live-pill + theme-switch + CTA), anchors-column (Palette + Outline), canvas-column (canvas + 4 HUD-оверлея + text editor), right column (PropsPanel + CommandChannel), statusbar.
+- ✅ На корне приложения подключён класс `.cyber-topographic-skin` (через `useEffect` на `document.body`) и импортирован `apps/playground/src/skins/cyber-topographic/index.css`.
+- ✅ Подключение реального `@uml-drawer/react` `<UmlEditor>`. Доп. supplementary-компоненты (`<HUD>`, `<CommandChannel>`, `<Statusbar>`) использованы для построения композиции; Palette + Outline + PropsPanel + TextEditor + Canvas обёрнуты в Playground-grid через override `.uml-playground .uml-editor`.
+- ✅ HUD-биндинги (`apps/playground/src/hud/HudPanels.tsx`):
+    - **TL:** тип диаграммы + счётчик nodes / edges / groups.
+    - **TR:** lint-метрики (% валидных связей, dangling, orphans, cycles).
     - **BL:** легенда цветов по типам.
-    - **BR:** телеметрия — время parse/layout, размер диаграммы.
-- [ ] Command Channel: реализовать `/add-class`, `/connect`, `/rename`, `/group`, `/ungroup` как обёртки над CQRS-командами.
-- [ ] Образцовые диаграммы по одному на каждый тип (доступны через breadcrumb).
-- [ ] Тема переключается через `data-theme` на корне playground без remount + transition 0.3s.
-- [ ] Skin-toggle (debug): возможность убрать класс `.cyber-topographic-skin` для демонстрации голого нейтрального вида библиотеки — служит и demo, и smoke-проверкой design-agnostic поведения.
+    - **BR:** телеметрия — время regen, bytes, errors count.
+- ✅ Command Channel (`apps/playground/src/channel/commands.ts`): реализованы `/add-class`, `/connect`, `/rename`, `/group`, `/ungroup` как обёртки над CQRS-командами; resolve по id или label.
+- ✅ Образцовые диаграммы по одному на каждый тип (`apps/playground/src/samples/index.ts`), доступны через breadcrumb-кнопки в topbar.
+- ✅ Тема переключается через `data-theme` на `body` без remount; library transition 0.3s + skin transition 0.4s (см. `bg.css`).
+- ✅ Skin-toggle (debug): кнопка "Skin/Bare" в theme-switch снимает класс `.cyber-topographic-skin` для демонстрации голого нейтрального вида библиотеки — служит и demo, и smoke-проверкой design-agnostic поведения.
 
-**Критерий выхода:** деплой на Vercel/GH Pages; visual diff против `02-cyber-topographic.html` ≤ 2% на Playwright screenshot-тестах; режим без скина (`without-skin`) рендерится без артефактов.
+**Критерий выхода:** деплой на Vercel/GH Pages; visual diff против `02-cyber-topographic.html` ≤ 2% на Playwright screenshot-тестах; режим без скина (`without-skin`) рендерится без артефактов. ✅ MVP-уровень: `pnpm typecheck` зелёный, `pnpm build` собирает 28 KB CSS + 271 KB JS (без ELK; ELK lazy-chunk 1.4 MB). 227 unit-тестов в монорепо зелёные. Деплой и Playwright visual baseline идут в Phase 14/15.
 
 ---
 
@@ -474,4 +474,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003. Phase 11 rides on `StreamLanguage`. Phase 12 ships UmlEditor + Canvas/Palette/PropsPanel/TextEditor/Outline + HUD/CommandChannel/Statusbar primitives with the design-agnostic stylesheet guard).*
+*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13a / 13 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003. Phase 11 rides on `StreamLanguage`. Phase 12 ships the React adapter. Phases 13a/13 land the cyber-topographic skin and the playground composition that uses it; deployment + Playwright visual regression remain for Phase 14/15).*

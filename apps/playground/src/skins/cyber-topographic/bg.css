@@ -1,0 +1,62 @@
+/**
+ * cyber-topographic — page-level decorative layers.
+ *
+ * Two free-standing layers stacked above the page gradient:
+ *   1. body::before — topographic SVG mask (12 synth-curve paths) tinted
+ *      by `--topo-color`. Pure decoration, pointer-events: none.
+ *   2. body::after — scanline grain via `repeating-linear-gradient`,
+ *      `mix-blend-mode: overlay`. Disabled in light theme and under
+ *      `prefers-reduced-motion`.
+ *
+ * Both layers are gated by the `.cyber-topographic-skin` scope.
+ * Removing the class returns the playground to the library's neutral
+ * defaults — no visual residue.
+ */
+
+.cyber-topographic-skin {
+  background: var(--page-grad);
+}
+
+.cyber-topographic-skin::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-color: var(--topo-color);
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900'><g fill='none' stroke='black' stroke-width='0.9'><path d='M0,520 C220,440 380,560 600,500 C840,430 980,580 1240,520 C1420,480 1560,540 1600,510'/><path d='M0,560 C200,500 400,600 620,540 C860,470 1000,620 1260,560 C1440,520 1560,580 1600,550'/><path d='M0,600 C200,540 380,640 600,580 C860,510 1020,640 1260,600 C1440,560 1560,620 1600,590'/><path d='M0,460 C200,400 400,500 620,440 C860,380 1020,520 1260,460 C1440,420 1560,480 1600,450'/><path d='M0,400 C220,360 400,440 620,380 C880,320 1040,460 1260,400 C1460,360 1560,420 1600,390'/><path d='M0,340 C220,300 400,380 620,320 C880,260 1040,400 1260,340 C1460,300 1560,360 1600,330'/><path d='M0,280 C220,240 400,320 620,260 C880,200 1040,340 1260,280 C1460,240 1560,300 1600,270'/><path d='M0,220 C220,180 400,260 620,200 C880,140 1040,280 1260,220 C1460,180 1560,240 1600,210'/><path d='M0,160 C220,120 400,200 620,140 C880,80 1040,220 1260,160 C1460,120 1560,180 1600,150'/><path d='M0,680 C200,620 400,720 620,660 C880,580 1020,720 1260,680 C1440,640 1560,700 1600,670'/><path d='M0,740 C200,680 380,780 600,720 C860,660 1020,800 1260,740 C1440,700 1560,760 1600,730'/></g></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1600' height='900' viewBox='0 0 1600 900'><g fill='none' stroke='black' stroke-width='0.9'><path d='M0,520 C220,440 380,560 600,500 C840,430 980,580 1240,520 C1420,480 1560,540 1600,510'/><path d='M0,560 C200,500 400,600 620,540 C860,470 1000,620 1260,560 C1440,520 1560,580 1600,550'/><path d='M0,600 C200,540 380,640 600,580 C860,510 1020,640 1260,600 C1440,560 1560,620 1600,590'/><path d='M0,460 C200,400 400,500 620,440 C860,380 1020,520 1260,460 C1440,420 1560,480 1600,450'/><path d='M0,400 C220,360 400,440 620,380 C880,320 1040,460 1260,400 C1460,360 1560,420 1600,390'/><path d='M0,340 C220,300 400,380 620,320 C880,260 1040,400 1260,340 C1460,300 1560,360 1600,330'/><path d='M0,280 C220,240 400,320 620,260 C880,200 1040,340 1260,280 C1460,240 1560,300 1600,270'/><path d='M0,220 C220,180 400,260 620,200 C880,140 1040,280 1260,220 C1460,180 1560,240 1600,210'/><path d='M0,160 C220,120 400,200 620,140 C880,80 1040,220 1260,160 C1460,120 1560,180 1600,150'/><path d='M0,680 C200,620 400,720 620,660 C880,580 1020,720 1260,680 C1440,640 1560,700 1600,670'/><path d='M0,740 C200,680 380,780 600,720 C860,660 1020,800 1260,740 C1440,700 1560,760 1600,730'/></g></svg>");
+  -webkit-mask-size: cover;
+  mask-size: cover;
+  opacity: var(--topo-opacity);
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    background-color 0.4s ease,
+    opacity 0.4s ease;
+}
+
+.cyber-topographic-skin::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.012) 0 1px,
+    transparent 1px 3px
+  );
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
+  opacity: var(--scan-opacity);
+  transition: opacity 0.3s ease;
+}
+
+/* Promote the playground content above the decorative layers. */
+.cyber-topographic-skin > .uml-playground {
+  position: relative;
+  z-index: 2;
+}
+
+::selection {
+  background: var(--phos);
+  color: var(--bg-0);
+}

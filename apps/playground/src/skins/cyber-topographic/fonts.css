@@ -1,0 +1,23 @@
+/**
+ * cyber-topographic — typography.
+ *
+ * Imports Sora 300–800 + Azeret Mono 300–700 from Google Fonts and
+ * routes them into the library's `--uml-font-sans` / `--uml-font-mono`
+ * tokens, plus the skin's playground decorations. Hosts wishing to
+ * self-host should replace this `@import` with `@font-face` rules.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700;800&display=swap");
+
+.cyber-topographic-skin {
+  --uml-font-sans: "Sora", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --uml-font-mono:
+    "Azeret Mono", ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+
+.cyber-topographic-skin {
+  font-family: "Azeret Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
