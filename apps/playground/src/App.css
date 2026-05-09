@@ -31,16 +31,15 @@ body,
 .uml-playground__editor-wrap > .uml-editor {
   width: 100%;
   height: 100%;
-  /* Three-column, three-row grid. The library's default areas are
-     overridden so we can host Palette+Outline together on the left,
-     PropsPanel+CommandChannel together on the right, the text editor
-     directly under the canvas, and the status bar across the foot. */
+  /* Three-column, two-row grid. The Designer canvas and the PlantUML
+     text editor share a single `work` area and are toggled by the
+     <Tabs> component sitting inside it (DevTools-style strip at the
+     bottom). The status bar still spans the foot. */
   grid-template-areas:
-    "anchors canvas rightcol"
-    "anchors text rightcol"
+    "anchors work rightcol"
     "status status status";
   grid-template-columns: minmax(240px, 280px) 1fr minmax(300px, 360px);
-  grid-template-rows: 1fr 220px 30px;
+  grid-template-rows: 1fr 30px;
   gap: 1px;
 }
 
@@ -71,12 +70,29 @@ body,
   min-height: 0;
 }
 
-.uml-playground .uml-canvas-host {
-  grid-area: canvas;
+.uml-playground__workzone {
+  grid-area: work;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  background-color: var(--uml-bg);
 }
 
-.uml-playground .uml-text-editor {
-  grid-area: text;
+.uml-playground__workzone > .uml-tabs {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.uml-playground__workzone .uml-canvas-host {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.uml-playground__workzone .uml-text-editor {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .uml-playground .uml-statusbar {
@@ -114,10 +130,8 @@ body,
   letter-spacing: 0.1em;
 }
 
-/* Canvas hosts the HUD as a relatively-positioned overlay. */
-.uml-playground .uml-canvas-host {
-  position: relative;
-}
+/* Canvas hosts the HUD as a relatively-positioned overlay; positioning
+   is also re-asserted from the workzone scope above. */
 
 .uml-canvas-toolbar {
   position: absolute;
