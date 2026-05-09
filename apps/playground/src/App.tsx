@@ -29,10 +29,10 @@ const SKIN_CLASS = "cyber-topographic-skin";
 type WorkspaceTab = "designer" | "plantuml";
 
 export function App(): JSX.Element {
-  const [diagramType, setDiagramType] = useState<DiagramType>("class");
+  const [diagramType, setDiagramType] = useState<DiagramType>("c4-context");
   const [theme, setTheme] = useState<Theme>("dark");
   const [skin, setSkin] = useState<boolean>(true);
-  const [doc, setDoc] = useState<string>(SAMPLES.class);
+  const [doc, setDoc] = useState<string>(SAMPLES["c4-context"]);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("designer");
 
   // Apply theme + skin class on the body so the topographic + scanline
