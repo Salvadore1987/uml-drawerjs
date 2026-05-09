@@ -51,6 +51,10 @@
       "types": "./dist/exporters/index.d.ts",
       "import": "./dist/exporters/index.js"
     },
+    "./editor": {
+      "types": "./dist/editor/index.d.ts",
+      "import": "./dist/editor/index.js"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",

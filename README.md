@@ -2,7 +2,7 @@
 
 > Framework-agnostic TypeScript library for editing UML diagrams with bidirectional PlantUML synchronization.
 
-**Status:** pre-alpha. Phases 0–9 complete (repo bootstrap + design-agnostic theming contract + `@uml-drawer/core` AST model + CQRS commands & undo/redo history + PlantUML parser for all 5 diagram types + AST → PlantUML generator with round-trip guarantees + multi-level validator stack with quick-fix registry + auto-layout with lazy ELK + custom sequence + grid fallback + declarative SVG renderer with pan/zoom/minimap/keyboard/a11y + `.puml`/`.umljson`/`.svg`/`.png` exporters & importers). Editor / CodeMirror / React adapter pending. The Phase 4 parser is hand-rolled; Lezer migration is tracked in [ADR-0003](./docs/adr/0003-plantuml-subset.md).
+**Status:** pre-alpha. Phases 0–10 complete (repo bootstrap + design-agnostic theming contract + `@uml-drawer/core` AST model + CQRS commands & undo/redo history + PlantUML parser for all 5 diagram types + AST → PlantUML generator with round-trip guarantees + multi-level validator stack with quick-fix registry + auto-layout with lazy ELK + custom sequence + grid fallback + declarative SVG renderer with pan/zoom/minimap/keyboard/a11y + `.puml`/`.umljson`/`.svg`/`.png` exporters & importers + vanilla `createEditor` bootstrap composing every inner-hexagon module behind a single host-mounted instance). CodeMirror language package and React adapter pending. The Phase 4 parser is hand-rolled; Lezer migration is tracked in [ADR-0003](./docs/adr/0003-plantuml-subset.md).
 
 See [`docs/uml-drawer.md`](./docs/uml-drawer.md) for the full specification and [`docs/IMPLEMENTATION_PLAN.md`](./docs/IMPLEMENTATION_PLAN.md) for the phased roadmap.
 

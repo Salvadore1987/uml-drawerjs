@@ -18,6 +18,7 @@ export default defineConfig({
         "layout/index": "src/layout/index.ts",
         "renderer/index": "src/renderer/index.ts",
         "exporters/index": "src/exporters/index.ts",
+        "editor/index": "src/editor/index.ts",
       },
       formats: ["es"],
     },

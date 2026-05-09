@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@uml-drawer/core — createEditor smoke test</title>
+    <link rel="stylesheet" href="../../theme/dist/index.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: var(--uml-bg);
+        color: var(--uml-text);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        gap: 16px;
+        padding: 24px;
+        min-height: 100vh;
+      }
+
+      aside {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      button {
+        font: inherit;
+        padding: 8px 12px;
+        background: var(--uml-bg-elevated);
+        color: var(--uml-text);
+        border: 1px solid var(--uml-border);
+        border-radius: var(--uml-radius-md);
+        cursor: pointer;
+      }
+
+      [data-uml-host] {
+        width: 100%;
+        height: 480px;
+        background: var(--uml-bg-elevated);
+        border: 1px solid var(--uml-border);
+        border-radius: var(--uml-radius-lg);
+      }
+
+      pre {
+        margin: 16px 0 0;
+        padding: 12px;
+        background: var(--uml-bg-elevated);
+        border: 1px solid var(--uml-border);
+        border-radius: var(--uml-radius-md);
+        font-family: var(--uml-font-mono);
+        font-size: var(--uml-font-size-sm);
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body data-uml-host data-theme="dark">
+    <div class="layout">
+      <aside>
+        <button id="add">Add class</button>
+        <button id="undo">Undo</button>
+        <button id="redo">Redo</button>
+        <button id="layout">Auto-layout</button>
+        <button id="export-svg">Export SVG</button>
+        <button id="theme">Toggle theme</button>
+        <button id="destroy">Destroy</button>
+      </aside>
+      <section>
+        <div id="canvas" data-uml-host></div>
+        <pre id="text"></pre>
+      </section>
+    </div>
+
+    <script type="module">
+      import { addNodeCommand, createEditor } from "../dist/index.js";
+
+      const host = document.getElementById("canvas");
+      const out = document.getElementById("text");
+
+      let counter = 0;
+      const editor = createEditor(host, {
+        diagramType: "class",
+        theme: "dark",
+        interactive: { panZoom: true, keyboard: true },
+        onChange: (event) => {
+          out.textContent = event.text;
+        },
+      });
+
+      document.getElementById("add").addEventListener("click", () => {
+        counter += 1;
+        editor.dispatch(
+          addNodeCommand({ id: `n_${counter}`, kind: "class", label: `Class${counter}` }),
+        );
+      });
+      document.getElementById("undo").addEventListener("click", () => editor.undo());
+      document.getElementById("redo").addEventListener("click", () => editor.redo());
+      document.getElementById("layout").addEventListener("click", () => editor.runAutoLayout());
+      document.getElementById("export-svg").addEventListener("click", () => {
+        const blob = new Blob([editor.exportSvg()], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+      });
+      document.getElementById("theme").addEventListener("click", () => {
+        const current = host.getAttribute("data-theme");
+        editor.applyTheme(current === "dark" ? "light" : "dark");
+      });
+      document.getElementById("destroy").addEventListener("click", () => editor.destroy());
+    </script>
+  </body>
+</html>

@@ -235,13 +235,13 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** публичный API ядра для не-React хостов (vanilla JS).
 
-- [ ] `createEditor(host, options)` композирует parser + generator + validators + renderer + history.
-- [ ] Возвращает объект с методами по спеке: `loadFromText`, `loadFromJson`, `exportText`, `exportSvg`, `exportPng`, `exportJson`, `undo`, `redo`, `runAutoLayout`, `applyTheme`, `destroy`.
-- [ ] `onChange` отдаёт `{ text, ast, errors }` после каждой команды.
-- [ ] CSS-переменные применяются к host-контейнеру, не к глобальному `:root`.
-- [ ] Авто-выбор темы через `prefers-color-scheme`, если `data-theme` не задан.
+✅ `createEditor(host, options)` композирует parser + generator + validators + renderer + history (`packages/core/src/editor/createEditor.ts`).
+✅ Возвращает объект с методами по спеке: `loadFromText`, `loadFromJson`, `exportText`, `exportSvg`, `exportPng`, `exportJson`, `undo`, `redo`, `runAutoLayout`, `applyTheme`, `destroy` (+ удобные `dispatch` / `getState` / `getErrors`, и raw-доступ к `bus` / `history` / `panZoom`).
+✅ `onChange` отдаёт `{ text, ast, errors, command }` после каждой команды (включая undo/redo/import; первая публикация — с `command: null`).
+✅ CSS-переменные применяются к host-контейнеру через `data-uml-host` + `data-theme`, никаких манипуляций с `:root`.
+✅ Авто-выбор темы через `prefers-color-scheme` (`theme: "auto"` подписывается на `MediaQueryList.change`, в чистой Node-среде безопасно деградирует в `light`).
 
-**Критерий выхода:** smoke-тест в plain HTML монтирует редактор, добавляет узел, экспортирует SVG; `destroy()` убирает все listeners и DOM-узлы.
+**Критерий выхода:** smoke-тест в plain HTML монтирует редактор, добавляет узел, экспортирует SVG; `destroy()` убирает все listeners и DOM-узлы. ✅ (14 новых тестов в `editor.test.ts` под happy-dom: mount + addNode + exportSvg + undo/redo + theme + destroy; HTML-смоук в `packages/core/examples/editor-smoke.html`. 189 тестов в `core` зелёные).
 
 ---
 
@@ -474,4 +474,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-08 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
+*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 complete (Phase 4 ships hand-rolled parser; Lezer migration tracked in ADR-0003).*
