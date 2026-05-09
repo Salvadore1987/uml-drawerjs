@@ -28,8 +28,10 @@
 
 import {
   addEdgeCommand,
+  addNodeToGroupCommand,
   moveGroupCommand,
   moveNodeCommand,
+  removeNodeFromGroupCommand,
   resizeGroupCommand,
   resizeNodeCommand,
   updateNodeCommand,
@@ -87,6 +89,9 @@ export interface InteractionsController {
 interface MovingNode {
   readonly id: string;
   readonly original: { readonly x: number; readonly y: number };
+  /** Captured at pointerdown so we can hit-test the node's centre
+   *  against every boundary box without re-querying the DOM. */
+  readonly originalRect?: Rect;
 }
 
 interface DragState {
@@ -123,6 +128,13 @@ interface DragState {
   /** Move-only on groups: original boundary rect so we can rewrite the
    *  rect attributes on every pointermove without re-querying the DOM. */
   readonly groupOriginalRect: Rect | null;
+  /**
+   * Boundary boxes captured at pointerdown (move-mode only, target=node).
+   * Used by drag-into-boundary hit-testing so the target highlight + the
+   * pointerup membership-change commands work without re-reading the
+   * DOM on every frame.
+   */
+  readonly boundaryBoxes: ReadonlyArray<{ groupId: string; rect: Rect }>;
 }
 
 export function attachInteractions(initial: InteractionsOptions): InteractionsController {
@@ -202,6 +214,66 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
    * (move-mode loop) translates child node groups separately so a single
    * boundary-drag also drags every node it contains.
    */
+  /**
+   * Snapshot every boundary's current rect in layout coordinates by
+   * reading the rendered DOM. Used by drag-into-boundary hit-testing —
+   * captured once at pointerdown so the targets don't drift during
+   * the gesture (auto-fit boundaries would otherwise chase the
+   * dragged node and cause flicker).
+   */
+  function readBoundaryBoxesFromDOM(
+    contentGroupEl: SVGGraphicsElement,
+  ): Array<{ groupId: string; rect: Rect }> {
+    const result: Array<{ groupId: string; rect: Rect }> = [];
+    const els = contentGroupEl.querySelectorAll("[data-group-id]");
+    els.forEach((el) => {
+      if (!(el instanceof SVGGraphicsElement)) return;
+      const id = el.getAttribute("data-group-id");
+      if (!id) return;
+      result.push({ groupId: id, rect: groupRectInLayout(el) });
+    });
+    return result;
+  }
+
+  /**
+   * Pick the innermost boundary whose rect contains `point`. Innermost
+   * means smallest area — when boundaries are nested the deepest one
+   * wins, matching the visual intuition that a node dropped onto two
+   * stacked boundaries belongs to the inner one.
+   */
+  function findBoundaryAtPoint(
+    boxes: ReadonlyArray<{ groupId: string; rect: Rect }>,
+    point: { x: number; y: number },
+  ): string | null {
+    let best: { groupId: string; area: number } | null = null;
+    for (const { groupId, rect } of boxes) {
+      const inside =
+        point.x >= rect.x &&
+        point.x <= rect.x + rect.width &&
+        point.y >= rect.y &&
+        point.y <= rect.y + rect.height;
+      if (!inside) continue;
+      const area = rect.width * rect.height;
+      if (!best || area < best.area) best = { groupId, area };
+    }
+    return best?.groupId ?? null;
+  }
+
+  /**
+   * Toggle the `data-uml-drop-target` attribute on boundary groups so
+   * CSS can highlight the one the user is hovering with a dragged node.
+   * Pass `null` to clear. The attribute is the only DOM writes this
+   * function performs — cheap to call per-frame.
+   */
+  function paintDropTarget(contentGroupEl: SVGGraphicsElement, groupId: string | null): void {
+    const previously = contentGroupEl.querySelectorAll('[data-uml-drop-target="true"]');
+    previously.forEach((el) => el.removeAttribute("data-uml-drop-target"));
+    if (!groupId) return;
+    const escaped = groupId.replaceAll('"', '\\"');
+    const el = contentGroupEl.querySelector(`[data-group-id="${escaped}"]`);
+    if (el) el.setAttribute("data-uml-drop-target", "true");
+  }
+
   function applyEphemeralGroupRect(
     contentGroupEl: SVGGraphicsElement,
     groupId: string,
@@ -578,6 +650,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
           resizeOriginalRect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
           resizeLastRect: null,
           groupOriginalRect: null,
+          boundaryBoxes: [],
         };
         svg.setPointerCapture?.(event.pointerId);
         event.stopPropagation();
@@ -615,8 +688,26 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     const moveSet = mode === "move" && groupSelected ? [...selection.get()] : [nodeId];
     const movingNodes: MovingNode[] = moveSet.map((id) => {
       const coord = overrides[id] ?? { x: 0, y: 0 };
-      return { id, original: { x: coord.x, y: coord.y } };
+      // Capture each moving node's full DOM rect so we can hit-test its
+      // centre against boundary rects on pointerup without re-querying
+      // the DOM after the ephemeral move has rewritten transforms.
+      const escaped = id.replaceAll('"', '\\"');
+      const el = contentGroup.querySelector(`[data-node-id="${escaped}"]`);
+      const r =
+        el instanceof SVGGraphicsElement
+          ? nodeRectInLayout(el)
+          : { x: coord.x, y: coord.y, width: 0, height: 0 };
+      return {
+        id,
+        original: { x: coord.x, y: coord.y },
+        originalRect: { x: r.x, y: r.y, width: r.width, height: r.height },
+      };
     });
+
+    // Capture every visible boundary's rect once so drag-into-boundary
+    // hit-testing stays stable through the gesture even when an
+    // auto-fitting boundary would otherwise chase the dragged node.
+    const boundaryBoxes = mode === "move" ? readBoundaryBoxesFromDOM(contentGroup) : [];
 
     drag = {
       mode,
@@ -633,6 +724,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       resizeOriginalRect: null,
       resizeLastRect: null,
       groupOriginalRect: null,
+      boundaryBoxes,
     };
 
     svg.setPointerCapture?.(event.pointerId);
@@ -678,6 +770,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
           resizeOriginalRect: { ...rect },
           resizeLastRect: null,
           groupOriginalRect: { ...rect },
+          boundaryBoxes: [],
         };
         svg.setPointerCapture?.(event.pointerId);
         event.stopPropagation();
@@ -711,6 +804,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       resizeOriginalRect: null,
       resizeLastRect: null,
       groupOriginalRect: { ...rect },
+      boundaryBoxes: [],
     };
     svg.setPointerCapture?.(event.pointerId);
     event.stopPropagation();
@@ -745,6 +839,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       resizeOriginalRect: null,
       resizeLastRect: null,
       groupOriginalRect: null,
+      boundaryBoxes: [],
     };
     const host = svg.parentElement;
     host?.setAttribute("data-marquee-active", "true");
@@ -801,6 +896,21 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
           width: drag.groupOriginalRect.width,
           height: drag.groupOriginalRect.height,
         });
+      }
+      // Drag-into-boundary highlight: only when dragging a node, not the
+      // boundary itself (otherwise we'd light up the boundary we're
+      // currently moving). The hit-test uses the primary node's centre.
+      const dragSnapshot = drag;
+      if (dragSnapshot.targetKind === "node" && dragSnapshot.boundaryBoxes.length > 0) {
+        const primaryId = dragSnapshot.nodeId;
+        const primary = dragSnapshot.movingNodes.find((m) => m.id === primaryId);
+        if (primary?.originalRect) {
+          const centre = {
+            x: primary.originalRect.x + primary.originalRect.width / 2 + ddx,
+            y: primary.originalRect.y + primary.originalRect.height / 2 + ddy,
+          };
+          paintDropTarget(contentGroup, findBoundaryAtPoint(dragSnapshot.boundaryBoxes, centre));
+        }
       }
       return;
     }
@@ -870,6 +980,9 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     if (!finished.hasMoved) return; // pure click — selection already updated.
 
     if (finished.mode === "move") {
+      // Clear any drag-target highlight that pointermove may have set.
+      paintDropTarget(contentGroup, null);
+
       const cursor = clientToLayout(event.clientX, event.clientY);
       const rawDx = cursor.x - finished.startLayout.x;
       const rawDy = cursor.y - finished.startLayout.y;
@@ -895,15 +1008,39 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
         return;
       }
 
-      // One MoveNodeCommand per moving node, batched into a single
-      // history frame so Cmd+Z reverts the whole gesture.
-      const moves = finished.movingNodes.map((m) =>
-        moveNodeCommand(m.id, { x: m.original.x + ddx, y: m.original.y + ddy }, diagram),
-      );
-      if (moves.length === 1) {
-        history.dispatch(moves[0]!);
-      } else if (moves.length > 1) {
-        history.dispatchAll(moves);
+      // One MoveNodeCommand per moving node, plus membership-change
+      // commands when the final centre lands inside / outside a
+      // boundary. Everything goes through `dispatchAll` so Cmd+Z reverts
+      // the whole drag-into / drag-out-of gesture atomically.
+      const cmds: Array<ReturnType<typeof moveNodeCommand>> = [];
+      // Pre-compute parent group lookup so we can detect changes.
+      const parentByChild = new Map<string, string>();
+      for (const g of diagram.groups) {
+        for (const childId of g.children) parentByChild.set(childId, g.id);
+      }
+      for (const m of finished.movingNodes) {
+        cmds.push(moveNodeCommand(m.id, { x: m.original.x + ddx, y: m.original.y + ddy }, diagram));
+        if (!m.originalRect || finished.boundaryBoxes.length === 0) continue;
+        const centre = {
+          x: m.originalRect.x + m.originalRect.width / 2 + ddx,
+          y: m.originalRect.y + m.originalRect.height / 2 + ddy,
+        };
+        const targetGroupId = findBoundaryAtPoint(finished.boundaryBoxes, centre);
+        const currentParent = parentByChild.get(m.id) ?? null;
+        if (targetGroupId === currentParent) continue;
+        if (currentParent) {
+          const removeCmd = removeNodeFromGroupCommand(m.id, currentParent, diagram);
+          if (removeCmd) cmds.push(removeCmd as never);
+        }
+        if (targetGroupId) {
+          const addCmd = addNodeToGroupCommand(m.id, targetGroupId, diagram);
+          if (addCmd) cmds.push(addCmd as never);
+        }
+      }
+      if (cmds.length === 1) {
+        history.dispatch(cmds[0]!);
+      } else if (cmds.length > 1) {
+        history.dispatchAll(cmds);
       }
       return;
     }

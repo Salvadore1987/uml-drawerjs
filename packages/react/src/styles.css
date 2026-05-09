@@ -519,6 +519,15 @@
   stroke-width: 2;
 }
 
+/* Drag-into-boundary affordance: while a node is being dragged whose
+   centre falls inside this boundary, light up the dashed frame so the
+   user can see where the node will land on pointerup. */
+[data-group-id][data-uml-drop-target="true"] .uml-group-boundary {
+  stroke: var(--uml-accent);
+  stroke-width: 2;
+  fill-opacity: 0.55;
+}
+
 .uml-group-resize-handle {
   opacity: 0;
   transition: opacity 0.15s ease;
