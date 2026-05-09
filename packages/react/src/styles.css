@@ -96,9 +96,40 @@
 
 .uml-canvas-host {
   grid-area: canvas;
-  background-color: var(--uml-bg);
+  background-color: var(--uml-canvas-bg);
+  background-image: radial-gradient(circle at center, var(--uml-canvas-grid) 1px, transparent 1px);
+  background-size: var(--uml-canvas-grid-density) var(--uml-canvas-grid-density);
+  border: 1px solid var(--uml-border);
   position: relative;
   overflow: hidden;
+  cursor: grab;
+}
+
+.uml-canvas-host:active {
+  cursor: grabbing;
+}
+
+.uml-canvas-host > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.uml-canvas-host[data-locked="true"] {
+  cursor: not-allowed;
+}
+
+.uml-canvas-host[data-locked="true"] .uml-node {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.uml-canvas-host[data-marquee-active="true"] {
+  cursor: crosshair;
+}
+
+.uml-marquee {
+  pointer-events: none;
 }
 
 .uml-palette__header,
@@ -270,9 +301,18 @@
 }
 
 .uml-hud__slot {
-  pointer-events: auto;
+  /* Slot quadrants fill 1/4 of the canvas each. They must NOT intercept
+     pointer events — otherwise a node that happens to render in the
+     same area becomes unclickable. Slot content is also non-interactive
+     by default; widgets that need clicks opt in via `[data-hud-clickable]`
+     or by setting `pointer-events: auto` themselves. */
+  pointer-events: none;
   display: flex;
   align-items: flex-start;
+}
+
+.uml-hud__slot [data-hud-clickable] {
+  pointer-events: auto;
 }
 
 .uml-hud__slot--tl {
@@ -397,4 +437,36 @@
 
 .uml-statusbar__trailing {
   margin-left: auto;
+}
+
+/* === canvas interactions ============================== */
+
+.uml-canvas svg,
+.uml-canvas-host svg {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.uml-node {
+  cursor: grab;
+}
+
+.uml-node:active {
+  cursor: grabbing;
+}
+
+.uml-node[data-selected="true"] > rect,
+.uml-node[data-selected="true"] > path {
+  stroke: var(--uml-selection-stroke);
+  stroke-width: 2.5;
+}
+
+.uml-node:hover > rect {
+  stroke-width: 2;
+}
+
+.uml-edge-ghost {
+  pointer-events: none;
+  opacity: 0.7;
 }

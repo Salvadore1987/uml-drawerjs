@@ -56,6 +56,27 @@
   --uml-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --uml-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.1);
   --uml-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.15);
+
+  /* C4 palette — official C4-PlantUML scale (darkest → lightest). */
+  --uml-c4-person-bg: #08427b;
+  --uml-c4-person-border: #073b6f;
+  --uml-c4-person-text: #ffffff;
+  --uml-c4-system-bg: #1168bd;
+  --uml-c4-system-border: #0e5fa9;
+  --uml-c4-system-text: #ffffff;
+  --uml-c4-external-bg: #999999;
+  --uml-c4-external-border: #8a8a8a;
+  --uml-c4-external-text: #ffffff;
+  --uml-c4-container-bg: #438dd5;
+  --uml-c4-container-border: #3c7fc0;
+  --uml-c4-container-text: #ffffff;
+  --uml-c4-component-bg: #85bbf0;
+  --uml-c4-component-border: #78a8d8;
+  --uml-c4-component-text: #0f172a;
+  --uml-c4-database-bg: #438dd5;
+  --uml-c4-database-border: #3c7fc0;
+  --uml-c4-database-text: #ffffff;
+  --uml-c4-tech-text: #cbd5e1;
 }
 
 /* Auto-detect: no explicit data-theme + OS prefers light (or no preference). */
@@ -101,5 +122,25 @@
     --uml-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
     --uml-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.1);
     --uml-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.15);
+
+    --uml-c4-person-bg: #08427b;
+    --uml-c4-person-border: #073b6f;
+    --uml-c4-person-text: #ffffff;
+    --uml-c4-system-bg: #1168bd;
+    --uml-c4-system-border: #0e5fa9;
+    --uml-c4-system-text: #ffffff;
+    --uml-c4-external-bg: #999999;
+    --uml-c4-external-border: #8a8a8a;
+    --uml-c4-external-text: #ffffff;
+    --uml-c4-container-bg: #438dd5;
+    --uml-c4-container-border: #3c7fc0;
+    --uml-c4-container-text: #ffffff;
+    --uml-c4-component-bg: #85bbf0;
+    --uml-c4-component-border: #78a8d8;
+    --uml-c4-component-text: #0f172a;
+    --uml-c4-database-bg: #438dd5;
+    --uml-c4-database-border: #3c7fc0;
+    --uml-c4-database-text: #ffffff;
+    --uml-c4-tech-text: #cbd5e1;
   }
 }

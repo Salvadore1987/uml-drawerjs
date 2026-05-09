@@ -154,6 +154,52 @@ describe("History — coalesce policy", () => {
   });
 });
 
+describe("History — dispatchAll (compound undo frames)", () => {
+  it("undoes a batch of commands as one frame", () => {
+    // Arrange
+    const { bus, history } = setup();
+    const a = { id: uuidv7(), kind: "class" as const, label: "A" };
+    const b = { id: uuidv7(), kind: "class" as const, label: "B" };
+    history.dispatch(addNodeCommand(a));
+    history.dispatch(addNodeCommand(b));
+    const stateBeforeBatch = bus.getState();
+
+    // Act — group two MoveNode commands into one frame.
+    const moves = [
+      moveNodeCommand(a.id, { x: 100, y: 200 }, stateBeforeBatch),
+      moveNodeCommand(b.id, { x: 300, y: 400 }, stateBeforeBatch),
+    ];
+    history.dispatchAll(moves);
+
+    // Assert — both moves applied.
+    expect(bus.getState().metadata.layoutOverrides?.[a.id]).toEqual({ x: 100, y: 200 });
+    expect(bus.getState().metadata.layoutOverrides?.[b.id]).toEqual({ x: 300, y: 400 });
+
+    // Single undo reverts both.
+    history.undo();
+    expect(bus.getState().metadata.layoutOverrides?.[a.id]).toBeUndefined();
+    expect(bus.getState().metadata.layoutOverrides?.[b.id]).toBeUndefined();
+
+    // Single redo reapplies both.
+    history.redo();
+    expect(bus.getState().metadata.layoutOverrides?.[a.id]).toEqual({ x: 100, y: 200 });
+    expect(bus.getState().metadata.layoutOverrides?.[b.id]).toEqual({ x: 300, y: 400 });
+  });
+
+  it("dispatchAll([]) is a no-op", () => {
+    // Arrange
+    const { bus, history } = setup();
+    const before = bus.getState();
+
+    // Act
+    history.dispatchAll([]);
+
+    // Assert
+    expect(bus.getState()).toBe(before);
+    expect(history.canUndo()).toBe(false);
+  });
+});
+
 describe("History — clear", () => {
   it("forgets all frames without touching the bus state", () => {
     // Arrange

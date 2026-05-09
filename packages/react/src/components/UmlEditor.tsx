@@ -39,6 +39,13 @@ export interface UmlEditorProps {
   readonly layout?: UmlEditorLayout;
   /** Filter the default Palette item list down to a subset. */
   readonly paletteFilter?: PaletteFilter;
+  /**
+   * Auto-run ELK layout right after the initial parse if the diagram
+   * has no `layoutOverrides`. Useful for showcase samples; pass `false`
+   * when consumers want full control over node positions.
+   * Defaults to `true`.
+   */
+  readonly autoLayoutOnLoad?: boolean;
   /** Forwarded to `createEditor` — cuts through to the underlying core. */
   readonly editorOptions?: Omit<
     CreateEditorOptions,
@@ -82,6 +89,7 @@ export function UmlEditor({
   theme,
   layout,
   paletteFilter,
+  autoLayoutOnLoad = true,
   editorOptions,
   children,
   className,
@@ -108,13 +116,27 @@ export function UmlEditor({
   editorOptionsRef.current = editorOptions;
 
   const initialTextRef = useRef<string | null>(value ?? defaultValue ?? null);
+  const [initialLoaded, setInitialLoaded] = useState<boolean>(false);
 
   useEffect(() => {
     if (!host) return;
+    setInitialLoaded(false);
+    // Default to enabling pointer + keyboard interactions and hand the
+    // shared SelectionModel to core so Delete / arrow-nudge / pointer
+    // selection stay coherent between React panels and the SVG canvas.
+    const passedOptions = editorOptionsRef.current ?? {};
+    const passedInteractive = passedOptions.interactive ?? {};
+    const resolvedInteractive = {
+      panZoom: passedInteractive.panZoom ?? true,
+      keyboard: passedInteractive.keyboard ?? true,
+      pointer: passedInteractive.pointer ?? true,
+      selection: passedInteractive.selection ?? selection,
+    };
     const instance = createEditor(host, {
       diagramType,
       ...(theme ? { theme } : {}),
-      ...editorOptionsRef.current,
+      ...passedOptions,
+      interactive: resolvedInteractive,
       onChange: (event) => onChangeRef.current?.(event),
       onValidate: (errors) => onValidateRef.current?.(errors),
     });
@@ -126,9 +148,31 @@ export function UmlEditor({
     // observable to subscribers in the same tick the bus emits.
     const initialText = initialTextRef.current;
     if (initialText !== null && initialText !== undefined) {
-      void instance.loadFromText(initialText).catch(() => {
-        /* validator surfaces the error */
-      });
+      void instance
+        .loadFromText(initialText)
+        .then(async () => {
+          if (autoLayoutOnLoad) {
+            const ast = instance.getState();
+            if (ast.nodes.length > 0) {
+              const overrides = ast.metadata.layoutOverrides ?? {};
+              if (Object.keys(overrides).length === 0) {
+                await instance.runAutoLayout();
+              }
+            }
+          }
+          // Frame whatever ended up in the AST so the user sees the
+          // whole diagram on first paint, even when consumers supplied
+          // their own `layoutOverrides`.
+          requestAnimationFrame(() => instance.fitToView());
+        })
+        .catch(() => {
+          /* validator surfaces the error */
+        })
+        .finally(() => {
+          setInitialLoaded(true);
+        });
+    } else {
+      setInitialLoaded(true);
     }
 
     return () => {
@@ -139,16 +183,20 @@ export function UmlEditor({
 
   // Controlled prop sync — only fires on real value changes, not on
   // every render. We compare against `editor.exportText()` so external
-  // edits propagate without ricocheting through `onChange`.
+  // edits propagate without ricocheting through `onChange`. We skip
+  // until the construction effect's initial load + auto-layout settle,
+  // otherwise this effect would race-overwrite the layouted AST with a
+  // raw re-parse of the same `value` string.
   useEffect(() => {
     if (!editor) return;
     if (value === undefined) return;
+    if (!initialLoaded) return;
     const current = editor.exportText();
     if (current === value) return;
     void editor.loadFromText(value).catch(() => {
       /* swallow — surfaced via onValidate */
     });
-  }, [editor, value]);
+  }, [editor, value, initialLoaded]);
 
   const registerCanvas = useCallback((node: HTMLDivElement | null) => {
     setHost(node);

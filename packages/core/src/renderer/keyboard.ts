@@ -6,13 +6,18 @@
  *
  * Shortcuts (from the spec, § Keyboard):
  *
- *   Tab           → focus next node
- *   Shift+Tab     → focus previous node
- *   Arrow keys    → nudge selection by `step` px (Shift = 10× nudge)
- *   Delete / Bksp → request removal of the focused node
- *   Enter         → request "edit label" mode
- *   Cmd/Ctrl+Z    → undo (consumed only when `onUndo` is provided)
+ *   Tab              → focus next node
+ *   Shift+Tab        → focus previous node
+ *   Arrow keys       → nudge selection by `step` px (Shift = 10× nudge)
+ *   Delete / Bksp    → request removal of the focused node
+ *   Enter            → request "edit label" mode
+ *   Cmd/Ctrl+Z       → undo (consumed only when `onUndo` is provided)
  *   Cmd/Ctrl+Shift+Z → redo
+ *   Cmd/Ctrl+= / +   → zoom in
+ *   Cmd/Ctrl+-       → zoom out
+ *   Cmd/Ctrl+0       → reset zoom (1:1)
+ *   Cmd/Ctrl+1 / F   → fit diagram to viewport
+ *   Cmd/Ctrl+L       → toggle lock (suspend canvas-side editing)
  */
 export interface KeyboardNavigationCallbacks {
   readonly onTab?: (direction: "forward" | "backward") => void;
@@ -21,6 +26,12 @@ export interface KeyboardNavigationCallbacks {
   readonly onEnter?: () => void;
   readonly onUndo?: () => void;
   readonly onRedo?: () => void;
+  readonly onZoomIn?: () => void;
+  readonly onZoomOut?: () => void;
+  readonly onZoomReset?: () => void;
+  readonly onFitToView?: () => void;
+  readonly onToggleLock?: () => void;
+  readonly onSelectAll?: () => void;
 }
 
 export interface KeyboardNavigationOptions extends KeyboardNavigationCallbacks {
@@ -74,6 +85,45 @@ export function attachKeyboardNavigation(
         event.preventDefault();
         options.onUndo();
       }
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && (event.key === "=" || event.key === "+")) {
+      if (!options.onZoomIn) return;
+      event.preventDefault();
+      options.onZoomIn();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key === "-") {
+      if (!options.onZoomOut) return;
+      event.preventDefault();
+      options.onZoomOut();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key === "0") {
+      if (!options.onZoomReset) return;
+      event.preventDefault();
+      options.onZoomReset();
+      return;
+    }
+    if (
+      ((event.metaKey || event.ctrlKey) && event.key === "1") ||
+      (!event.metaKey && !event.ctrlKey && (event.key === "f" || event.key === "F"))
+    ) {
+      if (!options.onFitToView) return;
+      event.preventDefault();
+      options.onFitToView();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && (event.key === "l" || event.key === "L")) {
+      if (!options.onToggleLock) return;
+      event.preventDefault();
+      options.onToggleLock();
+      return;
+    }
+    if ((event.metaKey || event.ctrlKey) && (event.key === "a" || event.key === "A")) {
+      if (!options.onSelectAll) return;
+      event.preventDefault();
+      options.onSelectAll();
     }
   };
 

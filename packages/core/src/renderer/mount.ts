@@ -16,7 +16,7 @@ export interface MountResult {
 }
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
-const HTML_TAGS = new Set(["div", "span"]); // for foreignObject children — none in MVP
+const HTML_TAGS = new Set(["div", "span", "input"]); // for foreignObject children (inline rename)
 
 export function mountSvg(host: Element, vnode: VNode): MountResult {
   const root = createElementFor(vnode);

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="300" viewBox="-40 -40 800 300" role="img" aria-label="class diagram: Renderer Hierarchy" data-diagram-type="class" class="uml-canvas"><style>:root, [data-uml-host] {
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="-40 -40 800 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="class diagram: Renderer Hierarchy" data-diagram-type="class" class="uml-canvas"><style>:root, [data-uml-host] {
   --uml-bg: #0f172a;
   --uml-bg-elevated: #1e293b;
   --uml-text: #f1f5f9;

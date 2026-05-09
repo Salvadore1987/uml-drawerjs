@@ -17,6 +17,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { PLAYGROUND_COMMANDS } from "./channel/commands.js";
+import { CanvasToolbar } from "./components/CanvasToolbar.js";
 import { HudBottomLeft, HudBottomRight, HudTopLeft, HudTopRight } from "./hud/HudPanels.js";
 import { DIAGRAM_TYPE_LABELS, DIAGRAM_TYPES, SAMPLES } from "./samples/index.js";
 
@@ -129,7 +130,6 @@ export function App(): JSX.Element {
           value={doc}
           theme={theme}
           onChange={(event): void => setDoc(event.text)}
-          layout={{ palette: "hidden", props: "hidden", text: "hidden" }}
         >
           <div className="uml-playground__anchors">
             <Palette title="Palette" />
@@ -143,6 +143,7 @@ export function App(): JSX.Element {
               bl={<HudBottomLeft />}
               br={<HudBottomRight />}
             />
+            <CanvasToolbar />
           </Canvas>
 
           <div className="uml-playground__rightcol">

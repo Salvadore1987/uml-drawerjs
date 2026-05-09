@@ -62,9 +62,10 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
   const root: VNode = v(
     "svg",
     {
-      width: bbox.width,
-      height: bbox.height,
+      width: "100%",
+      height: "100%",
       viewBox: `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`,
+      preserveAspectRatio: "xMidYMid meet",
       role: "img",
       "aria-label": `${diagram.type} diagram${diagram.title ? `: ${diagram.title}` : ""}`,
       "data-diagram-type": diagram.type,
@@ -132,6 +133,8 @@ export type {
 } from "./keyboard.js";
 export { createSelectionModel } from "./selection.js";
 export type { SelectionListener, SelectionModel } from "./selection.js";
+export { attachInteractions } from "./interactions.js";
+export type { InteractionsController, InteractionsOptions } from "./interactions.js";
 export { summarizeForA11y } from "./a11y.js";
 export { RENDERER_DEFAULTS, resolveRendererDefaults, v } from "./types.js";
 export type { VNode, RenderedDiagram, RendererOptions, NodeGeometry } from "./types.js";

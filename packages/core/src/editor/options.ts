@@ -17,6 +17,7 @@ import type {
   PanZoomController,
   PanZoomOptions,
   RendererOptions,
+  SelectionModel,
 } from "../renderer/index.js";
 
 /** Three-state theme selector. `"auto"` follows `prefers-color-scheme`. */
@@ -56,6 +57,19 @@ export interface CreateEditorOptions {
   readonly interactive?: {
     readonly panZoom?: boolean | PanZoomOptions;
     readonly keyboard?: boolean | KeyboardNavigationOptions;
+    /**
+     * Selection model the editor should consult when resolving
+     * keyboard / pointer interactions (Delete removes the selected node,
+     * Arrow nudges it). When omitted, an internal selection model is
+     * created so interactions still work in vanilla bootstraps.
+     */
+    readonly selection?: SelectionModel;
+    /**
+     * Pointer interactions on the canvas (click-to-select, drag-to-move,
+     * drag-to-connect, double-click rename). Defaults to the same
+     * resolution as `panZoom` — enabled when interactivity is enabled.
+     */
+    readonly pointer?: boolean;
   };
   /** Fires after every command (including undo / redo / import). */
   readonly onChange?: (event: EditorChangeEvent) => void;
@@ -89,6 +103,16 @@ export interface EditorInstance {
   runAutoLayout(options?: LayoutOptions): Promise<void>;
   /** Switch theme on the host element. Triggers the contract's transition. */
   applyTheme(theme: EditorTheme): void;
+  /** Multiplicative zoom around the viewport centre. */
+  zoomIn(factor?: number): void;
+  zoomOut(factor?: number): void;
+  /** Reset pan/zoom to identity (1:1, no translation). */
+  zoomReset(): void;
+  /** Frame the diagram so it fits the viewport. */
+  fitToView(padding?: number): void;
+  /** Toggle canvas-side editing. Pan/zoom remain active when locked. */
+  setLocked(flag: boolean): void;
+  isLocked(): boolean;
   /** Dispatch a command and return the resulting AST. */
   dispatch(command: Command): Diagram;
   /** Current AST snapshot. */
@@ -101,6 +125,8 @@ export interface EditorInstance {
   readonly history: History;
   /** Pan/zoom controller, or `null` if interactivity was disabled. */
   readonly panZoom: PanZoomController | null;
+  /** Selection model — exposed so React / DOM adapters can subscribe. */
+  readonly selection: SelectionModel;
   /** Detach all listeners and remove the rendered SVG from the host. */
   destroy(): void;
 }

@@ -30,6 +30,27 @@ export interface PanZoomController {
   getState(): PanZoomState;
   setState(next: Partial<PanZoomState>): void;
   reset(): void;
+  /**
+   * Multiplicative zoom from the viewport centre. Positive `factor`s
+   * (e.g. 1.2) zoom in; values < 1 zoom out. Result is clamped to
+   * `[minScale, maxScale]`.
+   */
+  zoomIn(factor?: number): void;
+  zoomOut(factor?: number): void;
+  /**
+   * Fit a content bounding box (in layout coordinates) into the host
+   * viewport. The matrix is recomputed so the entire box is visible
+   * with `padding` px of margin and centred.
+   */
+  fitToContent(
+    bbox: { x: number; y: number; width: number; height: number },
+    viewport?: { width: number; height: number },
+    padding?: number,
+  ): void;
+  /** Subscribe to state changes — fires after every wheel/drag/setState. */
+  onChange(listener: (state: PanZoomState) => void): () => void;
+  /** Replace the SVG group the transform is written onto (post-rerender). */
+  rebindTarget(target: SVGGraphicsElement | null): void;
   dispose(): void;
 }
 
@@ -51,14 +72,31 @@ export function createPanZoomController(
   let pinchStartDistance: number | null = null;
   let pinchStartScale = 1;
 
+  const listeners = new Set<(state: PanZoomState) => void>();
+
+  let currentTarget: SVGGraphicsElement | undefined = config.target;
+
   const apply = (): void => {
-    if (config.target) {
-      config.target.setAttribute(
+    if (currentTarget) {
+      currentTarget.setAttribute(
         "transform",
         `translate(${state.translateX} ${state.translateY}) scale(${state.scale})`,
       );
     }
     if (options.onChange) options.onChange(state);
+    for (const listener of [...listeners]) listener(state);
+  };
+
+  const zoomAt = (cx: number, cy: number, factor: number): void => {
+    const nextScale = clampScale(state.scale * factor);
+    if (nextScale === state.scale) return;
+    const ratio = nextScale / state.scale;
+    state = {
+      scale: nextScale,
+      translateX: cx - (cx - state.translateX) * ratio,
+      translateY: cy - (cy - state.translateY) * ratio,
+    };
+    apply();
   };
 
   const clampScale = (value: number): number =>
@@ -82,6 +120,17 @@ export function createPanZoomController(
   };
 
   const onPointerDown = (event: PointerEvent): void => {
+    // Skip native pointerdown that originated inside an interactive
+    // overlay (canvas toolbar, HUD slot button, etc.). React's synthetic
+    // `stopPropagation` doesn't suppress the native event in time —
+    // pointerdown still reaches this listener and would otherwise call
+    // `setPointerCapture` on the host, hijacking pointerup so the
+    // button never receives a real `click`.
+    const target = event.target;
+    if (target instanceof Element) {
+      if (target.closest("[data-no-pan]") !== null) return;
+      if (target.closest("button, input, select, textarea, [role='button']") !== null) return;
+    }
     activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (activePointers.size === 1) {
       dragging = true;
@@ -154,12 +203,57 @@ export function createPanZoomController(
       state = { scale: 1, translateX: 0, translateY: 0 };
       apply();
     },
+    zoomIn(factor: number = 1.2): void {
+      const rect = host.getBoundingClientRect?.();
+      const cx = (rect?.width ?? 0) / 2;
+      const cy = (rect?.height ?? 0) / 2;
+      zoomAt(cx, cy, factor);
+    },
+    zoomOut(factor: number = 1.2): void {
+      const rect = host.getBoundingClientRect?.();
+      const cx = (rect?.width ?? 0) / 2;
+      const cy = (rect?.height ?? 0) / 2;
+      zoomAt(cx, cy, 1 / factor);
+    },
+    fitToContent(
+      bbox: { x: number; y: number; width: number; height: number },
+      viewport?: { width: number; height: number },
+      padding: number = 24,
+    ): void {
+      const vp =
+        viewport ??
+        (() => {
+          const rect = host.getBoundingClientRect?.();
+          return { width: rect?.width ?? 0, height: rect?.height ?? 0 };
+        })();
+      if (vp.width <= 0 || vp.height <= 0 || bbox.width <= 0 || bbox.height <= 0) return;
+      const availableW = Math.max(vp.width - padding * 2, 1);
+      const availableH = Math.max(vp.height - padding * 2, 1);
+      const fitScale = clampScale(Math.min(availableW / bbox.width, availableH / bbox.height));
+      const tx = (vp.width - bbox.width * fitScale) / 2 - bbox.x * fitScale;
+      const ty = (vp.height - bbox.height * fitScale) / 2 - bbox.y * fitScale;
+      state = { scale: fitScale, translateX: tx, translateY: ty };
+      apply();
+    },
+    onChange(listener: (state: PanZoomState) => void): () => void {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    rebindTarget(target: SVGGraphicsElement | null): void {
+      currentTarget = target ?? undefined;
+      // Re-apply current state to the freshly-bound group so the
+      // visual stays in sync after a rerender.
+      apply();
+    },
     dispose(): void {
       host.removeEventListener("wheel", onWheel as EventListener);
       host.removeEventListener("pointerdown", onPointerDown as EventListener);
       host.removeEventListener("pointermove", onPointerMove as EventListener);
       host.removeEventListener("pointerup", onPointerUp as EventListener);
       host.removeEventListener("pointercancel", onPointerUp as EventListener);
+      listeners.clear();
     },
   };
 }

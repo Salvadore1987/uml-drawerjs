@@ -113,6 +113,28 @@ export class History {
     return state;
   }
 
+  /**
+   * Apply a list of commands as a single undo frame. All commands are
+   * dispatched through the bus in order, but pushed onto the undo stack
+   * as one atomic frame — `undo()` rewinds the whole batch, `redo()`
+   * re-applies the whole batch. Used by group-move (drag of N
+   * selected nodes) so the user gets one undo step.
+   *
+   * Empty arrays are a no-op. Non-empty: bus state is mutated for each
+   * command, redo stack is cleared once.
+   */
+  dispatchAll(commands: readonly Command[]): Diagram {
+    if (commands.length === 0) return this.bus.getState();
+    let state = this.bus.getState();
+    for (const command of commands) {
+      state = this.bus.dispatch(command);
+    }
+    this.undoStack.push([...commands]);
+    this.redoStack.length = 0;
+    this.lastDispatchTs = Date.now();
+    return state;
+  }
+
   /** Forget all undo / redo history. The bus's current state is untouched. */
   clear(): void {
     this.undoStack.length = 0;

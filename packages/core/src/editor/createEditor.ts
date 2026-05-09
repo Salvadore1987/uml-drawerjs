@@ -1,4 +1,9 @@
-import { applyLayoutCommand, importTextCommand } from "../commands/index.js";
+import {
+  applyLayoutCommand,
+  importTextCommand,
+  moveNodeCommand,
+  removeNodeCommand,
+} from "../commands/index.js";
 import { CommandBus } from "../commands/index.js";
 import type { Command } from "../commands/index.js";
 import { exportJson, exportPng, exportSvg, importJson, importPuml } from "../exporters/index.js";
@@ -17,18 +22,22 @@ import { cloneDiagram } from "../model/clone.js";
 import type { Diagram, DiagramError } from "../model/types.js";
 import { adoptParserErrors, runAllValidators } from "../validators/index.js";
 import {
+  attachInteractions,
   attachKeyboardNavigation,
   createPanZoomController,
+  createSelectionModel,
   mountSvg,
   rerenderSvg,
   renderDiagram,
 } from "../renderer/index.js";
 import type {
+  InteractionsController,
   KeyboardNavigationController,
   KeyboardNavigationOptions,
   MountResult,
   PanZoomController,
   PanZoomOptions,
+  SelectionModel,
 } from "../renderer/index.js";
 import type {
   CreateEditorOptions,
@@ -79,18 +88,83 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
 
   const unsubscribeBus = bus.on("after", ({ command, nextState }) => {
     if (mount) {
-      const rendered = renderDiagram(nextState, options.rendererOptions);
+      const rendered = renderDiagram(
+        nextState,
+        withLayoutOverrides(nextState, options.rendererOptions),
+      );
       mount = rerenderSvg(mount, host, rendered.root);
+      rebindInteractions();
     }
     errors = collectErrors(nextState, []);
     options.onValidate?.(errors);
     options.onChange?.(snapshotChangeEvent(nextState, errors, command));
   });
 
-  // Optional interactivity — both controllers are disposed in `destroy()`.
+  // Optional interactivity — every controller is disposed in `destroy()`.
   const interactive = options.interactive ?? {};
+  const selection: SelectionModel = interactive.selection ?? createSelectionModel();
+  let locked = false;
+  const getLocked = (): boolean => locked;
   const panZoom = bootstrapPanZoom(host, mount?.root ?? null, interactive.panZoom);
-  const keyboard = bootstrapKeyboard(host, interactive.keyboard, history);
+
+  const fitToViewport = (padding: number = 24): void => {
+    if (!panZoom || !mount) return;
+    const bbox = computeContentBoundingBox(bus.getState(), options.rendererOptions);
+    if (!bbox) return;
+    panZoom.fitToContent(bbox, undefined, padding);
+  };
+
+  const toggleLock = (): boolean => {
+    locked = !locked;
+    syncLockedAttribute();
+    return locked;
+  };
+
+  const setLockedFlag = (value: boolean): void => {
+    if (locked === value) return;
+    locked = value;
+    syncLockedAttribute();
+  };
+
+  function syncLockedAttribute(): void {
+    if (locked) host.setAttribute("data-locked", "true");
+    else host.removeAttribute("data-locked");
+  }
+
+  const undoAndRerender = (): void => {
+    const previousState = bus.getState();
+    const next = history.undo();
+    if (next === undefined) return;
+    handleSilentStateChange(next, previousState);
+  };
+  const redoAndRerender = (): void => {
+    const previousState = bus.getState();
+    const next = history.redo();
+    if (next === undefined) return;
+    handleSilentStateChange(next, previousState);
+  };
+
+  const keyboard = bootstrapKeyboard(
+    host,
+    interactive.keyboard,
+    history,
+    bus,
+    selection,
+    panZoom,
+    fitToViewport,
+    toggleLock,
+    undoAndRerender,
+    redoAndRerender,
+  );
+  let interactions: InteractionsController | null = bootstrapInteractions(
+    interactive.pointer,
+    mount?.root ?? null,
+    history,
+    bus,
+    selection,
+    options.idFactory,
+    getLocked,
+  );
 
   const instance: EditorInstance = {
     async loadFromText(text: string): Promise<EditorChangeEvent> {
@@ -189,13 +263,35 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
       return errors;
     },
 
+    zoomIn(factor?: number): void {
+      panZoom?.zoomIn(factor);
+    },
+    zoomOut(factor?: number): void {
+      panZoom?.zoomOut(factor);
+    },
+    zoomReset(): void {
+      panZoom?.reset();
+    },
+    fitToView(padding?: number): void {
+      fitToViewport(padding);
+    },
+    setLocked(flag: boolean): void {
+      setLockedFlag(flag);
+    },
+    isLocked(): boolean {
+      return locked;
+    },
+
     bus,
     history,
     panZoom,
+    selection,
 
     destroy(): void {
       unsubscribeBus();
       themeMql?.removeEventListener("change", themeMqlListener);
+      interactions?.dispose();
+      interactions = null;
       keyboard?.dispose();
       panZoom?.dispose();
       mount?.dispose();
@@ -209,13 +305,23 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
 
   function handleSilentStateChange(next: Diagram, previousState: Diagram): void {
     if (mount) {
-      const rendered = renderDiagram(next, options.rendererOptions);
+      const rendered = renderDiagram(next, withLayoutOverrides(next, options.rendererOptions));
       mount = rerenderSvg(mount, host, rendered.root);
+      rebindInteractions();
     }
     errors = collectErrors(next, []);
     options.onValidate?.(errors);
     void previousState;
     options.onChange?.(snapshotChangeEvent(next, errors, null));
+  }
+
+  function rebindInteractions(): void {
+    if (!mount) return;
+    const content = mount.root.querySelector('[data-uml-content="true"]');
+    if (content instanceof SVGGraphicsElement) {
+      interactions?.rebind(mount.root, content);
+      panZoom?.rebindTarget(content);
+    }
   }
 }
 
@@ -243,46 +349,145 @@ function mountInitialRender(
   diagram: Diagram,
   options: CreateEditorOptions,
 ): MountResult {
-  const rendered = renderDiagram(diagram, options.rendererOptions);
+  const rendered = renderDiagram(diagram, withLayoutOverrides(diagram, options.rendererOptions));
   return mountSvg(host, rendered.root);
+}
+
+/**
+ * Merge persisted `metadata.layoutOverrides` into the renderer options'
+ * `coordinates`. Without this, every re-render after a `MoveNodeCommand`
+ * snaps nodes back to the deterministic grid because the renderer
+ * defaults to `layoutGrid` when `coordinates` is absent.
+ */
+function withLayoutOverrides(
+  diagram: Diagram,
+  rendererOptions: CreateEditorOptions["rendererOptions"],
+): CreateEditorOptions["rendererOptions"] {
+  const overrides = diagram.metadata.layoutOverrides;
+  if (!overrides || Object.keys(overrides).length === 0) return rendererOptions;
+  // Caller's coordinates take precedence — they're an explicit override.
+  if (rendererOptions?.coordinates) return rendererOptions;
+  return { ...(rendererOptions ?? {}), coordinates: overrides };
 }
 
 function bootstrapPanZoom(
   host: Element,
-  target: SVGElement | null,
+  svgRoot: SVGElement | null,
   flag: boolean | PanZoomOptions | undefined,
 ): PanZoomController | null {
   if (flag === false) return null;
   if (flag === undefined) return null;
   const provided: PanZoomOptions = typeof flag === "object" ? flag : {};
-  const options: PanZoomOptions =
-    provided.target === undefined && target
-      ? { ...provided, target: target as unknown as SVGGraphicsElement }
-      : provided;
+  // Pan / zoom transforms live on the inner content group, not the
+  // outer <svg> element. Setting `transform` on an SVG element with
+  // `width="100%"` only moves its CSS box, leaving the rendered
+  // diagram pinned in place — the inner <g> is what we actually want
+  // to translate / scale.
+  let resolvedTarget: SVGGraphicsElement | undefined = provided.target;
+  if (!resolvedTarget && svgRoot) {
+    const inner = svgRoot.querySelector('[data-uml-content="true"]');
+    if (inner instanceof SVGGraphicsElement) {
+      resolvedTarget = inner;
+    }
+  }
+  const options: PanZoomOptions = resolvedTarget
+    ? { ...provided, target: resolvedTarget }
+    : provided;
   return createPanZoomController(host as HTMLElement, options);
+}
+
+function bootstrapInteractions(
+  flag: boolean | undefined,
+  svgRoot: SVGElement | null,
+  history: History,
+  bus: CommandBus,
+  selection: SelectionModel,
+  idFactory: (() => string) | undefined,
+  getLocked: () => boolean,
+): InteractionsController | null {
+  if (flag === false) return null;
+  if (flag === undefined) return null;
+  if (!svgRoot) return null;
+  const content = svgRoot.querySelector('[data-uml-content="true"]');
+  if (!(content instanceof SVGGraphicsElement)) return null;
+  return attachInteractions({
+    svg: svgRoot,
+    contentGroup: content,
+    history,
+    bus,
+    selection,
+    getLocked,
+    ...(idFactory ? { idFactory } : {}),
+  });
 }
 
 function bootstrapKeyboard(
   host: Element,
   flag: boolean | KeyboardNavigationOptions | undefined,
   history: History,
+  bus: CommandBus,
+  selection: SelectionModel,
+  panZoom: PanZoomController | null,
+  fitToViewport: (padding?: number) => void,
+  toggleLock: () => boolean,
+  doUndo: () => void,
+  doRedo: () => void,
 ): KeyboardNavigationController | null {
   if (flag === false) return null;
   if (flag === undefined) return null;
   const baseOptions: KeyboardNavigationOptions =
     typeof flag === "object" ? { ...flag } : ({} as KeyboardNavigationOptions);
-  // Wire undo / redo to the editor's history if the caller hasn't already.
+
+  // Wire defaults the editor knows how to satisfy without delegating to
+  // the caller. `Delete` removes whichever ids the selection holds;
+  // arrow keys nudge the focused node by `step` px through `MoveNodeCommand`,
+  // keeping every interaction reversible via the history stack.
   const merged: KeyboardNavigationOptions = {
     ...baseOptions,
-    onUndo:
-      baseOptions.onUndo ??
+    onUndo: baseOptions.onUndo ?? doUndo,
+    onRedo: baseOptions.onRedo ?? doRedo,
+    onDelete:
+      baseOptions.onDelete ??
       ((): void => {
-        history.undo();
+        const ids = [...selection.get()];
+        if (ids.length === 0) return;
+        const diagram = bus.getState();
+        const known = new Set(diagram.nodes.map((n) => n.id));
+        for (const id of ids) {
+          if (!known.has(id)) continue;
+          history.dispatch(removeNodeCommand(id, bus.getState()));
+        }
+        selection.clear();
       }),
-    onRedo:
-      baseOptions.onRedo ??
+    onArrow:
+      baseOptions.onArrow ??
+      ((direction, scale): void => {
+        const ids = [...selection.get()];
+        if (ids.length === 0) return;
+        const dx = direction === "left" ? -scale : direction === "right" ? scale : 0;
+        const dy = direction === "up" ? -scale : direction === "down" ? scale : 0;
+        if (dx === 0 && dy === 0) return;
+        for (const id of ids) {
+          const diagram = bus.getState();
+          const previous = diagram.metadata.layoutOverrides?.[id] ?? { x: 0, y: 0 };
+          const next = { x: previous.x + dx, y: previous.y + dy };
+          history.dispatch(moveNodeCommand(id, next, diagram));
+        }
+      }),
+    onZoomIn: baseOptions.onZoomIn ?? ((): void => panZoom?.zoomIn()),
+    onZoomOut: baseOptions.onZoomOut ?? ((): void => panZoom?.zoomOut()),
+    onZoomReset: baseOptions.onZoomReset ?? ((): void => panZoom?.reset()),
+    onFitToView: baseOptions.onFitToView ?? ((): void => fitToViewport()),
+    onToggleLock:
+      baseOptions.onToggleLock ??
       ((): void => {
-        history.redo();
+        toggleLock();
+      }),
+    onSelectAll:
+      baseOptions.onSelectAll ??
+      ((): void => {
+        const ids = bus.getState().nodes.map((n) => n.id);
+        selection.set(ids);
       }),
   };
   return attachKeyboardNavigation(host as HTMLElement, merged);
@@ -319,4 +524,39 @@ function matchPrefersColorScheme(): MediaQueryList | null {
 function writeThemeAttribute(host: Element, theme: EditorTheme, mql: MediaQueryList | null): void {
   const resolved = theme === "auto" ? (mql?.matches ? "dark" : "light") : theme;
   host.setAttribute(HOST_THEME_ATTR, resolved);
+}
+
+/**
+ * Recompute the diagram's content bounding box from the current AST so
+ * `fitToView` can frame it without parsing the SVG. Mirrors the bbox
+ * math used inside `renderDiagram` but is cheaper because we don't
+ * build a vnode tree.
+ */
+function computeContentBoundingBox(
+  diagram: Diagram,
+  rendererOptions: CreateEditorOptions["rendererOptions"],
+): { x: number; y: number; width: number; height: number } | null {
+  if (diagram.nodes.length === 0) return null;
+  const nodeWidth = rendererOptions?.nodeWidth ?? 200;
+  const nodeHeight = rendererOptions?.nodeHeight ?? 80;
+  const padding = rendererOptions?.canvasPadding ?? 40;
+  const overrides = diagram.metadata.layoutOverrides ?? {};
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const node of diagram.nodes) {
+    const coord = overrides[node.id] ?? { x: 0, y: 0 };
+    if (coord.x < minX) minX = coord.x;
+    if (coord.y < minY) minY = coord.y;
+    if (coord.x + nodeWidth > maxX) maxX = coord.x + nodeWidth;
+    if (coord.y + nodeHeight > maxY) maxY = coord.y + nodeHeight;
+  }
+  if (!Number.isFinite(minX)) return null;
+  return {
+    x: minX - padding,
+    y: minY - padding,
+    width: maxX - minX + padding * 2,
+    height: maxY - minY + padding * 2,
+  };
 }
