@@ -24,17 +24,39 @@ type NodeMacroShape = "personLike" | "containerLike";
 
 const NODE_MACROS: NodeMacroSpec[] = [
   // Person / Person_Ext: (alias, "label", "description"?)
+  // Person_Ext is matched BEFORE Person so the longer prefix wins.
+  {
+    pattern: /^Person_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "person-external",
+    shape: "personLike",
+  },
   {
     pattern: /^Person\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
     kind: "person",
     shape: "personLike",
   },
+  // System variants — Db / Queue first (longer prefixes win), then plain.
+  // (alias, "label", "description"?) — no tech on Context tier.
   {
-    pattern: /^Person_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
-    kind: "person",
+    pattern: /^SystemDb_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "database",
     shape: "personLike",
   },
-  // System / System_Ext: (alias, "label", "description"?)
+  {
+    pattern: /^SystemDb\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "database",
+    shape: "personLike",
+  },
+  {
+    pattern: /^SystemQueue_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
+    shape: "personLike",
+  },
+  {
+    pattern: /^SystemQueue\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
+    shape: "personLike",
+  },
   {
     pattern: /^System_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
     kind: "system-external",
@@ -45,11 +67,30 @@ const NODE_MACROS: NodeMacroSpec[] = [
     kind: "system",
     shape: "personLike",
   },
-  // Container / ContainerDb: (alias, "label", "tech"?, "description"?)
+  // Container variants — Db / Queue first, then plain.
+  // (alias, "label", "tech"?, "description"?)
+  {
+    pattern:
+      /^ContainerDb_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "database",
+    shape: "containerLike",
+  },
   {
     pattern:
       /^ContainerDb\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
     kind: "database",
+    shape: "containerLike",
+  },
+  {
+    pattern:
+      /^ContainerQueue_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
+    shape: "containerLike",
+  },
+  {
+    pattern:
+      /^ContainerQueue\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
     shape: "containerLike",
   },
   {
@@ -63,6 +104,12 @@ const NODE_MACROS: NodeMacroSpec[] = [
     pattern:
       /^ComponentDb\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
     kind: "database",
+    shape: "containerLike",
+  },
+  {
+    pattern:
+      /^ComponentQueue\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
     shape: "containerLike",
   },
   {

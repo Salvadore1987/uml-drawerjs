@@ -273,6 +273,46 @@ describe("validateConstraints — diagram-type rules", () => {
     // Assert
     expect(errors).toEqual([]);
   });
+
+  it("warns when a c4-context diagram contains a Container (c4model tier rule)", () => {
+    // Arrange — palette won't surface Container on c4-context, but a hand-typed
+    // PlantUML can still slip one through; the rule guards that path.
+    const diagram = c4DiagramWith({
+      nodes: [
+        { id: "p", kind: "person", label: "User" },
+        { id: "c", kind: "container", label: "API" },
+      ],
+    });
+
+    // Act
+    const result = validateConstraints(diagram);
+    const mismatch = result.find((e) => e.code === CONSTRAINT_ERROR_CODES.C4ContextKindMismatch);
+
+    // Assert
+    expect(mismatch).toBeDefined();
+    expect(mismatch?.severity).toBe("warning");
+    expect(mismatch?.nodeId).toBe("c");
+  });
+
+  it("does not warn when a c4-context diagram contains only context-tier kinds", () => {
+    // Arrange — every kind allowed at the System Context tier
+    const diagram = c4DiagramWith({
+      nodes: [
+        { id: "p1", kind: "person", label: "Customer" },
+        { id: "p2", kind: "person-external", label: "Auditor" },
+        { id: "s1", kind: "system", label: "Bank" },
+        { id: "s2", kind: "system-external", label: "Mail" },
+        { id: "d", kind: "database", label: "Audit Log" },
+        { id: "q", kind: "queue", label: "Events" },
+      ],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).not.toContain(CONSTRAINT_ERROR_CODES.C4ContextKindMismatch);
+  });
 });
 
 describe("validateLint — soft warnings", () => {

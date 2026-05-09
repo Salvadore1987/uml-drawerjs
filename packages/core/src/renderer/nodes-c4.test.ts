@@ -105,7 +105,7 @@ describe("renderer/nodes — C4 per-kind visual language", () => {
     expect(childTags).toEqual(["ellipse", "path"]);
   });
 
-  it("container with technology renders a [Container: Tech] subtitle row", () => {
+  it("container with technology renders a [Container: Tech] type-tag row", () => {
     // Arrange
     const diagram = diagramWith({
       type: "c4-container",
@@ -123,12 +123,86 @@ describe("renderer/nodes — C4 per-kind visual language", () => {
     // Act
     const rendered = renderDiagram(diagram, { coordinates: { api: { x: 0, y: 0 } } });
     const node = findNodeVNode(rendered.root, "api");
-    const techRow = node.children?.find(
-      (c) => c.tag === "text" && (c.classes ?? []).includes("uml-node-tech"),
+    const tagRow = node.children?.find(
+      (c) => c.tag === "text" && (c.classes ?? []).includes("uml-node-type-tag"),
     );
 
     // Assert
-    expect(techRow?.text).toBe("[Container: Spring Boot]");
+    expect(tagRow?.text).toBe("[Container: Spring Boot]");
+  });
+
+  it("system without technology still renders a [Software System] type-tag (c4model rule)", () => {
+    // Arrange
+    const diagram = diagramWith({
+      type: "c4-context",
+      nodes: [{ id: "s", kind: "system", label: "Bank" }],
+      metadata: { schemaVersion: "1.0.0", layoutOverrides: { s: { x: 0, y: 0 } } },
+    });
+
+    // Act
+    const rendered = renderDiagram(diagram, { coordinates: { s: { x: 0, y: 0 } } });
+    const node = findNodeVNode(rendered.root, "s");
+    const tagRow = node.children?.find(
+      (c) => c.tag === "text" && (c.classes ?? []).includes("uml-node-type-tag"),
+    );
+
+    // Assert
+    expect(tagRow?.text).toBe("[Software System]");
+  });
+
+  it("person-external reuses the external palette tokens (grey fill)", () => {
+    // Arrange
+    const diagram = diagramWith({
+      type: "c4-context",
+      nodes: [{ id: "p", kind: "person-external", label: "Auditor" }],
+      metadata: { schemaVersion: "1.0.0", layoutOverrides: { p: { x: 0, y: 0 } } },
+    });
+
+    // Act
+    const rendered = renderDiagram(diagram, { coordinates: { p: { x: 0, y: 0 } } });
+    const node = findNodeVNode(rendered.root, "p");
+    const frameGroup = node.children?.find(
+      (c) =>
+        c.tag === "g" &&
+        (c.attrs as Record<string, unknown> | undefined)?.["data-uml-frame"] === "person-external",
+    );
+    const innerRect = frameGroup?.children?.find((c) => c.tag === "rect");
+    const tagRow = node.children?.find(
+      (c) => c.tag === "text" && (c.classes ?? []).includes("uml-node-type-tag"),
+    );
+
+    // Assert — frame stamps `external` palette, type-tag still says [Person]
+    expect((innerRect?.attrs as Record<string, unknown> | undefined)?.fill).toContain(
+      "--uml-c4-external-bg",
+    );
+    expect(tagRow?.text).toBe("[Person]");
+  });
+
+  it("queue renders rounded rect with two end-cap lines and a [Queue] type-tag", () => {
+    // Arrange
+    const diagram = diagramWith({
+      type: "c4-context",
+      nodes: [{ id: "q", kind: "queue", label: "Events" }],
+      metadata: { schemaVersion: "1.0.0", layoutOverrides: { q: { x: 0, y: 0 } } },
+    });
+
+    // Act
+    const rendered = renderDiagram(diagram, { coordinates: { q: { x: 0, y: 0 } } });
+    const node = findNodeVNode(rendered.root, "q");
+    const frameGroup = node.children?.find(
+      (c) =>
+        c.tag === "g" &&
+        (c.attrs as Record<string, unknown> | undefined)?.["data-uml-frame"] === "queue",
+    );
+    const tags = (frameGroup?.children ?? []).map((c) => c.tag);
+    const tagRow = node.children?.find(
+      (c) => c.tag === "text" && (c.classes ?? []).includes("uml-node-type-tag"),
+    );
+
+    // Assert — frame: outer rect + two end-cap paths
+    expect(frameGroup, "queue frame group should be emitted").toBeTruthy();
+    expect(tags).toEqual(["rect", "path", "path"]);
+    expect(tagRow?.text).toBe("[Queue]");
   });
 
   it("description is rendered as italic muted text", () => {

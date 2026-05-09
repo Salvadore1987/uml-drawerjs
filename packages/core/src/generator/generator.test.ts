@@ -139,6 +139,74 @@ describe("generatePlantUml — output shape", () => {
     expect(generated).not.toContain("<|--");
   });
 
+  it("emits Person_Ext for kind 'person-external' (round-trip with the parser)", () => {
+    // Arrange
+    const text = `@startuml\nPerson_Ext(a, "Auditor", "Reviews")\n@enduml\n`;
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    expect(ast.nodes[0]?.kind).toBe("person-external");
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert — the alias is derived from label via the same rules used
+    // by the existing tech-suffix test above.
+    expect(generated).toContain('Person_Ext(Auditor, "Auditor", "Reviews")');
+  });
+
+  it("emits SystemDb for a database without technology, ContainerDb when one is set", () => {
+    // Arrange — Context-level SystemDb (no tech). Single-word labels keep
+    // the alias predictable: the generator uses the label verbatim as
+    // alias when it matches `\w+` (see existing tech-suffix test).
+    const ctxText = `@startuml\nSystemDb(d, "AuditLog")\n@enduml\n`;
+    const ctxAst = parsePlantUml(ctxText, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    }).ast;
+    const ctnText = `@startuml\nContainerDb(d, "Postgres", "PostgreSQL")\n@enduml\n`;
+    const ctnAst = parsePlantUml(ctnText, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    }).ast;
+
+    // Act
+    const ctxOut = generatePlantUml(ctxAst);
+    const ctnOut = generatePlantUml(ctnAst);
+
+    // Assert
+    expect(ctxOut).toContain('SystemDb(AuditLog, "AuditLog")');
+    expect(ctnOut).toContain('ContainerDb(Postgres, "Postgres", "PostgreSQL")');
+  });
+
+  it("emits SystemQueue / ContainerQueue based on the technology field", () => {
+    // Arrange
+    const ctxText = `@startuml\nSystemQueue(q, "Events")\n@enduml\n`;
+    const ctxAst = parsePlantUml(ctxText, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    }).ast;
+    const ctnText = `@startuml\nContainerQueue(q, "Events", "Kafka")\n@enduml\n`;
+    const ctnAst = parsePlantUml(ctnText, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    }).ast;
+
+    // Act
+    const ctxOut = generatePlantUml(ctxAst);
+    const ctnOut = generatePlantUml(ctnAst);
+
+    // Assert
+    expect(ctxOut).toContain('SystemQueue(Events, "Events")');
+    expect(ctnOut).toContain('ContainerQueue(Events, "Events", "Kafka")');
+  });
+
   it("preserves the `[tech]` suffix on C4 Rel labels by promoting it to a 4th argument", () => {
     // Arrange
     const text =

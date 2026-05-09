@@ -149,3 +149,78 @@ describe("parsePlantUml — meta-comment decoding", () => {
     expect(errors.some((e) => e.code === "SYNTAX_META")).toBe(true);
   });
 });
+
+describe("parsePlantUml — C4 macro coverage", () => {
+  it("Person_Ext lands as kind 'person-external' (separate from internal Person)", () => {
+    // Arrange
+    const text = `@startuml\nPerson(c, "Customer")\nPerson_Ext(a, "Auditor", "Reviews")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    const kinds = ast.nodes.map((n) => n.kind);
+    expect(kinds).toEqual(["person", "person-external"]);
+  });
+
+  it("SystemDb / SystemDb_Ext map to kind 'database' on a Context diagram", () => {
+    // Arrange
+    const text = `@startuml\nSystemDb(d1, "Audit Log", "Stores trails")\nSystemDb_Ext(d2, "Vendor DB")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.nodes.map((n) => n.kind)).toEqual(["database", "database"]);
+    expect(ast.nodes[0]?.description).toBe("Stores trails");
+  });
+
+  it("SystemQueue maps to kind 'queue' without a technology field", () => {
+    // Arrange
+    const text = `@startuml\nSystemQueue(q, "Events", "Domain bus")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.nodes[0]?.kind).toBe("queue");
+    expect(ast.nodes[0]?.description).toBe("Domain bus");
+    expect(ast.nodes[0]?.technology).toBeUndefined();
+  });
+
+  it("ContainerQueue carries the technology argument across", () => {
+    // Arrange
+    const text = `@startuml\nContainerQueue(q, "Events", "Kafka", "Order events")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.nodes[0]).toMatchObject({
+      kind: "queue",
+      label: "Events",
+      technology: "Kafka",
+      description: "Order events",
+    });
+  });
+});

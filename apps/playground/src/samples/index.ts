@@ -11,11 +11,15 @@ export const SAMPLES: Record<DiagramType, string> = {
 title Online Banking — Context
 
 Person(customer, "Customer", "Personal banking customer")
+Person_Ext(auditor, "External Auditor", "Reviews bank operations")
 System(bank, "Internet Banking System", "Allows customers to manage accounts")
 System_Ext(mail, "E-mail System", "Sends notifications")
+SystemDb(audit_db, "Audit Log", "Stores audit trails")
 
 Rel(customer, bank, "Uses")
 Rel(bank, mail, "Sends e-mail using")
+Rel(bank, audit_db, "Writes audit events to")
+Rel(auditor, audit_db, "Inspects")
 @enduml
 `,
   "c4-container": `@startuml

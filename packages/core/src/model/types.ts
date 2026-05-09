@@ -24,11 +24,13 @@ export type DiagramType =
 export type NodeKind =
   // C4 Context / Container / Component
   | "person"
+  | "person-external"
   | "system"
   | "system-external"
   | "container"
   | "component"
   | "database"
+  | "queue"
   // Class
   | "class"
   | "interface"

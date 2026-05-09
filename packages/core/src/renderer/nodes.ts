@@ -20,18 +20,21 @@ export interface RenderNodeArgs {
 
 const ATTRIBUTE_ROW_HEIGHT = 20;
 const HEADER_HEIGHT = 36;
-const TECH_ROW_HEIGHT = 16;
+const TYPE_TAG_ROW_HEIGHT = 16;
 const DESCRIPTION_ROW_HEIGHT = 16;
 const DATABASE_CAP_HEIGHT = 14;
+const QUEUE_END_INSET = 10;
 const PERSON_ICON_HEIGHT = 18;
 
 const C4_KINDS = new Set<NodeKind>([
   "person",
+  "person-external",
   "system",
   "system-external",
   "container",
   "component",
   "database",
+  "queue",
 ]);
 
 /**
@@ -57,8 +60,11 @@ function c4ExtraHeight(node: DiagramNode): number {
   if (!C4_KINDS.has(node.kind)) return 0;
   let extra = 0;
   if (node.kind === "database") extra += DATABASE_CAP_HEIGHT;
-  if (node.kind === "person") extra += PERSON_ICON_HEIGHT;
-  if (node.technology) extra += TECH_ROW_HEIGHT;
+  if (node.kind === "person" || node.kind === "person-external") extra += PERSON_ICON_HEIGHT;
+  // c4model.com requires every element to carry a type tag like
+  // "[Software System]" / "[Person]" — we render it on a dedicated row
+  // for every C4 kind, regardless of whether `technology` is set.
+  extra += TYPE_TAG_ROW_HEIGHT;
   if (node.description) extra += DESCRIPTION_ROW_HEIGHT;
   return extra;
 }
@@ -120,7 +126,9 @@ export function renderNode(args: RenderNodeArgs): VNode {
 function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
   switch (node.kind) {
     case "person":
-      return renderPersonFrame(geom);
+      return renderPersonFrame(geom, "person");
+    case "person-external":
+      return renderPersonFrame(geom, "external");
     case "system":
       return renderC4Rect(geom, "system");
     case "system-external":
@@ -131,6 +139,8 @@ function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
       return renderC4Rect(geom, "component");
     case "database":
       return renderDatabaseFrame(geom);
+    case "queue":
+      return renderQueueFrame(geom);
     case "actor":
       return v("rect", {
         x: 0,
@@ -260,21 +270,37 @@ function renderC4Rect(
   return v("rect", attrs);
 }
 
-function renderPersonFrame(geom: NodeGeometry): VNode {
+function renderPersonFrame(geom: NodeGeometry, variant: "person" | "external"): VNode {
   // Rounded rect frame plus a small stick-figure icon centred at the top
-  // so the C4 affordance reads even when label text is short.
+  // so the C4 affordance reads even when label text is short. The
+  // `external` variant reuses the same frame shape but pulls the
+  // shared `--uml-c4-external-*` palette so external persons read
+  // identically to external systems (c4model treats internal/external
+  // as styling, not a separate element type).
   const cx = geom.width / 2;
   const iconTop = 10;
   const headRadius = 5;
+  const textVar =
+    variant === "external"
+      ? "var(--uml-c4-external-text, var(--uml-node-text))"
+      : "var(--uml-c4-person-text, var(--uml-node-text))";
+  const bgVar =
+    variant === "external"
+      ? "var(--uml-c4-external-bg, var(--uml-node-bg))"
+      : "var(--uml-c4-person-bg, var(--uml-node-bg))";
+  const borderVar =
+    variant === "external"
+      ? "var(--uml-c4-external-border, var(--uml-node-border))"
+      : "var(--uml-c4-person-border, var(--uml-node-border))";
   const head = v("circle", {
     cx,
     cy: iconTop,
     r: headRadius,
-    fill: "var(--uml-c4-person-text, var(--uml-node-text))",
+    fill: textVar,
   });
   const body = v("path", {
     d: `M ${cx} ${iconTop + headRadius} L ${cx} ${iconTop + headRadius + 8} M ${cx - 6} ${iconTop + headRadius + 4} L ${cx + 6} ${iconTop + headRadius + 4} M ${cx} ${iconTop + headRadius + 8} L ${cx - 4} ${iconTop + headRadius + 14} M ${cx} ${iconTop + headRadius + 8} L ${cx + 4} ${iconTop + headRadius + 14}`,
-    stroke: "var(--uml-c4-person-text, var(--uml-node-text))",
+    stroke: textVar,
     "stroke-width": "1.5",
     fill: "none",
     "stroke-linecap": "round",
@@ -286,11 +312,54 @@ function renderPersonFrame(geom: NodeGeometry): VNode {
     height: geom.height,
     rx: 8,
     ry: 8,
-    fill: "var(--uml-c4-person-bg, var(--uml-node-bg))",
-    stroke: "var(--uml-c4-person-border, var(--uml-node-border))",
+    fill: bgVar,
+    stroke: borderVar,
     "stroke-width": "1.5",
   });
-  return v("g", { "data-uml-frame": "person" }, [frame, head, body]);
+  // Keep `data-uml-frame="person"` for the default variant so existing
+  // selectors / tests aren't disturbed; switch to `person-external`
+  // only when the actor is external.
+  const frameTag = variant === "external" ? "person-external" : "person";
+  return v("g", { "data-uml-frame": frameTag }, [frame, head, body]);
+}
+
+/**
+ * Queue / FIFO frame: rounded rectangle with two short vertical end-caps
+ * inset from the left and right edges. Reuses the `database` palette
+ * tokens because queues and databases occupy the same data-storage slot
+ * in C4 and we deliberately don't expand the theming contract for a
+ * single new element. A skin author can still re-target Queue colours
+ * by overriding `--uml-c4-database-*` for `[data-node-kind="queue"]`.
+ */
+function renderQueueFrame(geom: NodeGeometry): VNode {
+  const w = geom.width;
+  const h = geom.height;
+  const fill = "var(--uml-c4-database-bg, var(--uml-node-bg))";
+  const stroke = "var(--uml-c4-database-border, var(--uml-node-border))";
+  const frame = v("rect", {
+    x: 0,
+    y: 0,
+    width: w,
+    height: h,
+    rx: 8,
+    ry: 8,
+    fill,
+    stroke,
+    "stroke-width": "1.5",
+  });
+  const leftCap = v("path", {
+    d: `M ${QUEUE_END_INSET} 6 L ${QUEUE_END_INSET} ${h - 6}`,
+    stroke,
+    "stroke-width": "1.5",
+    fill: "none",
+  });
+  const rightCap = v("path", {
+    d: `M ${w - QUEUE_END_INSET} 6 L ${w - QUEUE_END_INSET} ${h - 6}`,
+    stroke,
+    "stroke-width": "1.5",
+    fill: "none",
+  });
+  return v("g", { "data-uml-frame": "queue" }, [frame, leftCap, rightCap]);
 }
 
 function renderDatabaseFrame(geom: NodeGeometry): VNode {
@@ -330,7 +399,7 @@ function headerLayoutFor(node: DiagramNode): HeaderLayout {
   if (node.kind === "database") {
     return { topOffset: DATABASE_CAP_HEIGHT + 14, lineHeight: 16 };
   }
-  if (node.kind === "person") {
+  if (node.kind === "person" || node.kind === "person-external") {
     return { topOffset: PERSON_ICON_HEIGHT + 14, lineHeight: 16 };
   }
   return { topOffset: 14, lineHeight: 16 };
@@ -377,8 +446,11 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
   );
   y += layout.lineHeight + 4;
 
-  if (node.technology && C4_KINDS.has(node.kind)) {
-    const subtitle = formatTechSubtitle(node);
+  if (C4_KINDS.has(node.kind)) {
+    // c4model.com requires every element to display its type tag.
+    // Format: "[Person]", "[Software System]", "[Container: Spring Boot]"
+    // — the bracket-and-colon convention matches C4-PlantUML's default.
+    const tag = formatTypeTag(node);
     rows.push(
       v(
         "text",
@@ -386,15 +458,15 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
           x: geom.width / 2,
           y,
           "text-anchor": "middle",
-          "font-family": "var(--uml-font-mono)",
+          "font-family": "var(--uml-font-sans)",
           "font-size": "var(--uml-font-size-sm)",
           fill: "var(--uml-c4-tech-text, var(--uml-text-muted))",
         },
         undefined,
-        { text: subtitle, classes: ["uml-node-tech"] },
+        { text: tag, classes: ["uml-node-type-tag"] },
       ),
     );
-    y += TECH_ROW_HEIGHT;
+    y += TYPE_TAG_ROW_HEIGHT;
   }
 
   if (node.description && C4_KINDS.has(node.kind)) {
@@ -421,25 +493,38 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
 
 function c4TextColor(kind: NodeKind): string {
   if (kind === "person") return "var(--uml-c4-person-text, var(--uml-node-text))";
+  if (kind === "person-external") return "var(--uml-c4-external-text, var(--uml-node-text))";
   if (kind === "system") return "var(--uml-c4-system-text, var(--uml-node-text))";
   if (kind === "system-external") return "var(--uml-c4-external-text, var(--uml-node-text))";
   if (kind === "container") return "var(--uml-c4-container-text, var(--uml-node-text))";
   if (kind === "component") return "var(--uml-c4-component-text, var(--uml-node-text))";
   if (kind === "database") return "var(--uml-c4-database-text, var(--uml-node-text))";
+  if (kind === "queue") return "var(--uml-c4-database-text, var(--uml-node-text))";
   return "var(--uml-node-text)";
 }
 
-function formatTechSubtitle(node: DiagramNode): string {
+/**
+ * c4model type-tag — the "[Software System]" / "[Person]" line under
+ * the element name. Format follows C4-PlantUML default rendering:
+ * "[Type]" without technology, "[Type: technology]" with one. Names
+ * use the official c4model spellings, not internal kind ids.
+ */
+function formatTypeTag(node: DiagramNode): string {
   const labelByKind: Record<string, string> = {
+    person: "Person",
+    "person-external": "Person",
+    system: "Software System",
+    "system-external": "Software System",
     container: "Container",
     component: "Component",
     database: "Database",
-    system: "System",
-    "system-external": "System",
-    person: "Person",
+    queue: "Queue",
   };
-  const prefix = labelByKind[node.kind] ?? "Tech";
-  return `[${prefix}: ${node.technology}]`;
+  const prefix = labelByKind[node.kind] ?? "Element";
+  if (node.technology && node.technology.length > 0) {
+    return `[${prefix}: ${node.technology}]`;
+  }
+  return `[${prefix}]`;
 }
 
 function truncate(text: string, max: number): string {
