@@ -11,10 +11,11 @@ import {
   Palette,
   PropsPanel,
   Statusbar,
+  Tabs,
   TextEditor,
   UmlEditor,
 } from "@uml-drawer/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PLAYGROUND_COMMANDS } from "./channel/commands.js";
 import { CanvasToolbar } from "./components/CanvasToolbar.js";
@@ -25,11 +26,14 @@ type Theme = "dark" | "light";
 
 const SKIN_CLASS = "cyber-topographic-skin";
 
+type WorkspaceTab = "designer" | "plantuml";
+
 export function App(): JSX.Element {
-  const [diagramType, setDiagramType] = useState<DiagramType>("class");
+  const [diagramType, setDiagramType] = useState<DiagramType>("c4-context");
   const [theme, setTheme] = useState<Theme>("dark");
   const [skin, setSkin] = useState<boolean>(true);
-  const [doc, setDoc] = useState<string>(SAMPLES.class);
+  const [doc, setDoc] = useState<string>(SAMPLES["c4-context"]);
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("designer");
 
   // Apply theme + skin class on the body so the topographic + scanline
   // decorative layers can live above the document gradient. Cleanup on
@@ -54,6 +58,50 @@ export function App(): JSX.Element {
     setDiagramType(type);
     setDoc(SAMPLES[type]);
   };
+
+  // Alt+1 / Alt+2 swap the workspace tab. We deliberately don't bind
+  // Cmd/Ctrl+1/2 — the browser owns those (window-tab navigation) and
+  // hijacking them would surprise users.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent): void => {
+      if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      if (event.key === "1") {
+        event.preventDefault();
+        setActiveTab("designer");
+      } else if (event.key === "2") {
+        event.preventDefault();
+        setActiveTab("plantuml");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const workspaceTabs = useMemo(
+    () => [
+      {
+        id: "designer" as const,
+        label: "Designer",
+        content: (
+          <Canvas data-testid="playground-canvas">
+            <HUD
+              tl={<HudTopLeft />}
+              tr={<HudTopRight />}
+              bl={<HudBottomLeft />}
+              br={<HudBottomRight />}
+            />
+            <CanvasToolbar />
+          </Canvas>
+        ),
+      },
+      {
+        id: "plantuml" as const,
+        label: "PlantUML",
+        content: <TextEditor title="PlantUML" />,
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="uml-playground">
@@ -129,6 +177,7 @@ export function App(): JSX.Element {
           diagramType={diagramType}
           value={doc}
           theme={theme}
+          layout={{ text: "hidden" }}
           onChange={(event): void => setDoc(event.text)}
         >
           <div className="uml-playground__anchors">
@@ -136,15 +185,16 @@ export function App(): JSX.Element {
             <Outline title="Outline" />
           </div>
 
-          <Canvas data-testid="playground-canvas">
-            <HUD
-              tl={<HudTopLeft />}
-              tr={<HudTopRight />}
-              bl={<HudBottomLeft />}
-              br={<HudBottomRight />}
+          <div className="uml-playground__workzone">
+            <Tabs
+              aria-label="Workspace view"
+              tabsPosition="bottom"
+              keepMounted
+              value={activeTab}
+              onChange={(id): void => setActiveTab(id as WorkspaceTab)}
+              tabs={workspaceTabs}
             />
-            <CanvasToolbar />
-          </Canvas>
+          </div>
 
           <div className="uml-playground__rightcol">
             <PropsPanel title="Properties" />
@@ -155,7 +205,6 @@ export function App(): JSX.Element {
             />
           </div>
 
-          <TextEditor title="PlantUML" />
           <Statusbar
             label="UML-DRAWER"
             trailing={<span className="uml-playground__build-tag">BUILD · 0.0.0</span>}

@@ -149,3 +149,157 @@ describe("parsePlantUml — meta-comment decoding", () => {
     expect(errors.some((e) => e.code === "SYNTAX_META")).toBe(true);
   });
 });
+
+describe("parsePlantUml — C4 macro coverage", () => {
+  it("Person_Ext lands as kind 'person-external' (separate from internal Person)", () => {
+    // Arrange
+    const text = `@startuml\nPerson(c, "Customer")\nPerson_Ext(a, "Auditor", "Reviews")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    const kinds = ast.nodes.map((n) => n.kind);
+    expect(kinds).toEqual(["person", "person-external"]);
+  });
+
+  it("SystemDb / SystemDb_Ext map to kind 'database' on a Context diagram", () => {
+    // Arrange
+    const text = `@startuml\nSystemDb(d1, "Audit Log", "Stores trails")\nSystemDb_Ext(d2, "Vendor DB")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.nodes.map((n) => n.kind)).toEqual(["database", "database"]);
+    expect(ast.nodes[0]?.description).toBe("Stores trails");
+  });
+
+  it("SystemQueue maps to kind 'queue' without a technology field", () => {
+    // Arrange
+    const text = `@startuml\nSystemQueue(q, "Events", "Domain bus")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.nodes[0]?.kind).toBe("queue");
+    expect(ast.nodes[0]?.description).toBe("Domain bus");
+    expect(ast.nodes[0]?.technology).toBeUndefined();
+  });
+
+  it("System_Boundary { ... } populates group.children with the inner node ids", () => {
+    // Arrange — boundary block with two containers inside; the parser
+    // used to drop the inner `{}` block and leave `children` empty.
+    const text = `@startuml\nSystem_Boundary(b, "Bank") {\n  Container(web, "Web")\n  Container(api, "API")\n}\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.groups).toHaveLength(1);
+    const group = ast.groups[0]!;
+    const ids = ast.nodes.map((n) => n.id);
+    expect(group.children).toEqual(ids);
+    expect(group.kind).toBe("boundary");
+  });
+
+  it("preserves the boundary's PlantUML alias on the parsed group", () => {
+    // Arrange
+    const text = `@startuml\nSystem_Boundary(bank, "Internet Banking System") {\n  Container(api, "API")\n}\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.groups[0]?.alias).toBe("bank");
+    expect(ast.groups[0]?.label).toBe("Internet Banking System");
+  });
+
+  it("nodes outside the boundary block stay top-level", () => {
+    // Arrange — one inside, one outside.
+    const text = `@startuml\nSystem_Boundary(b, "Bank") {\n  Container(web, "Web")\n}\nPerson(c, "Customer")\n@enduml\n`;
+
+    // Act
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    const group = ast.groups[0]!;
+    const personId = ast.nodes.find((n) => n.kind === "person")!.id;
+    expect(group.children).not.toContain(personId);
+    expect(group.children).toHaveLength(1);
+  });
+
+  it("Container_Ext lands as kind 'container-external' (separate from internal Container)", () => {
+    // Arrange
+    const text = `@startuml\nContainer(api, "API", "Java")\nContainer_Ext(pay, "Payments", "REST", "Third-party")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    const kinds = ast.nodes.map((n) => n.kind);
+    expect(kinds).toEqual(["container", "container-external"]);
+    expect(ast.nodes[1]).toMatchObject({
+      kind: "container-external",
+      label: "Payments",
+      technology: "REST",
+      description: "Third-party",
+    });
+  });
+
+  it("ContainerQueue carries the technology argument across", () => {
+    // Arrange
+    const text = `@startuml\nContainerQueue(q, "Events", "Kafka", "Order events")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.nodes[0]).toMatchObject({
+      kind: "queue",
+      label: "Events",
+      technology: "Kafka",
+      description: "Order events",
+    });
+  });
+});

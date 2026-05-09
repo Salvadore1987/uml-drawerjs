@@ -46,6 +46,9 @@ export type {
 export { Statusbar } from "./components/Statusbar.js";
 export type { StatusbarProps } from "./components/Statusbar.js";
 
+export { Tabs } from "./components/Tabs.js";
+export type { TabsProps, TabDescriptor } from "./components/Tabs.js";
+
 export { useEditor } from "./hooks/useEditor.js";
 export { useEditorState } from "./hooks/useEditorState.js";
 export { useDiagramErrors } from "./hooks/useDiagramErrors.js";

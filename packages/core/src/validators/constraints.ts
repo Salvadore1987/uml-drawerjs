@@ -52,17 +52,102 @@ export function validateConstraints(diagram: Diagram): DiagramError[] {
   if (isC4(diagram.type)) {
     enforceC4BoundaryChildren(diagram, errors);
   }
+  if (diagram.type === "c4-context") {
+    enforceC4ContextTier(diagram, errors);
+  }
+  if (diagram.type === "c4-container") {
+    enforceC4ContainerTier(diagram, errors);
+  }
 
   return errors;
 }
 
+/**
+ * Soft check: warn when a System Context diagram contains kinds that
+ * c4model.com places on the deeper Container / Component tiers. Render
+ * still proceeds — the diagnostic shows up in the errors panel and the
+ * CodeMirror lint gutter.
+ */
+function enforceC4ContextTier(diagram: Diagram, errors: DiagramError[]): void {
+  for (const node of diagram.nodes) {
+    if (!C4_NODE_KINDS.has(node.kind)) continue;
+    if (C4_CONTEXT_NODE_KINDS.has(node.kind)) continue;
+    errors.push({
+      severity: "warning",
+      code: CONSTRAINT_ERROR_CODES.C4ContextKindMismatch,
+      message: `Node kind '${node.kind}' is not part of a System Context diagram per c4model.com — move it to a Container or Component diagram.`,
+      nodeId: node.id,
+    });
+  }
+}
+
+/**
+ * Twin of `enforceC4ContextTier` for the Container tier. Components live
+ * one level deeper, so flagging them on a Container diagram steers the
+ * author toward the right tier.
+ */
+function enforceC4ContainerTier(diagram: Diagram, errors: DiagramError[]): void {
+  for (const node of diagram.nodes) {
+    if (!C4_NODE_KINDS.has(node.kind)) continue;
+    if (C4_CONTAINER_NODE_KINDS.has(node.kind)) continue;
+    errors.push({
+      severity: "warning",
+      code: CONSTRAINT_ERROR_CODES.C4ContainerKindMismatch,
+      message: `Node kind '${node.kind}' is not part of a Container diagram per c4model.com — move it to a Component diagram.`,
+      nodeId: node.id,
+    });
+  }
+}
+
 const C4_NODE_KINDS = new Set<NodeKind>([
   "person",
+  "person-external",
   "system",
   "system-external",
   "container",
+  "container-external",
   "component",
   "database",
+  "queue",
+]);
+
+/**
+ * Subset of `C4_NODE_KINDS` that c4model.com permits on a System Context
+ * diagram. Container / Component are deliberately excluded — they belong
+ * on the deeper-tier diagrams. This matches the canonical guidance at
+ * <https://c4model.com/diagrams/system-context>.
+ *
+ * The constraint is reported at WARNING severity (not ERROR), because
+ * c4model itself frames the levels as guidance and our renderer copes
+ * with mixed-level diagrams. Authors who genuinely want a hybrid view
+ * can ignore the warning.
+ */
+const C4_CONTEXT_NODE_KINDS = new Set<NodeKind>([
+  "person",
+  "person-external",
+  "system",
+  "system-external",
+  "database",
+  "queue",
+]);
+
+/**
+ * Subset of `C4_NODE_KINDS` that c4model.com permits on a Container
+ * diagram per <https://c4model.com/diagrams/container>. Components are
+ * excluded — they belong on the deeper Component-tier diagram.
+ *
+ * Like the Context-tier rule, this is reported at WARNING severity so
+ * authors who deliberately mix levels still get a working render.
+ */
+const C4_CONTAINER_NODE_KINDS = new Set<NodeKind>([
+  "person",
+  "person-external",
+  "system",
+  "system-external",
+  "container",
+  "container-external",
+  "database",
+  "queue",
 ]);
 const CLASS_NODE_KINDS = new Set<NodeKind>(["class", "interface", "abstract-class", "enum"]);
 const ER_NODE_KINDS = new Set<NodeKind>(["entity"]);

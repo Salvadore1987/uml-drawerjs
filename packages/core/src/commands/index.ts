@@ -32,6 +32,12 @@ export type { MoveNodeCommand, MoveNodePayload } from "./moveNode.js";
 export { resizeNodeCommand } from "./resizeNode.js";
 export type { ResizeNodeCommand, ResizeNodePayload, NodeRect } from "./resizeNode.js";
 
+export { moveGroupCommand } from "./moveGroup.js";
+export type { MoveGroupCommand, MoveGroupPayload } from "./moveGroup.js";
+
+export { resizeGroupCommand } from "./resizeGroup.js";
+export type { ResizeGroupCommand, ResizeGroupPayload } from "./resizeGroup.js";
+
 export { updateNodeCommand } from "./updateNode.js";
 export type { UpdateNodeCommand, UpdateNodePayload, NodePatch } from "./updateNode.js";
 
@@ -44,7 +50,13 @@ export type { RemoveEdgeCommand, RemoveEdgePayload } from "./removeEdge.js";
 export { updateEdgeCommand } from "./updateEdge.js";
 export type { UpdateEdgeCommand, UpdateEdgePayload, EdgePatch } from "./updateEdge.js";
 
-export { addGroupCommand, updateGroupCommand, removeGroupCommand } from "./group.js";
+export {
+  addGroupCommand,
+  updateGroupCommand,
+  removeGroupCommand,
+  addNodeToGroupCommand,
+  removeNodeFromGroupCommand,
+} from "./group.js";
 export type {
   AddGroupCommand,
   AddGroupPayload,

@@ -44,6 +44,13 @@ export interface ParseContext {
   /** Whether we have seen `@startuml` / `@enduml` markers. */
   sawStart: boolean;
   sawEnd: boolean;
+  /**
+   * Stack of currently-open boundary group ids. Pushed on `System_Boundary
+   * (alias, "label") {`, popped on the matching `}`. Nodes / nested
+   * boundaries created while the stack is non-empty are auto-attached to
+   * the top group's `children` so the AST reflects PlantUML nesting.
+   */
+  openGroupStack: string[];
 }
 
 export function createParseContext(options: ParseOptions): ParseContext {
@@ -63,6 +70,7 @@ export function createParseContext(options: ParseOptions): ParseContext {
     errors: [],
     sawStart: false,
     sawEnd: false,
+    openGroupStack: [],
   };
 }
 

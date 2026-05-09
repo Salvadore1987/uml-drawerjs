@@ -11,26 +11,36 @@ export const SAMPLES: Record<DiagramType, string> = {
 title Online Banking — Context
 
 Person(customer, "Customer", "Personal banking customer")
+Person_Ext(auditor, "External Auditor", "Reviews bank operations")
 System(bank, "Internet Banking System", "Allows customers to manage accounts")
 System_Ext(mail, "E-mail System", "Sends notifications")
+SystemDb(audit_db, "Audit Log", "Stores audit trails")
 
 Rel(customer, bank, "Uses")
 Rel(bank, mail, "Sends e-mail using")
+Rel(bank, audit_db, "Writes audit events to")
+Rel(auditor, audit_db, "Inspects")
 @enduml
 `,
   "c4-container": `@startuml
 title Online Banking — Containers
 
-Person(customer, "Customer")
+Person(customer, "Customer", "Personal banking customer")
+System_Ext(mail, "E-mail System", "Sends notifications")
 System_Boundary(bank, "Internet Banking System") {
   Container(web, "Web App", "JS / SPA", "Delivers static content")
   Container(api, "API", "Java/Spring", "Provides banking functionality")
   ContainerDb(db, "Database", "PostgreSQL", "Stores accounts, transactions")
+  ContainerQueue(events, "Domain Events", "Kafka", "Publishes account events")
 }
+Container_Ext(payments, "Payments Gateway", "REST", "Third-party processor")
 
 Rel(customer, web, "Uses", "HTTPS")
 Rel(web, api, "Calls", "JSON/HTTPS")
 Rel(api, db, "Reads/Writes", "JDBC")
+Rel(api, events, "Publishes to", "Kafka")
+Rel(api, payments, "Charges via", "HTTPS")
+Rel(api, mail, "Sends notifications via", "SMTP")
 @enduml
 `,
   "c4-component": `@startuml

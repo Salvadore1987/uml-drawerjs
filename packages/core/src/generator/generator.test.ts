@@ -139,6 +139,112 @@ describe("generatePlantUml — output shape", () => {
     expect(generated).not.toContain("<|--");
   });
 
+  it("emits Person_Ext for kind 'person-external' (round-trip with the parser)", () => {
+    // Arrange
+    const text = `@startuml\nPerson_Ext(a, "Auditor", "Reviews")\n@enduml\n`;
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    expect(ast.nodes[0]?.kind).toBe("person-external");
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert — the alias is derived from label via the same rules used
+    // by the existing tech-suffix test above.
+    expect(generated).toContain('Person_Ext(Auditor, "Auditor", "Reviews")');
+  });
+
+  it("emits SystemDb for a database without technology, ContainerDb when one is set", () => {
+    // Arrange — Context-level SystemDb (no tech). Single-word labels keep
+    // the alias predictable: the generator uses the label verbatim as
+    // alias when it matches `\w+` (see existing tech-suffix test).
+    const ctxText = `@startuml\nSystemDb(d, "AuditLog")\n@enduml\n`;
+    const ctxAst = parsePlantUml(ctxText, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    }).ast;
+    const ctnText = `@startuml\nContainerDb(d, "Postgres", "PostgreSQL")\n@enduml\n`;
+    const ctnAst = parsePlantUml(ctnText, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    }).ast;
+
+    // Act
+    const ctxOut = generatePlantUml(ctxAst);
+    const ctnOut = generatePlantUml(ctnAst);
+
+    // Assert
+    expect(ctxOut).toContain('SystemDb(AuditLog, "AuditLog")');
+    expect(ctnOut).toContain('ContainerDb(Postgres, "Postgres", "PostgreSQL")');
+  });
+
+  it("emits Container_Ext for kind 'container-external' (round-trip)", () => {
+    // Arrange
+    const text = `@startuml\nContainer_Ext(pay, "Payments", "REST", "Third-party")\n@enduml\n`;
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    expect(ast.nodes[0]?.kind).toBe("container-external");
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert
+    expect(generated).toContain('Container_Ext(Payments, "Payments", "REST", "Third-party")');
+  });
+
+  it("emits SystemQueue / ContainerQueue based on the technology field", () => {
+    // Arrange
+    const ctxText = `@startuml\nSystemQueue(q, "Events")\n@enduml\n`;
+    const ctxAst = parsePlantUml(ctxText, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    }).ast;
+    const ctnText = `@startuml\nContainerQueue(q, "Events", "Kafka")\n@enduml\n`;
+    const ctnAst = parsePlantUml(ctnText, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    }).ast;
+
+    // Act
+    const ctxOut = generatePlantUml(ctxAst);
+    const ctnOut = generatePlantUml(ctnAst);
+
+    // Assert
+    expect(ctxOut).toContain('SystemQueue(Events, "Events")');
+    expect(ctnOut).toContain('ContainerQueue(Events, "Events", "Kafka")');
+  });
+
+  it("uses an explicit group.alias as the boundary alias in the generated PlantUML", () => {
+    // Arrange — round-trip through the parser to lock the alias on the group
+    const text = `@startuml\nSystem_Boundary(bank, "Internet Banking System") {\n  Container(api, "API")\n}\n@enduml\n`;
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    expect(ast.groups[0]?.alias).toBe("bank");
+
+    // Act — rename the alias as a user would via the props panel
+    const renamed = {
+      ...ast,
+      groups: ast.groups.map((g, i) => (i === 0 ? { ...g, alias: "bank2" } : g)),
+    };
+    const generated = generatePlantUml(renamed);
+
+    // Assert
+    expect(generated).toContain('System_Boundary(bank2, "Internet Banking System")');
+  });
+
   it("preserves the `[tech]` suffix on C4 Rel labels by promoting it to a 4th argument", () => {
     // Arrange
     const text =

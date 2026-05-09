@@ -47,20 +47,43 @@ function formatC4Node(node: DiagramNode, aliases: Map<string, string>): string {
   switch (node.kind) {
     case "person":
       return formatPersonLike("Person", alias, label, node.description);
+    case "person-external":
+      return formatPersonLike("Person_Ext", alias, label, node.description);
     case "system":
       return formatPersonLike("System", alias, label, node.description);
     case "system-external":
       return formatPersonLike("System_Ext", alias, label, node.description);
     case "container":
       return formatContainerLike("Container", alias, label, node.technology, node.description);
+    case "container-external":
+      return formatContainerLike("Container_Ext", alias, label, node.technology, node.description);
     case "component":
       return formatContainerLike("Component", alias, label, node.technology, node.description);
     case "database":
-      // Without context we can't tell whether this DB lives at Container or
-      // Component scope — the parser collapses ContainerDb / ComponentDb to
-      // the same `database` kind. ContainerDb is the safer default and
-      // round-trips identically because the parser accepts both.
-      return formatContainerLike("ContainerDb", alias, label, node.technology, node.description);
+      // Without context we can't tell whether this DB lives at Context /
+      // Container / Component scope — the parser collapses SystemDb /
+      // ContainerDb / ComponentDb into the same `database` kind. When a
+      // technology is set we emit ContainerDb (the only Db macro that
+      // accepts $techn); otherwise SystemDb, which round-trips at all
+      // three tiers because the parser accepts each variant.
+      if (node.technology) {
+        return formatContainerLike("ContainerDb", alias, label, node.technology, node.description);
+      }
+      return formatPersonLike("SystemDb", alias, label, node.description);
+    case "queue":
+      // Same shape collapse as `database`: SystemQueue / ContainerQueue
+      // map to one kind. Pick ContainerQueue when there's a technology
+      // (Container tier signature), SystemQueue otherwise (Context tier).
+      if (node.technology) {
+        return formatContainerLike(
+          "ContainerQueue",
+          alias,
+          label,
+          node.technology,
+          node.description,
+        );
+      }
+      return formatPersonLike("SystemQueue", alias, label, node.description);
     default:
       // C4 dispatchers only ever see C4 kinds in practice; fall back to a
       // raw `Component(alias, "label")` so the generator never throws.

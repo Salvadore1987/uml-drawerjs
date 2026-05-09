@@ -24,11 +24,14 @@ export type DiagramType =
 export type NodeKind =
   // C4 Context / Container / Component
   | "person"
+  | "person-external"
   | "system"
   | "system-external"
   | "container"
+  | "container-external"
   | "component"
   | "database"
+  | "queue"
   // Class
   | "class"
   | "interface"
@@ -201,6 +204,13 @@ export interface DiagramGroup {
   id: string;
   kind: GroupKind;
   label: string;
+  /**
+   * Optional PlantUML alias — the symbolic name that appears as the first
+   * argument of `System_Boundary(alias, "label")`. When omitted, the
+   * generator derives one from `id` so the output stays valid PlantUML.
+   * Editable through the props panel so authors can keep readable names.
+   */
+  alias?: string;
   /** ids of contained nodes and/or nested groups. */
   children: string[];
   description?: string;

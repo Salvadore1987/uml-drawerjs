@@ -24,17 +24,39 @@ type NodeMacroShape = "personLike" | "containerLike";
 
 const NODE_MACROS: NodeMacroSpec[] = [
   // Person / Person_Ext: (alias, "label", "description"?)
+  // Person_Ext is matched BEFORE Person so the longer prefix wins.
+  {
+    pattern: /^Person_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "person-external",
+    shape: "personLike",
+  },
   {
     pattern: /^Person\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
     kind: "person",
     shape: "personLike",
   },
+  // System variants — Db / Queue first (longer prefixes win), then plain.
+  // (alias, "label", "description"?) — no tech on Context tier.
   {
-    pattern: /^Person_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
-    kind: "person",
+    pattern: /^SystemDb_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "database",
     shape: "personLike",
   },
-  // System / System_Ext: (alias, "label", "description"?)
+  {
+    pattern: /^SystemDb\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "database",
+    shape: "personLike",
+  },
+  {
+    pattern: /^SystemQueue_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
+    shape: "personLike",
+  },
+  {
+    pattern: /^SystemQueue\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
+    shape: "personLike",
+  },
   {
     pattern: /^System_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
     kind: "system-external",
@@ -45,11 +67,37 @@ const NODE_MACROS: NodeMacroSpec[] = [
     kind: "system",
     shape: "personLike",
   },
-  // Container / ContainerDb: (alias, "label", "tech"?, "description"?)
+  // Container variants — Db / Queue first, then plain.
+  // (alias, "label", "tech"?, "description"?)
+  {
+    pattern:
+      /^ContainerDb_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "database",
+    shape: "containerLike",
+  },
   {
     pattern:
       /^ContainerDb\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
     kind: "database",
+    shape: "containerLike",
+  },
+  {
+    pattern:
+      /^ContainerQueue_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
+    shape: "containerLike",
+  },
+  {
+    pattern:
+      /^ContainerQueue\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
+    shape: "containerLike",
+  },
+  // Container_Ext is matched BEFORE Container so the longer prefix wins.
+  {
+    pattern:
+      /^Container_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "container-external",
     shape: "containerLike",
   },
   {
@@ -63,6 +111,12 @@ const NODE_MACROS: NodeMacroSpec[] = [
     pattern:
       /^ComponentDb\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
     kind: "database",
+    shape: "containerLike",
+  },
+  {
+    pattern:
+      /^ComponentQueue\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "queue",
     shape: "containerLike",
   },
   {
@@ -100,11 +154,26 @@ export function handleC4Line(ctx: ParseContext, line: SourceLine): boolean {
     return true;
   }
 
-  // Closing brace of a Boundary block — not modelled in MVP. Mark consumed
-  // so it stays out of the opaque bucket.
-  if (text === "}") return true;
+  // Closing brace of a Boundary block. Pop the open-group stack so any
+  // following macros land at the parent scope (or top-level).
+  if (text === "}") {
+    if (ctx.openGroupStack.length > 0) ctx.openGroupStack.pop();
+    return true;
+  }
 
   return false;
+}
+
+/**
+ * Auto-attach a freshly-created node id to the innermost open boundary,
+ * if any. Called by `consumeNodeMacro` after pushing into `ctx.nodes`.
+ */
+function attachToOpenGroup(ctx: ParseContext, childId: string): void {
+  const top = ctx.openGroupStack[ctx.openGroupStack.length - 1];
+  if (!top) return;
+  const group = ctx.groups.find((g) => g.id === top);
+  if (!group) return;
+  group.children.push(childId);
 }
 
 function consumeNodeMacro(
@@ -130,6 +199,7 @@ function consumeNodeMacro(
     if (description !== undefined && description !== "") node.description = description;
   }
   ctx.nodes.push(node);
+  attachToOpenGroup(ctx, id);
 }
 
 function consumeBoundary(ctx: ParseContext, match: RegExpExecArray): void {
@@ -138,7 +208,15 @@ function consumeBoundary(ctx: ParseContext, match: RegExpExecArray): void {
   if (alias === undefined || label === undefined) return;
   const id = resolveAlias(ctx, alias, "create");
   if (id === null) return;
-  ctx.groups.push({ id, kind: "boundary", label, children: [] });
+  // Preserve the original PlantUML alias on the group so generator
+  // output round-trips with the same symbolic name (and the props
+  // panel can edit it).
+  ctx.groups.push({ id, kind: "boundary", label, alias, children: [] });
+  // Nested boundary: register itself as a child of the enclosing group
+  // before pushing onto the stack, so `parent.children` matches the
+  // visual containment.
+  attachToOpenGroup(ctx, id);
+  ctx.openGroupStack.push(id);
 }
 
 function consumeRel(ctx: ParseContext, line: SourceLine, match: RegExpExecArray): void {

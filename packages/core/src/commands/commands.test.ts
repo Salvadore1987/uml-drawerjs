@@ -6,7 +6,15 @@ import type { Diagram, DiagramEdge, DiagramGroup, DiagramNode } from "../model/t
 import { addEdgeCommand } from "./addEdge.js";
 import { addNodeCommand } from "./addNode.js";
 import { applyLayoutCommand } from "./applyLayout.js";
-import { addGroupCommand, removeGroupCommand, updateGroupCommand } from "./group.js";
+import {
+  addGroupCommand,
+  addNodeToGroupCommand,
+  removeGroupCommand,
+  removeNodeFromGroupCommand,
+  updateGroupCommand,
+} from "./group.js";
+import { moveGroupCommand } from "./moveGroup.js";
+import { resizeGroupCommand } from "./resizeGroup.js";
 import { importTextCommand } from "./importText.js";
 import { moveNodeCommand } from "./moveNode.js";
 import { removeEdgeCommand } from "./removeEdge.js";
@@ -245,6 +253,105 @@ describe("group commands", () => {
 
     // Act + Assert
     expectRoundTrip(initial, (d) => removeGroupCommand(g2.id, d));
+  });
+
+  it("addNodeToGroupCommand inserts a child id and is idempotent", () => {
+    // Arrange
+    const group = makeGroup("g", ["n1"]);
+    const diagram: Diagram = { ...createEmptyDiagram("class"), groups: [group] };
+
+    // Act — first call adds, second is a no-op
+    const cmd = addNodeToGroupCommand("n2", group.id, diagram);
+    expect(cmd).not.toBeNull();
+    const after = cmd!.apply(diagram);
+    expect(after.groups[0]?.children).toEqual(["n1", "n2"]);
+    expect(addNodeToGroupCommand("n2", group.id, after)).toBeNull();
+  });
+
+  it("removeNodeFromGroupCommand drops a child id and is idempotent", () => {
+    // Arrange
+    const group = makeGroup("g", ["n1", "n2"]);
+    const diagram: Diagram = { ...createEmptyDiagram("class"), groups: [group] };
+
+    // Act
+    const cmd = removeNodeFromGroupCommand("n1", group.id, diagram);
+    expect(cmd).not.toBeNull();
+    const after = cmd!.apply(diagram);
+    expect(after.groups[0]?.children).toEqual(["n2"]);
+    expect(removeNodeFromGroupCommand("n1", group.id, after)).toBeNull();
+  });
+
+  it("addGroupCommand with layout writes layoutOverrides[groupId] in the same frame", () => {
+    // Arrange
+    const initial = createEmptyDiagram("c4-context");
+
+    // Act
+    const cmd = addGroupCommand(
+      { id: "g1", kind: "boundary", label: "B", children: [] },
+      { x: 100, y: 200, width: 320, height: 200 },
+    );
+    const after = cmd.apply(initial);
+
+    // Assert
+    expect(after.groups[0]?.id).toBe("g1");
+    expect(after.metadata.layoutOverrides?.["g1"]).toEqual({
+      x: 100,
+      y: 200,
+      width: 320,
+      height: 200,
+    });
+
+    // Invert restores the empty state
+    const reverted = cmd.invert(after);
+    expect(reverted.groups).toEqual([]);
+    expect(reverted.metadata.layoutOverrides?.["g1"]).toBeUndefined();
+  });
+
+  it("moveGroupCommand round-trip writes/restores layoutOverrides[groupId]", () => {
+    // Arrange — group already in diagram, no override yet
+    const group = makeGroup("g", []);
+    const initial: Diagram = { ...createEmptyDiagram("c4-context"), groups: [group] };
+
+    // Act
+    const cmd = moveGroupCommand(group.id, { x: 50, y: 60 }, initial);
+    const after = cmd.apply(initial);
+
+    // Assert
+    expect(after.metadata.layoutOverrides?.[group.id]).toEqual({ x: 50, y: 60 });
+    const reverted = cmd.invert(after);
+    expect(reverted.metadata.layoutOverrides?.[group.id]).toBeUndefined();
+  });
+
+  it("resizeGroupCommand persists the full rect and inverts cleanly", () => {
+    // Arrange
+    const group = makeGroup("g", []);
+    const initial: Diagram = {
+      ...createEmptyDiagram("c4-context"),
+      groups: [group],
+      metadata: {
+        schemaVersion: "1.0.0",
+        layoutOverrides: { [group.id]: { x: 0, y: 0, width: 320, height: 200 } },
+      },
+    };
+
+    // Act
+    const cmd = resizeGroupCommand(group.id, { x: 0, y: 0, width: 640, height: 400 }, initial);
+    const after = cmd.apply(initial);
+
+    // Assert
+    expect(after.metadata.layoutOverrides?.[group.id]).toEqual({
+      x: 0,
+      y: 0,
+      width: 640,
+      height: 400,
+    });
+    const reverted = cmd.invert(after);
+    expect(reverted.metadata.layoutOverrides?.[group.id]).toEqual({
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 200,
+    });
   });
 });
 
