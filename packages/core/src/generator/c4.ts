@@ -1,4 +1,4 @@
-import type { Diagram, DiagramEdge, DiagramNode } from "../model/types.js";
+import type { Diagram, DiagramEdge, DiagramNode, DiagramType } from "../model/types.js";
 import { escapeStringLiteral, lookupAlias, nodeAlias } from "./format.js";
 
 /**
@@ -14,14 +14,18 @@ import { escapeStringLiteral, lookupAlias, nodeAlias } from "./format.js";
  */
 export function renderC4(diagram: Diagram, aliases: Map<string, string>): string[] {
   const lines: string[] = [];
+  // Component-tier diagrams wrap their components in Container_Boundary
+  // per c4model.com; the other tiers use System_Boundary as the canonical
+  // wrapper macro.
+  const boundaryMacro = diagram.type === "c4-component" ? "Container_Boundary" : "System_Boundary";
 
   for (const group of diagram.groups) {
     if (group.kind !== "boundary") continue;
     const alias = lookupAlias(aliases, group.id);
-    lines.push(`System_Boundary(${alias}, "${escapeStringLiteral(group.label)}") {`);
+    lines.push(`${boundaryMacro}(${alias}, "${escapeStringLiteral(group.label)}") {`);
     for (const childId of group.children) {
       const child = diagram.nodes.find((n) => n.id === childId);
-      if (child) lines.push(`  ${formatC4Node(child, aliases)}`);
+      if (child) lines.push(`  ${formatC4Node(child, aliases, diagram.type)}`);
     }
     lines.push("}");
   }
@@ -31,7 +35,7 @@ export function renderC4(diagram: Diagram, aliases: Map<string, string>): string
   );
   for (const node of diagram.nodes) {
     if (groupedNodeIds.has(node.id)) continue;
-    lines.push(formatC4Node(node, aliases));
+    lines.push(formatC4Node(node, aliases, diagram.type));
   }
 
   for (const edge of diagram.edges) {
@@ -41,7 +45,11 @@ export function renderC4(diagram: Diagram, aliases: Map<string, string>): string
   return lines;
 }
 
-function formatC4Node(node: DiagramNode, aliases: Map<string, string>): string {
+function formatC4Node(
+  node: DiagramNode,
+  aliases: Map<string, string>,
+  diagramType: DiagramType,
+): string {
   const alias = nodeAlias(aliases, node);
   const label = escapeStringLiteral(node.label);
   switch (node.kind) {
@@ -59,21 +67,32 @@ function formatC4Node(node: DiagramNode, aliases: Map<string, string>): string {
       return formatContainerLike("Container_Ext", alias, label, node.technology, node.description);
     case "component":
       return formatContainerLike("Component", alias, label, node.technology, node.description);
+    case "component-external":
+      return formatContainerLike("Component_Ext", alias, label, node.technology, node.description);
     case "database":
-      // Without context we can't tell whether this DB lives at Context /
-      // Container / Component scope — the parser collapses SystemDb /
-      // ContainerDb / ComponentDb into the same `database` kind. When a
-      // technology is set we emit ContainerDb (the only Db macro that
-      // accepts $techn); otherwise SystemDb, which round-trips at all
-      // three tiers because the parser accepts each variant.
+      // The parser collapses SystemDb / ContainerDb / ComponentDb into the
+      // same `database` kind, so the generator picks the macro by diagram
+      // tier (Component-tier emits ComponentDb; Container-tier emits
+      // ContainerDb when tech is present; Context-tier falls through to
+      // SystemDb). Each tier's parser accepts the matching macro, so the
+      // round-trip stays lossless within a given diagram type.
+      if (diagramType === "c4-component" && node.technology) {
+        return formatContainerLike("ComponentDb", alias, label, node.technology, node.description);
+      }
       if (node.technology) {
         return formatContainerLike("ContainerDb", alias, label, node.technology, node.description);
       }
       return formatPersonLike("SystemDb", alias, label, node.description);
     case "queue":
-      // Same shape collapse as `database`: SystemQueue / ContainerQueue
-      // map to one kind. Pick ContainerQueue when there's a technology
-      // (Container tier signature), SystemQueue otherwise (Context tier).
+      if (diagramType === "c4-component" && node.technology) {
+        return formatContainerLike(
+          "ComponentQueue",
+          alias,
+          label,
+          node.technology,
+          node.description,
+        );
+      }
       if (node.technology) {
         return formatContainerLike(
           "ContainerQueue",
@@ -127,7 +146,16 @@ function formatC4Edge(edge: DiagramEdge, aliases: Map<string, string>): string {
   const to = lookupAlias(aliases, edge.target);
   const { label, technology } = splitTechSuffix(edge.label ?? "");
   if (technology !== null) {
+    // C4-PlantUML's Rel macro requires the third (label) argument when a
+    // fourth (technology) is present, so we keep the empty string only in
+    // this branch.
     return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}", "${escapeStringLiteral(technology)}")`;
+  }
+  if (label === "") {
+    // Drop the empty third argument entirely — `Rel(a, b)` is valid in
+    // C4-PlantUML and avoids the "" label that some downstream linters
+    // (and our own LINT_C4_EMPTY_REL_LABEL) flag.
+    return `Rel(${from}, ${to})`;
   }
   return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}")`;
 }

@@ -6,6 +6,12 @@ import type { SourceLine } from "../tokenizer.js";
 const START_MARKER = /^@startuml(?:\s+(.+))?$/u;
 const END_MARKER = /^@enduml\b/u;
 const TITLE = /^title\s+(.+)$/u;
+// PlantUML preprocessor directives we accept and quietly drop on parse so
+// they don't end up in the opaque bucket. The generator re-emits the
+// canonical C4 stdlib `!include` based on diagram type, so round-trip
+// stays clean even if the source had a different (or missing) include.
+const PREPROCESSOR =
+  /^!(?:include(?:_many|url)?|import|importurl|pragma|theme|define|undef|if|ifdef|ifndef|elseif|else|endif|assert|function|procedure|return|while|endwhile|foreach|endforeach|log|startsub|endsub|includesub)\b/u;
 
 /**
  * Handle a "universal" line — present in every diagram type. Returns
@@ -24,6 +30,10 @@ export function handleUniversalLine(ctx: ParseContext, line: SourceLine): boolea
 
   if (text.startsWith("'")) {
     return true; // ordinary single-line comment — ignore
+  }
+
+  if (PREPROCESSOR.test(text)) {
+    return true; // preprocessor directive (e.g. `!include <C4/...>`) — ignore
   }
 
   const startMatch = START_MARKER.exec(text);

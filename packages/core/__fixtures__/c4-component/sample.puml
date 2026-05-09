@@ -1,17 +1,24 @@
 @startuml C4 Component
 title API Application Components
 
-Container(spa, "SPA", "JavaScript")
+Container_Boundary(api, "API Application") {
+  Component(signin, "Sign In Controller", "Spring MVC", "Handles authentication")
+  Component(accounts, "Accounts Controller", "Spring MVC", "Handles account requests")
+  Component(security, "Security Component", "Spring", "Authenticates users")
+  ComponentDb(repo, "Account Repository", "Spring Data", "Persistence")
+  ComponentQueue(events, "Event Publisher", "Kafka", "Publishes domain events")
+}
+Person(customer, "Customer", "Personal banking customer")
 ContainerDb(db, "Database", "Oracle")
-Component(signin, "Sign In Controller", "Spring MVC", "Handles authentication")
-Component(accounts, "Accounts Controller", "Spring MVC", "Handles account requests")
-Component(security, "Security Component", "Spring", "Authenticates users")
-Component(repo, "Account Repository", "Spring Data", "Persistence")
+Component_Ext(payments, "Payments Gateway Client", "REST", "Third-party processor")
 
-Rel(spa, signin, "Submits credentials", "JSON/HTTPS")
-Rel(spa, accounts, "Requests accounts", "JSON/HTTPS")
+Rel(customer, signin, "Submits credentials", "JSON/HTTPS")
+Rel(customer, accounts, "Requests accounts", "JSON/HTTPS")
 Rel(signin, security, "Uses")
-Rel(accounts, repo, "Uses")
+Rel(accounts, security, "Uses")
+Rel(accounts, repo, "Reads")
+Rel(accounts, events, "Publishes to")
+Rel(accounts, payments, "Charges via", "HTTPS")
 Rel(repo, db, "Reads/writes", "JDBC")
 
 @enduml

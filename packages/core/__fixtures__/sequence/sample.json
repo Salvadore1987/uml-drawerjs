@@ -1,11 +1,25 @@
 {
   "id": "diagram-fixture",
   "type": "sequence",
-  "title": "Sign-in Sequence",
   "nodes": [
-    { "id": "id-1", "kind": "actor", "label": "User" },
-    { "id": "id-2", "kind": "lifeline", "label": "Auth" },
-    { "id": "id-3", "kind": "lifeline", "label": "DB" }
+    {
+      "id": "id-1",
+      "kind": "actor",
+      "label": "User",
+      "alias": "User"
+    },
+    {
+      "id": "id-2",
+      "kind": "lifeline",
+      "label": "Auth",
+      "alias": "Auth"
+    },
+    {
+      "id": "id-3",
+      "kind": "lifeline",
+      "label": "DB",
+      "alias": "DB"
+    }
   ],
   "edges": [
     {
@@ -15,10 +29,31 @@
       "kind": "sync-call",
       "label": "login(credentials)"
     },
-    { "id": "id-5", "source": "id-2", "target": "id-3", "kind": "sync-call", "label": "validate" },
-    { "id": "id-6", "source": "id-3", "target": "id-2", "kind": "return", "label": "ok" },
-    { "id": "id-7", "source": "id-2", "target": "id-1", "kind": "async-call", "label": "token" }
+    {
+      "id": "id-5",
+      "source": "id-2",
+      "target": "id-3",
+      "kind": "sync-call",
+      "label": "validate"
+    },
+    {
+      "id": "id-6",
+      "source": "id-3",
+      "target": "id-2",
+      "kind": "return",
+      "label": "ok"
+    },
+    {
+      "id": "id-7",
+      "source": "id-2",
+      "target": "id-1",
+      "kind": "async-call",
+      "label": "token"
+    }
   ],
   "groups": [],
-  "metadata": { "schemaVersion": "0.1.0" }
+  "metadata": {
+    "schemaVersion": "0.1.0"
+  },
+  "title": "Sign-in Sequence"
 }

@@ -1,11 +1,22 @@
 {
   "id": "diagram-fixture",
   "type": "er",
-  "title": "E-commerce ER",
   "nodes": [
-    { "id": "id-1", "kind": "entity", "label": "Customer" },
-    { "id": "id-2", "kind": "entity", "label": "Order" },
-    { "id": "id-3", "kind": "entity", "label": "Product" }
+    {
+      "id": "id-1",
+      "kind": "entity",
+      "label": "Customer"
+    },
+    {
+      "id": "id-2",
+      "kind": "entity",
+      "label": "Order"
+    },
+    {
+      "id": "id-3",
+      "kind": "entity",
+      "label": "Product"
+    }
   ],
   "edges": [
     {
@@ -13,7 +24,10 @@
       "source": "id-1",
       "target": "id-2",
       "kind": "one-to-many",
-      "cardinality": { "source": "1", "target": "0..*" },
+      "cardinality": {
+        "source": "1",
+        "target": "0..*"
+      },
       "label": "places"
     },
     {
@@ -21,10 +35,16 @@
       "source": "id-2",
       "target": "id-3",
       "kind": "many-to-many",
-      "cardinality": { "source": "0..*", "target": "0..*" },
+      "cardinality": {
+        "source": "0..*",
+        "target": "0..*"
+      },
       "label": "contains"
     }
   ],
   "groups": [],
-  "metadata": { "schemaVersion": "0.1.0" }
+  "metadata": {
+    "schemaVersion": "0.1.0"
+  },
+  "title": "E-commerce ER"
 }

@@ -1,18 +1,52 @@
 {
   "id": "diagram-fixture",
   "type": "class",
-  "title": "Renderer Hierarchy",
   "nodes": [
-    { "id": "id-1", "kind": "interface", "label": "Renderable" },
-    { "id": "id-2", "kind": "abstract-class", "label": "Shape" },
-    { "id": "id-3", "kind": "class", "label": "Circle" },
-    { "id": "id-4", "kind": "class", "label": "Square" },
-    { "id": "id-5", "kind": "enum", "label": "LineStyle" }
+    {
+      "id": "id-1",
+      "kind": "interface",
+      "label": "Renderable"
+    },
+    {
+      "id": "id-2",
+      "kind": "abstract-class",
+      "label": "Shape"
+    },
+    {
+      "id": "id-3",
+      "kind": "class",
+      "label": "Circle"
+    },
+    {
+      "id": "id-4",
+      "kind": "class",
+      "label": "Square"
+    },
+    {
+      "id": "id-5",
+      "kind": "enum",
+      "label": "LineStyle"
+    }
   ],
   "edges": [
-    { "id": "id-6", "source": "id-3", "target": "id-2", "kind": "inheritance" },
-    { "id": "id-7", "source": "id-4", "target": "id-2", "kind": "inheritance" },
-    { "id": "id-8", "source": "id-2", "target": "id-1", "kind": "realization" },
+    {
+      "id": "id-6",
+      "source": "id-3",
+      "target": "id-2",
+      "kind": "inheritance"
+    },
+    {
+      "id": "id-7",
+      "source": "id-4",
+      "target": "id-2",
+      "kind": "inheritance"
+    },
+    {
+      "id": "id-8",
+      "source": "id-2",
+      "target": "id-1",
+      "kind": "realization"
+    },
     {
       "id": "id-9",
       "source": "id-2",
@@ -29,5 +63,8 @@
     }
   ],
   "groups": [],
-  "metadata": { "schemaVersion": "0.1.0" }
+  "metadata": {
+    "schemaVersion": "0.1.0"
+  },
+  "title": "Renderer Hierarchy"
 }

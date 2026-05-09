@@ -51,6 +51,7 @@ export function validateConstraints(diagram: Diagram): DiagramError[] {
   }
   if (isC4(diagram.type)) {
     enforceC4BoundaryChildren(diagram, errors);
+    enforceC4BoundaryTier(diagram, errors);
   }
   if (diagram.type === "c4-context") {
     enforceC4ContextTier(diagram, errors);
@@ -107,6 +108,7 @@ const C4_NODE_KINDS = new Set<NodeKind>([
   "container",
   "container-external",
   "component",
+  "component-external",
   "database",
   "queue",
 ]);
@@ -272,6 +274,59 @@ function reportInvalidCardinality(
     });
   }
 }
+
+/**
+ * Tier-aware boundary check: c4model.com treats `System_Boundary` as the
+ * envelope around the SUBJECT system, so its children should be tier-N+1
+ * (Containers in a Container diagram, Components in a Component diagram).
+ *
+ * A `system` node inside a Container-diagram boundary almost always means
+ * the author dragged a Software-System palette item where they wanted a
+ * Container — flag it as a warning so the author can swap kinds via the
+ * props panel (or a future quick-fix). External nodes are exempt because
+ * "external system inside our boundary" is occasionally legitimate.
+ */
+function enforceC4BoundaryTier(diagram: Diagram, errors: DiagramError[]): void {
+  if (diagram.type === "c4-context") return; // Context boundary may contain anything tier-0.
+
+  const allowedInside =
+    diagram.type === "c4-container"
+      ? CONTAINER_BOUNDARY_CHILD_KINDS
+      : COMPONENT_BOUNDARY_CHILD_KINDS;
+  const tierLabel = diagram.type === "c4-container" ? "Container" : "Component";
+
+  const nodeKinds = new Map(diagram.nodes.map((node) => [node.id, node.kind] as const));
+  for (const group of diagram.groups) {
+    if (group.kind !== "boundary") continue;
+    for (const childId of group.children) {
+      const kind = nodeKinds.get(childId);
+      if (kind === undefined) continue;
+      if (!C4_NODE_KINDS.has(kind)) continue; // covered by C4BoundaryChildKind
+      if (allowedInside.has(kind)) continue;
+      errors.push({
+        severity: "warning",
+        code: CONSTRAINT_ERROR_CODES.C4BoundaryTierMismatch,
+        message: `Node kind '${kind}' inside a ${tierLabel}-tier boundary should be a ${tierLabel.toLowerCase()} per c4model.com — convert it via the properties panel.`,
+        groupId: group.id,
+        nodeId: childId,
+      });
+    }
+  }
+}
+
+const CONTAINER_BOUNDARY_CHILD_KINDS = new Set<NodeKind>([
+  "container",
+  "container-external",
+  "database",
+  "queue",
+]);
+
+const COMPONENT_BOUNDARY_CHILD_KINDS = new Set<NodeKind>([
+  "component",
+  "component-external",
+  "database",
+  "queue",
+]);
 
 /**
  * C4 Boundary blocks may only contain other C4 nodes (Person / System /

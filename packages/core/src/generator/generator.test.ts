@@ -152,9 +152,10 @@ describe("generatePlantUml — output shape", () => {
     // Act
     const generated = generatePlantUml(ast);
 
-    // Assert — the alias is derived from label via the same rules used
-    // by the existing tech-suffix test above.
-    expect(generated).toContain('Person_Ext(Auditor, "Auditor", "Reviews")');
+    // Assert — the original alias `a` is preserved on the node and
+    // round-trips through the generator (instead of being re-derived
+    // from the label as it was before alias persistence).
+    expect(generated).toContain('Person_Ext(a, "Auditor", "Reviews")');
   });
 
   it("emits SystemDb for a database without technology, ContainerDb when one is set", () => {
@@ -178,9 +179,9 @@ describe("generatePlantUml — output shape", () => {
     const ctxOut = generatePlantUml(ctxAst);
     const ctnOut = generatePlantUml(ctnAst);
 
-    // Assert
-    expect(ctxOut).toContain('SystemDb(AuditLog, "AuditLog")');
-    expect(ctnOut).toContain('ContainerDb(Postgres, "Postgres", "PostgreSQL")');
+    // Assert — original alias `d` survives the round-trip on both tiers.
+    expect(ctxOut).toContain('SystemDb(d, "AuditLog")');
+    expect(ctnOut).toContain('ContainerDb(d, "Postgres", "PostgreSQL")');
   });
 
   it("emits Container_Ext for kind 'container-external' (round-trip)", () => {
@@ -196,8 +197,8 @@ describe("generatePlantUml — output shape", () => {
     // Act
     const generated = generatePlantUml(ast);
 
-    // Assert
-    expect(generated).toContain('Container_Ext(Payments, "Payments", "REST", "Third-party")');
+    // Assert — original alias `pay` round-trips through the generator.
+    expect(generated).toContain('Container_Ext(pay, "Payments", "REST", "Third-party")');
   });
 
   it("emits SystemQueue / ContainerQueue based on the technology field", () => {
@@ -219,9 +220,9 @@ describe("generatePlantUml — output shape", () => {
     const ctxOut = generatePlantUml(ctxAst);
     const ctnOut = generatePlantUml(ctnAst);
 
-    // Assert
-    expect(ctxOut).toContain('SystemQueue(Events, "Events")');
-    expect(ctnOut).toContain('ContainerQueue(Events, "Events", "Kafka")');
+    // Assert — original alias `q` survives on both tiers.
+    expect(ctxOut).toContain('SystemQueue(q, "Events")');
+    expect(ctnOut).toContain('ContainerQueue(q, "Events", "Kafka")');
   });
 
   it("uses an explicit group.alias as the boundary alias in the generated PlantUML", () => {
@@ -245,6 +246,88 @@ describe("generatePlantUml — output shape", () => {
     expect(generated).toContain('System_Boundary(bank2, "Internet Banking System")');
   });
 
+  it("preserves authored aliases across parse → generate (no n_<id> regression on round-trip)", () => {
+    // Arrange — the playground's default c4-container sample uses readable
+    // aliases (`customer`, `web`, `api`, `db`, `events`, `mail`, `payments`).
+    // A regression here surfaces immediately: the user opens the editor,
+    // touches nothing, exports, and aliases collapse to label-derived or
+    // `n_id_N` values — making the export unreadable and breaking
+    // hand-edited `Rel(...)` statements that targeted the original names.
+    const text =
+      `@startuml\n` +
+      `title Online Banking — Containers\n` +
+      `\n` +
+      `Person(customer, "Customer", "Personal banking customer")\n` +
+      `System_Ext(mail, "E-mail System", "Sends notifications")\n` +
+      `System_Boundary(bank, "Internet Banking System") {\n` +
+      `  Container(web, "Web App", "JS / SPA", "Delivers static content")\n` +
+      `  Container(api, "API", "Java/Spring", "Provides banking functionality")\n` +
+      `  ContainerDb(db, "Database", "PostgreSQL", "Stores accounts, transactions")\n` +
+      `  ContainerQueue(events, "Domain Events", "Kafka", "Publishes account events")\n` +
+      `}\n` +
+      `Container_Ext(payments, "Payments Gateway", "REST", "Third-party processor")\n` +
+      `\n` +
+      `Rel(customer, web, "Uses", "HTTPS")\n` +
+      `Rel(api, db, "Reads/Writes", "JDBC")\n` +
+      `@enduml\n`;
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert — every authored alias survives, both at the macro definition
+    // site and inside Rel(...) references.
+    for (const alias of ["customer", "mail", "bank", "web", "api", "db", "events", "payments"]) {
+      expect(generated).toMatch(new RegExp(`\\(${alias}[,)]`));
+    }
+    expect(generated).toContain("Rel(customer, web,");
+    expect(generated).toContain("Rel(api, db,");
+    expect(generated).not.toMatch(/\bn_id_\d+\b/); // no synthesized aliases
+  });
+
+  it("emits a C4-PlantUML !include line for each c4 tier so output renders in vanilla PlantUML", () => {
+    // Arrange — minimum viable diagram per tier; we only assert the include
+    // line, so the body content doesn't matter.
+    const ctx = generatePlantUml(createEmptyDiagram("c4-context"));
+    const ctn = generatePlantUml(createEmptyDiagram("c4-container"));
+    const cmp = generatePlantUml(createEmptyDiagram("c4-component"));
+    const cls = generatePlantUml(createEmptyDiagram("class"));
+
+    // Assert — include lines appear immediately after @startuml (line 2)
+    // and only on c4-* diagrams.
+    expect(ctx.split("\n")[1]).toBe("!include <C4/C4_Context>");
+    expect(ctn.split("\n")[1]).toBe("!include <C4/C4_Container>");
+    expect(cmp.split("\n")[1]).toBe("!include <C4/C4_Component>");
+    expect(cls).not.toContain("!include");
+  });
+
+  it("drops the empty third argument from Rel(...) when there's neither label nor tech", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "")\n` +
+      `@enduml\n`;
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert — clean two-arg form, no `Rel(p, s, "")` artefact. Original
+    // aliases `p` and `s` survive the round-trip.
+    expect(generated).toContain("Rel(p, s)\n");
+    expect(generated).not.toMatch(/Rel\([^()]+,\s*[^()]+,\s*""\)/);
+  });
+
   it("preserves the `[tech]` suffix on C4 Rel labels by promoting it to a 4th argument", () => {
     // Arrange
     const text =
@@ -265,9 +348,8 @@ describe("generatePlantUml — output shape", () => {
     const generated = generatePlantUml(ast);
 
     // Assert — the suffix is decoded back into the 4-arg form. The
-    // generator uses the label as alias when it's a clean `\w+`, so the
-    // emitted aliases are `Person` and `System` (not their AST ids).
-    expect(generated).toContain('Rel(Person, System, "Uses", "HTTPS")');
+    // original aliases `p` and `s` round-trip through the parser.
+    expect(generated).toContain('Rel(p, s, "Uses", "HTTPS")');
   });
 });
 

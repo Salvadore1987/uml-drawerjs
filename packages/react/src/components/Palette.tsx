@@ -87,6 +87,12 @@ const PALETTE_ITEMS: readonly PaletteItem[] = [
     category: "C4 Components",
     diagramTypes: ["c4-component"],
   },
+  {
+    kind: "component-external",
+    label: "Component (External)",
+    category: "C4 Components",
+    diagramTypes: ["c4-component"],
+  },
 
   // Class
   { kind: "class", label: "Class", category: "Class", diagramTypes: ["class"] },
@@ -145,7 +151,11 @@ export function Palette({
       bucket.push(item);
       buckets.set(item.category, bucket);
     }
-    return [...buckets.entries()].map(([category, list]) => ({ category, items: list }));
+    const priority = (category: string): number =>
+      categoryPriorityFor(diagramType).get(category) ?? 100;
+    return [...buckets.entries()]
+      .map(([category, list]) => ({ category, items: list }))
+      .sort((a, b) => priority(a.category) - priority(b.category));
   }, [items, diagramType, paletteFilter]);
 
   const composedClassName = ["uml-palette", className].filter(Boolean).join(" ");
@@ -208,6 +218,40 @@ export function Palette({
       </div>
     </aside>
   );
+}
+
+/**
+ * Per-tier ordering of palette categories. Sorting by this priority steers
+ * authors toward the kinds c4model.com expects on the active tier — for a
+ * Container diagram, Containers come first; Software Systems sink under
+ * an "Other" heading because they belong outside the System_Boundary, not
+ * inside it. The validator (`C4_BOUNDARY_TIER_MISMATCH`) catches the
+ * remaining mistake; this UX nudge prevents it in the first place.
+ */
+function categoryPriorityFor(diagramType: DiagramType): Map<string, number> {
+  switch (diagramType) {
+    case "c4-context":
+      return new Map([
+        ["C4 Actors", 0],
+        ["C4 Systems", 10],
+        ["C4 Containers", 90], // boundary only — keep visible but low
+      ]);
+    case "c4-container":
+      return new Map([
+        ["C4 Containers", 0],
+        ["C4 Actors", 20],
+        ["C4 Systems", 30],
+      ]);
+    case "c4-component":
+      return new Map([
+        ["C4 Components", 0],
+        ["C4 Containers", 10],
+        ["C4 Actors", 20],
+        ["C4 Systems", 30],
+      ]);
+    default:
+      return new Map();
+  }
 }
 
 /** Default palette item table — handy for tests and external consumers. */

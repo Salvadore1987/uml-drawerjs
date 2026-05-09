@@ -28,6 +28,7 @@ export const CONSTRAINT_ERROR_CODES = {
   NodeKindNotAllowed: "CONSTRAINT_NODE_KIND_NOT_ALLOWED",
   EdgeKindNotAllowed: "CONSTRAINT_EDGE_KIND_NOT_ALLOWED",
   C4BoundaryChildKind: "CONSTRAINT_C4_BOUNDARY_CHILD_KIND",
+  C4BoundaryTierMismatch: "CONSTRAINT_C4_BOUNDARY_TIER_MISMATCH",
   C4ContextKindMismatch: "CONSTRAINT_C4_CONTEXT_KIND_MISMATCH",
   C4ContainerKindMismatch: "CONSTRAINT_C4_CONTAINER_KIND_MISMATCH",
   SequenceEdgeNonLifeline: "CONSTRAINT_SEQUENCE_EDGE_NON_LIFELINE",
@@ -43,6 +44,7 @@ export const LINT_ERROR_CODES = {
   OrphanNode: "LINT_ORPHAN_NODE",
   DuplicateLabel: "LINT_DUPLICATE_LABEL",
   InheritanceCycle: "LINT_INHERITANCE_CYCLE",
+  C4EmptyRelLabel: "LINT_C4_EMPTY_REL_LABEL",
 } as const;
 
 export type LintErrorCode = (typeof LINT_ERROR_CODES)[keyof typeof LINT_ERROR_CODES];
