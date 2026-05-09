@@ -183,6 +183,23 @@ describe("generatePlantUml — output shape", () => {
     expect(ctnOut).toContain('ContainerDb(Postgres, "Postgres", "PostgreSQL")');
   });
 
+  it("emits Container_Ext for kind 'container-external' (round-trip)", () => {
+    // Arrange
+    const text = `@startuml\nContainer_Ext(pay, "Payments", "REST", "Third-party")\n@enduml\n`;
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    expect(ast.nodes[0]?.kind).toBe("container-external");
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert
+    expect(generated).toContain('Container_Ext(Payments, "Payments", "REST", "Third-party")');
+  });
+
   it("emits SystemQueue / ContainerQueue based on the technology field", () => {
     // Arrange
     const ctxText = `@startuml\nSystemQueue(q, "Events")\n@enduml\n`;

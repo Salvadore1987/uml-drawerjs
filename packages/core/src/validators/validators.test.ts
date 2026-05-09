@@ -294,6 +294,47 @@ describe("validateConstraints — diagram-type rules", () => {
     expect(mismatch?.nodeId).toBe("c");
   });
 
+  it("warns when a c4-container diagram contains a Component (c4model tier rule)", () => {
+    // Arrange
+    const diagram: Diagram = {
+      ...createEmptyDiagram("c4-container"),
+      nodes: [
+        { id: "c1", kind: "container", label: "API" },
+        { id: "comp", kind: "component", label: "Controller" },
+      ],
+    };
+
+    // Act
+    const result = validateConstraints(diagram);
+    const mismatch = result.find((e) => e.code === CONSTRAINT_ERROR_CODES.C4ContainerKindMismatch);
+
+    // Assert
+    expect(mismatch).toBeDefined();
+    expect(mismatch?.severity).toBe("warning");
+    expect(mismatch?.nodeId).toBe("comp");
+  });
+
+  it("does not warn when a c4-container diagram contains only container-tier kinds", () => {
+    // Arrange — every kind allowed at the Container tier
+    const diagram: Diagram = {
+      ...createEmptyDiagram("c4-container"),
+      nodes: [
+        { id: "p", kind: "person", label: "Customer" },
+        { id: "s", kind: "system-external", label: "Mail" },
+        { id: "c1", kind: "container", label: "API" },
+        { id: "c2", kind: "container-external", label: "Payments" },
+        { id: "d", kind: "database", label: "Postgres" },
+        { id: "q", kind: "queue", label: "Events" },
+      ],
+    };
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).not.toContain(CONSTRAINT_ERROR_CODES.C4ContainerKindMismatch);
+  });
+
   it("does not warn when a c4-context diagram contains only context-tier kinds", () => {
     // Arrange — every kind allowed at the System Context tier
     const diagram = c4DiagramWith({

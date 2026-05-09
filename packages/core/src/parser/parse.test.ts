@@ -203,6 +203,29 @@ describe("parsePlantUml — C4 macro coverage", () => {
     expect(ast.nodes[0]?.technology).toBeUndefined();
   });
 
+  it("Container_Ext lands as kind 'container-external' (separate from internal Container)", () => {
+    // Arrange
+    const text = `@startuml\nContainer(api, "API", "Java")\nContainer_Ext(pay, "Payments", "REST", "Third-party")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    const kinds = ast.nodes.map((n) => n.kind);
+    expect(kinds).toEqual(["container", "container-external"]);
+    expect(ast.nodes[1]).toMatchObject({
+      kind: "container-external",
+      label: "Payments",
+      technology: "REST",
+      description: "Third-party",
+    });
+  });
+
   it("ContainerQueue carries the technology argument across", () => {
     // Arrange
     const text = `@startuml\nContainerQueue(q, "Events", "Kafka", "Order events")\n@enduml\n`;

@@ -55,6 +55,8 @@ function formatC4Node(node: DiagramNode, aliases: Map<string, string>): string {
       return formatPersonLike("System_Ext", alias, label, node.description);
     case "container":
       return formatContainerLike("Container", alias, label, node.technology, node.description);
+    case "container-external":
+      return formatContainerLike("Container_Ext", alias, label, node.technology, node.description);
     case "component":
       return formatContainerLike("Component", alias, label, node.technology, node.description);
     case "database":

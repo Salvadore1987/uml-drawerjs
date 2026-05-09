@@ -28,6 +28,7 @@ export type NodeKind =
   | "system"
   | "system-external"
   | "container"
+  | "container-external"
   | "component"
   | "database"
   | "queue"

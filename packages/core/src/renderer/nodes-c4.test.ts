@@ -178,6 +178,37 @@ describe("renderer/nodes — C4 per-kind visual language", () => {
     expect(tagRow?.text).toBe("[Person]");
   });
 
+  it("container-external renders dashed border and a [Container] type-tag", () => {
+    // Arrange
+    const diagram = diagramWith({
+      type: "c4-container",
+      nodes: [
+        {
+          id: "ext",
+          kind: "container-external",
+          label: "Payments",
+          technology: "REST",
+        },
+      ],
+      metadata: { schemaVersion: "1.0.0", layoutOverrides: { ext: { x: 0, y: 0 } } },
+    });
+
+    // Act
+    const rendered = renderDiagram(diagram, { coordinates: { ext: { x: 0, y: 0 } } });
+    const node = findNodeVNode(rendered.root, "ext");
+    const rect = node.children?.find((c) => c.tag === "rect");
+    const tagRow = node.children?.find(
+      (c) => c.tag === "text" && (c.classes ?? []).includes("uml-node-type-tag"),
+    );
+
+    // Assert
+    expect((rect?.attrs as Record<string, unknown> | undefined)?.["stroke-dasharray"]).toBe("6 4");
+    expect((rect?.attrs as Record<string, unknown> | undefined)?.fill).toContain(
+      "--uml-c4-external-bg",
+    );
+    expect(tagRow?.text).toBe("[Container: REST]");
+  });
+
   it("queue renders rounded rect with two end-cap lines and a [Queue] type-tag", () => {
     // Arrange
     const diagram = diagramWith({

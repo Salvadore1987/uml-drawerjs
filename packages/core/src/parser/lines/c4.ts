@@ -93,6 +93,13 @@ const NODE_MACROS: NodeMacroSpec[] = [
     kind: "queue",
     shape: "containerLike",
   },
+  // Container_Ext is matched BEFORE Container so the longer prefix wins.
+  {
+    pattern:
+      /^Container_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
+    kind: "container-external",
+    shape: "containerLike",
+  },
   {
     pattern:
       /^Container\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
