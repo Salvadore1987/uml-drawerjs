@@ -324,7 +324,13 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     const startLayout = clientToLayout(event.clientX, event.clientY);
     const rect = nodeRectInLayout(group);
     const distance = distanceToBorder(rect, startLayout);
-    const onBorder = distance <= BORDER_GRAB_PX;
+    // Connect mode triggers when:
+    //   * The pointer landed on an explicit `[data-port-handle]` circle
+    //     (the visible affordance shown on hover / selection), OR
+    //   * The pointer landed within `BORDER_GRAB_PX` of a node's edge.
+    const isPortHandle =
+      event.target instanceof Element && event.target.closest("[data-port-handle]") !== null;
+    const onBorder = isPortHandle || distance <= BORDER_GRAB_PX;
     const overrides = diagram.metadata.layoutOverrides ?? {};
 
     // Selection update:

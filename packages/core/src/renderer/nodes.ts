@@ -83,6 +83,15 @@ export function renderNode(args: RenderNodeArgs): VNode {
     children.push(...renderAttributeRows(node.attributes ?? [], geometry));
   }
 
+  // Port handles — four small circles at edge midpoints. Hidden by
+  // default via CSS (`opacity: 0`); become visible on `:hover` and
+  // when the node carries `data-selected="true"`. Pointerdown on a
+  // handle is the primary affordance for creating edges between
+  // nodes; the handle's `data-port-handle` attribute lets the
+  // interactions module detect connect intent without relying on
+  // distance-from-border heuristics.
+  children.push(...renderPortHandles(geometry));
+
   return v(
     "g",
     {
@@ -141,6 +150,36 @@ function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
         "stroke-width": "1.5",
       });
   }
+}
+
+/**
+ * Four small port handles at edge midpoints (N / E / S / W) used for
+ * starting edge-creation drags. Hidden by default — CSS reveals them on
+ * `:hover` of the node group and when `data-selected="true"`.
+ */
+function renderPortHandles(geom: NodeGeometry): VNode[] {
+  const positions: ReadonlyArray<{ side: "n" | "e" | "s" | "w"; x: number; y: number }> = [
+    { side: "n", x: geom.width / 2, y: 0 },
+    { side: "e", x: geom.width, y: geom.height / 2 },
+    { side: "s", x: geom.width / 2, y: geom.height },
+    { side: "w", x: 0, y: geom.height / 2 },
+  ];
+  return positions.map((p) =>
+    v(
+      "circle",
+      {
+        cx: p.x,
+        cy: p.y,
+        r: 5,
+        fill: "var(--uml-accent)",
+        stroke: "var(--uml-bg)",
+        "stroke-width": "1.5",
+        "data-port-handle": p.side,
+      },
+      undefined,
+      { classes: ["uml-node-port", `uml-node-port--${p.side}`] },
+    ),
+  );
 }
 
 function renderC4Rect(

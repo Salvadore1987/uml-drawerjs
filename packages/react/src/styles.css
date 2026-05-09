@@ -466,6 +466,24 @@
   stroke-width: 2;
 }
 
+/* Port handles for edge creation — hidden by default, shown on hover or
+   when the node is selected. Cursor changes to crosshair to signal that
+   pointerdown will start a connect-drag, not a move. */
+.uml-node-port {
+  opacity: 0;
+  cursor: crosshair;
+  transition: opacity 0.15s ease;
+}
+
+.uml-node:hover .uml-node-port,
+.uml-node[data-selected="true"] .uml-node-port {
+  opacity: 1;
+}
+
+.uml-node-port:hover {
+  r: 7;
+}
+
 .uml-edge-ghost {
   pointer-events: none;
   opacity: 0.7;
