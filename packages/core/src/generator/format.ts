@@ -53,13 +53,23 @@ const WORD_ONLY = /^[A-Za-z0-9_]+$/u;
 export function buildAliasIndex(diagram: Diagram): Map<string, string> {
   const result = new Map<string, string>();
   const taken = new Set<string>();
-  const assign = (id: string, label: string): void => {
-    const alias = WORD_ONLY.test(label) && !taken.has(label) ? label : aliasFromId(id);
+  const assign = (id: string, label: string, explicit?: string): void => {
+    // Explicit alias takes priority — that's the user-edited PlantUML
+    // identifier from the props panel. Fall back to label-as-alias when
+    // it's a clean `\w+` and unique, then to the sanitized id.
+    let alias: string;
+    if (explicit && WORD_ONLY.test(explicit) && !taken.has(explicit)) {
+      alias = explicit;
+    } else if (WORD_ONLY.test(label) && !taken.has(label)) {
+      alias = label;
+    } else {
+      alias = aliasFromId(id);
+    }
     result.set(id, alias);
     taken.add(alias);
   };
   for (const node of diagram.nodes) assign(node.id, node.label);
-  for (const group of diagram.groups) assign(group.id, group.label);
+  for (const group of diagram.groups) assign(group.id, group.label, group.alias);
   return result;
 }
 

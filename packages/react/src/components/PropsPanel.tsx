@@ -1,10 +1,12 @@
 import {
   removeEdgeCommand,
+  removeGroupCommand,
   removeNodeCommand,
   updateEdgeCommand,
+  updateGroupCommand,
   updateNodeCommand,
 } from "@uml-drawer/core/commands";
-import type { DiagramEdge, DiagramNode } from "@uml-drawer/core/model";
+import type { DiagramEdge, DiagramGroup, DiagramNode } from "@uml-drawer/core/model";
 import { type HTMLAttributes, useContext, useEffect, useState } from "react";
 import { UmlEditorContext } from "../internal/context.js";
 import { useEditorState } from "../hooks/useEditorState.js";
@@ -22,6 +24,9 @@ interface FormState {
   description: string;
   edgeLabel: string;
   edgeKind: string;
+  groupAlias: string;
+  groupLabel: string;
+  groupDescription: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -31,6 +36,9 @@ const EMPTY_FORM: FormState = {
   description: "",
   edgeLabel: "",
   edgeKind: "",
+  groupAlias: "",
+  groupLabel: "",
+  groupDescription: "",
 };
 
 /**
@@ -58,16 +66,19 @@ export function PropsPanel({
   const selectedNode = selectedId ? (ast.nodes.find((n) => n.id === selectedId) ?? null) : null;
   const selectedEdge =
     selectedId && !selectedNode ? (ast.edges.find((e) => e.id === selectedId) ?? null) : null;
+  const selectedGroup =
+    selectedId && !selectedNode && !selectedEdge
+      ? (ast.groups.find((g) => g.id === selectedId) ?? null)
+      : null;
 
   useEffect(() => {
     if (selectedNode) {
       setForm({
+        ...EMPTY_FORM,
         label: selectedNode.label ?? "",
         stereotype: selectedNode.stereotype ?? "",
         technology: selectedNode.technology ?? "",
         description: selectedNode.description ?? "",
-        edgeLabel: "",
-        edgeKind: "",
       });
     } else if (selectedEdge) {
       setForm({
@@ -75,10 +86,17 @@ export function PropsPanel({
         edgeLabel: selectedEdge.label ?? "",
         edgeKind: selectedEdge.kind,
       });
+    } else if (selectedGroup) {
+      setForm({
+        ...EMPTY_FORM,
+        groupAlias: selectedGroup.alias ?? "",
+        groupLabel: selectedGroup.label ?? "",
+        groupDescription: selectedGroup.description ?? "",
+      });
     } else {
       setForm(EMPTY_FORM);
     }
-  }, [selectedNode?.id, selectedEdge?.id]);
+  }, [selectedNode?.id, selectedEdge?.id, selectedGroup?.id]);
 
   const composedClassName = ["uml-props-panel", className].filter(Boolean).join(" ");
 
@@ -89,6 +107,10 @@ export function PropsPanel({
   const commitEdge = (patch: Partial<DiagramEdge>): void => {
     if (!selectedEdge || !editor) return;
     editor.dispatch(updateEdgeCommand(selectedEdge.id, patch, editor.getState()));
+  };
+  const commitGroup = (patch: Partial<DiagramGroup>): void => {
+    if (!selectedGroup || !editor) return;
+    editor.dispatch(updateGroupCommand(selectedGroup.id, patch, editor.getState()));
   };
 
   const renderEmpty = (): JSX.Element => (
@@ -208,11 +230,78 @@ export function PropsPanel({
     </form>
   );
 
+  const renderGroup = (group: DiagramGroup): JSX.Element => (
+    <form
+      className="uml-props-panel__form"
+      onSubmit={(e): void => e.preventDefault()}
+      aria-label={`Properties for boundary ${group.label || "untitled"}`}
+    >
+      <div className="uml-field">
+        <span>Kind</span>
+        <code>{group.kind}</code>
+      </div>
+      <label className="uml-field">
+        <span>Alias</span>
+        <input
+          type="text"
+          value={form.groupAlias}
+          // PlantUML aliases are `\w+` only — keep the user honest with
+          // a pattern hint; non-matching values are dropped on commit.
+          pattern="[A-Za-z0-9_]+"
+          onChange={(e): void => setForm((prev) => ({ ...prev, groupAlias: e.target.value }))}
+          onBlur={(): void => {
+            const next = form.groupAlias.trim();
+            // Empty string clears the alias — `buildAliasIndex` falls
+            // back to label-as-alias when `WORD_ONLY` doesn't match.
+            if (next !== (group.alias ?? "")) commitGroup({ alias: next });
+          }}
+        />
+      </label>
+      <label className="uml-field">
+        <span>Label</span>
+        <input
+          type="text"
+          value={form.groupLabel}
+          onChange={(e): void => setForm((prev) => ({ ...prev, groupLabel: e.target.value }))}
+          onBlur={(): void => {
+            if (form.groupLabel !== (group.label ?? "")) {
+              commitGroup({ label: form.groupLabel });
+            }
+          }}
+        />
+      </label>
+      <label className="uml-field uml-field--multiline">
+        <span>Description</span>
+        <textarea
+          rows={3}
+          value={form.groupDescription}
+          onChange={(e): void => setForm((prev) => ({ ...prev, groupDescription: e.target.value }))}
+          onBlur={(): void => {
+            if (form.groupDescription !== (group.description ?? "")) {
+              commitGroup({ description: form.groupDescription });
+            }
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        className="uml-button uml-button--danger"
+        onClick={(): void => {
+          if (!editor) return;
+          editor.dispatch(removeGroupCommand(group.id, editor.getState()));
+        }}
+      >
+        Delete boundary
+      </button>
+    </form>
+  );
+
   let body: JSX.Element;
   if (selectedIds.size === 0) body = renderEmpty();
   else if (selectedIds.size > 1) body = renderMulti();
   else if (selectedNode) body = renderNode(selectedNode);
   else if (selectedEdge) body = renderEdge(selectedEdge);
+  else if (selectedGroup) body = renderGroup(selectedGroup);
   else body = renderEmpty();
 
   return (

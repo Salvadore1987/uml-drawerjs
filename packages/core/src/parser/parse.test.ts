@@ -224,6 +224,23 @@ describe("parsePlantUml — C4 macro coverage", () => {
     expect(group.kind).toBe("boundary");
   });
 
+  it("preserves the boundary's PlantUML alias on the parsed group", () => {
+    // Arrange
+    const text = `@startuml\nSystem_Boundary(bank, "Internet Banking System") {\n  Container(api, "API")\n}\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.groups[0]?.alias).toBe("bank");
+    expect(ast.groups[0]?.label).toBe("Internet Banking System");
+  });
+
   it("nodes outside the boundary block stay top-level", () => {
     // Arrange — one inside, one outside.
     const text = `@startuml\nSystem_Boundary(b, "Bank") {\n  Container(web, "Web")\n}\nPerson(c, "Customer")\n@enduml\n`;

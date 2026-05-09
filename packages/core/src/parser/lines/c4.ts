@@ -208,7 +208,10 @@ function consumeBoundary(ctx: ParseContext, match: RegExpExecArray): void {
   if (alias === undefined || label === undefined) return;
   const id = resolveAlias(ctx, alias, "create");
   if (id === null) return;
-  ctx.groups.push({ id, kind: "boundary", label, children: [] });
+  // Preserve the original PlantUML alias on the group so generator
+  // output round-trips with the same symbolic name (and the props
+  // panel can edit it).
+  ctx.groups.push({ id, kind: "boundary", label, alias, children: [] });
   // Nested boundary: register itself as a child of the enclosing group
   // before pushing onto the stack, so `parent.children` matches the
   // visual containment.

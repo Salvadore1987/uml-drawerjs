@@ -224,6 +224,27 @@ describe("generatePlantUml — output shape", () => {
     expect(ctnOut).toContain('ContainerQueue(Events, "Events", "Kafka")');
   });
 
+  it("uses an explicit group.alias as the boundary alias in the generated PlantUML", () => {
+    // Arrange — round-trip through the parser to lock the alias on the group
+    const text = `@startuml\nSystem_Boundary(bank, "Internet Banking System") {\n  Container(api, "API")\n}\n@enduml\n`;
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    expect(ast.groups[0]?.alias).toBe("bank");
+
+    // Act — rename the alias as a user would via the props panel
+    const renamed = {
+      ...ast,
+      groups: ast.groups.map((g, i) => (i === 0 ? { ...g, alias: "bank2" } : g)),
+    };
+    const generated = generatePlantUml(renamed);
+
+    // Assert
+    expect(generated).toContain('System_Boundary(bank2, "Internet Banking System")');
+  });
+
   it("preserves the `[tech]` suffix on C4 Rel labels by promoting it to a 4th argument", () => {
     // Arrange
     const text =
