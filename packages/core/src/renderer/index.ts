@@ -17,6 +17,7 @@
 import { renderEdge, renderArrowMarkerDefs } from "./edges.js";
 import { computeNodeGeometry, renderNode } from "./nodes.js";
 import { renderGridLayer } from "./grid.js";
+import { computeGroupBoxes, renderGroupLayer } from "./groups.js";
 import { layoutGrid } from "../layout/fallback.js";
 import type { Diagram } from "../model/types.js";
 import { resolveRendererDefaults, v } from "./types.js";
@@ -66,7 +67,10 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
     edgeVNodes.push(renderEdge({ edge, source, target }));
   }
 
-  const bbox = boundingBoxOf(geometry, defaults.canvasPadding);
+  const groupBoxes = computeGroupBoxes({ diagram, nodeGeometry: geometry });
+  const groupLayer = renderGroupLayer({ diagram, nodeGeometry: geometry });
+
+  const bbox = boundingBoxOf(geometry, defaults.canvasPadding, groupBoxes);
 
   const gridVisible = options.grid?.visible ?? true;
   const gridStep = options.grid?.step ?? DEFAULT_GRID_STEP;
@@ -86,8 +90,11 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
     [
       renderArrowMarkerDefs(),
       v("g", { "data-uml-content": "true" }, [
-        // Grid sits behind edges and nodes so it never occludes content.
+        // Grid sits behind everything so it never occludes content.
         gridLayer,
+        // Boundary frames sit between the grid and edges/nodes — the
+        // dashed rect should appear behind the elements it contains.
+        groupLayer,
         // Edges go behind nodes so node frames cover edge endpoints.
         v("g", { "data-uml-layer": "edges" }, edgeVNodes),
         v("g", { "data-uml-layer": "nodes" }, nodeVNodes),
@@ -110,8 +117,9 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
 function boundingBoxOf(
   geometry: ReadonlyMap<string, NodeGeometry>,
   padding: number,
+  groupBoxes: ReadonlyArray<{ x: number; y: number; width: number; height: number }> = [],
 ): { x: number; y: number; width: number; height: number } {
-  if (geometry.size === 0) {
+  if (geometry.size === 0 && groupBoxes.length === 0) {
     return { x: 0, y: 0, width: padding * 2, height: padding * 2 };
   }
   let minX = Number.POSITIVE_INFINITY;
@@ -124,6 +132,15 @@ function boundingBoxOf(
     if (geom.x + geom.width > maxX) maxX = geom.x + geom.width;
     if (geom.y + geom.height > maxY) maxY = geom.y + geom.height;
   }
+  // Boundary rectangles can extend past the children they contain (auto-
+  // fit padding, or an explicit override). Include them in the canvas
+  // bbox so the viewBox doesn't clip the dashed frame.
+  for (const box of groupBoxes) {
+    if (box.x < minX) minX = box.x;
+    if (box.y < minY) minY = box.y;
+    if (box.x + box.width > maxX) maxX = box.x + box.width;
+    if (box.y + box.height > maxY) maxY = box.y + box.height;
+  }
   return {
     x: minX - padding,
     y: minY - padding,
@@ -134,6 +151,8 @@ function boundingBoxOf(
 
 export { renderGridLayer } from "./grid.js";
 export type { GridLayerOptions } from "./grid.js";
+export { renderGroupLayer, computeGroupBoxes } from "./groups.js";
+export type { GroupBox, ComputeGroupBoxesArgs, RenderGroupLayerArgs } from "./groups.js";
 export { snapValue, snapPoint, snapRect, DEFAULT_SNAP } from "./snap.js";
 export type { SnapOptions } from "./snap.js";
 export { computeResizeRect } from "./resizeGeometry.js";

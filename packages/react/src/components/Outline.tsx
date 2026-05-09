@@ -51,16 +51,6 @@ export function Outline({ title = "Outline", className, ...rest }: OutlineProps)
   return (
     <aside className={composedClassName} aria-label={title} {...rest}>
       <header className="uml-outline__header">{title}</header>
-      {ast.groups.length > 0 && (
-        <section className="uml-outline__section">
-          <h4 className="uml-outline__category">Groups</h4>
-          <ul className="uml-outline__list">
-            {ast.groups.map((group) =>
-              renderRow(group.id, group.label || "(untitled group)", group.kind, "group"),
-            )}
-          </ul>
-        </section>
-      )}
       <section className="uml-outline__section">
         <h4 className="uml-outline__category">Nodes</h4>
         <ul className="uml-outline__list">

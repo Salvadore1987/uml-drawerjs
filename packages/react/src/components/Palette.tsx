@@ -1,18 +1,25 @@
-import { addNodeCommand } from "@uml-drawer/core/commands";
-import type { DiagramType, NodeKind } from "@uml-drawer/core/model";
+import { addGroupCommand, addNodeCommand } from "@uml-drawer/core/commands";
+import type { DiagramType, GroupKind, NodeKind } from "@uml-drawer/core/model";
 import { uuidv7 } from "@uml-drawer/core/model";
 import { useContext, useMemo, type HTMLAttributes } from "react";
 import { UmlEditorContext } from "../internal/context.js";
 
 export interface PaletteItem {
   /** AST kind to instantiate when the user activates the item. */
-  readonly kind: NodeKind;
+  readonly kind: NodeKind | GroupKind;
   /** Display label. */
   readonly label: string;
   /** Visual / semantic group (rendered as a section heading). */
   readonly category: string;
   /** Diagram types this item applies to — used by the default filter. */
   readonly diagramTypes: readonly DiagramType[];
+  /**
+   * What kind of element this item creates. Defaults to `"node"` so
+   * existing palette tables stay backward-compatible. Set to `"group"`
+   * for boundary-style entries — clicking such an item dispatches an
+   * `addGroupCommand` instead of `addNodeCommand`.
+   */
+  readonly target?: "node" | "group";
 }
 
 export type PaletteFilter = (item: PaletteItem) => boolean;
@@ -66,6 +73,13 @@ const PALETTE_ITEMS: readonly PaletteItem[] = [
     label: "Container (External)",
     category: "C4 Containers",
     diagramTypes: ["c4-container", "c4-component"],
+  },
+  {
+    target: "group",
+    kind: "boundary",
+    label: "Boundary",
+    category: "C4 Containers",
+    diagramTypes: ["c4-context", "c4-container", "c4-component"],
   },
   {
     kind: "component",
@@ -138,10 +152,21 @@ export function Palette({
 
   const handleAdd = (item: PaletteItem): void => {
     if (!editor) return;
+    if (item.target === "group") {
+      editor.dispatch(
+        addGroupCommand({
+          id: uuidv7(),
+          kind: item.kind as GroupKind,
+          label: `New ${item.label}`,
+          children: [],
+        }),
+      );
+      return;
+    }
     editor.dispatch(
       addNodeCommand({
         id: uuidv7(),
-        kind: item.kind,
+        kind: item.kind as NodeKind,
         label: `New ${item.label}`,
       }),
     );

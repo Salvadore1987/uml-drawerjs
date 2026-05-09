@@ -67,6 +67,42 @@ export interface RemoveGroupPayload {
 export type RemoveGroupCommand = Command<"RemoveGroup", RemoveGroupPayload>;
 
 /**
+ * Idempotent: add a node id to a group's `children` array. Returns
+ * `null` when the node is already a child or the group does not exist —
+ * callers usually treat that as a no-op rather than an error so DnD
+ * gestures don't generate empty undo frames.
+ */
+export function addNodeToGroupCommand(
+  nodeId: string,
+  groupId: string,
+  diagram: Diagram,
+): UpdateGroupCommand | null {
+  const group = findGroup(diagram, groupId);
+  if (!group) return null;
+  if (group.children.includes(nodeId)) return null;
+  return updateGroupCommand(groupId, { children: [...group.children, nodeId] }, diagram);
+}
+
+/**
+ * Idempotent inverse of `addNodeToGroupCommand`. Returns `null` when the
+ * node isn't currently a child of the group — same no-op convention.
+ */
+export function removeNodeFromGroupCommand(
+  nodeId: string,
+  groupId: string,
+  diagram: Diagram,
+): UpdateGroupCommand | null {
+  const group = findGroup(diagram, groupId);
+  if (!group) return null;
+  if (!group.children.includes(nodeId)) return null;
+  return updateGroupCommand(
+    groupId,
+    { children: group.children.filter((c) => c !== nodeId) },
+    diagram,
+  );
+}
+
+/**
  * Dissolve a group — children stay in the diagram, but lose their grouping.
  * Inverse re-inserts the group at its original index so the `groups` array
  * order is preserved (byte-equal round-trip).

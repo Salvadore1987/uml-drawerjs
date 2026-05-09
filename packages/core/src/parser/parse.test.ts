@@ -203,6 +203,45 @@ describe("parsePlantUml — C4 macro coverage", () => {
     expect(ast.nodes[0]?.technology).toBeUndefined();
   });
 
+  it("System_Boundary { ... } populates group.children with the inner node ids", () => {
+    // Arrange — boundary block with two containers inside; the parser
+    // used to drop the inner `{}` block and leave `children` empty.
+    const text = `@startuml\nSystem_Boundary(b, "Bank") {\n  Container(web, "Web")\n  Container(api, "API")\n}\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.groups).toHaveLength(1);
+    const group = ast.groups[0]!;
+    const ids = ast.nodes.map((n) => n.id);
+    expect(group.children).toEqual(ids);
+    expect(group.kind).toBe("boundary");
+  });
+
+  it("nodes outside the boundary block stay top-level", () => {
+    // Arrange — one inside, one outside.
+    const text = `@startuml\nSystem_Boundary(b, "Bank") {\n  Container(web, "Web")\n}\nPerson(c, "Customer")\n@enduml\n`;
+
+    // Act
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    const group = ast.groups[0]!;
+    const personId = ast.nodes.find((n) => n.kind === "person")!.id;
+    expect(group.children).not.toContain(personId);
+    expect(group.children).toHaveLength(1);
+  });
+
   it("Container_Ext lands as kind 'container-external' (separate from internal Container)", () => {
     // Arrange
     const text = `@startuml\nContainer(api, "API", "Java")\nContainer_Ext(pay, "Payments", "REST", "Third-party")\n@enduml\n`;

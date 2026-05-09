@@ -6,7 +6,13 @@ import type { Diagram, DiagramEdge, DiagramGroup, DiagramNode } from "../model/t
 import { addEdgeCommand } from "./addEdge.js";
 import { addNodeCommand } from "./addNode.js";
 import { applyLayoutCommand } from "./applyLayout.js";
-import { addGroupCommand, removeGroupCommand, updateGroupCommand } from "./group.js";
+import {
+  addGroupCommand,
+  addNodeToGroupCommand,
+  removeGroupCommand,
+  removeNodeFromGroupCommand,
+  updateGroupCommand,
+} from "./group.js";
 import { importTextCommand } from "./importText.js";
 import { moveNodeCommand } from "./moveNode.js";
 import { removeEdgeCommand } from "./removeEdge.js";
@@ -245,6 +251,32 @@ describe("group commands", () => {
 
     // Act + Assert
     expectRoundTrip(initial, (d) => removeGroupCommand(g2.id, d));
+  });
+
+  it("addNodeToGroupCommand inserts a child id and is idempotent", () => {
+    // Arrange
+    const group = makeGroup("g", ["n1"]);
+    const diagram: Diagram = { ...createEmptyDiagram("class"), groups: [group] };
+
+    // Act — first call adds, second is a no-op
+    const cmd = addNodeToGroupCommand("n2", group.id, diagram);
+    expect(cmd).not.toBeNull();
+    const after = cmd!.apply(diagram);
+    expect(after.groups[0]?.children).toEqual(["n1", "n2"]);
+    expect(addNodeToGroupCommand("n2", group.id, after)).toBeNull();
+  });
+
+  it("removeNodeFromGroupCommand drops a child id and is idempotent", () => {
+    // Arrange
+    const group = makeGroup("g", ["n1", "n2"]);
+    const diagram: Diagram = { ...createEmptyDiagram("class"), groups: [group] };
+
+    // Act
+    const cmd = removeNodeFromGroupCommand("n1", group.id, diagram);
+    expect(cmd).not.toBeNull();
+    const after = cmd!.apply(diagram);
+    expect(after.groups[0]?.children).toEqual(["n2"]);
+    expect(removeNodeFromGroupCommand("n1", group.id, after)).toBeNull();
   });
 });
 
