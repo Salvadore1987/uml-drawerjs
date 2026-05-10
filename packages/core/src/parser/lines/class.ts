@@ -1,17 +1,31 @@
-import type { DiagramEdge, DiagramNode, EdgeKind, NodeKind } from "../../model/types.js";
+import type {
+  DiagramEdge,
+  DiagramGroup,
+  DiagramNode,
+  EdgeKind,
+  NodeKind,
+} from "../../model/types.js";
 import { errorAtLine, SYNTAX_ERROR_CODES } from "../errors.js";
 import type { ParseContext } from "../context.js";
 import { freshId, resolveAlias } from "../context.js";
 import type { SourceLine } from "../tokenizer.js";
+import { applyGenerics, handleClassMember } from "./classMembers.js";
 
 /**
- * Class-diagram declarations and relationship arrows. Members ({attributes}
- * / {operations}) inside `{ ... }` blocks are not yet modelled — they fall
- * through to the opaque bucket and are tracked for a follow-up.
+ * Class-diagram declarations and relationship arrows. Member bodies
+ * (`{ +balance: Decimal; +deposit(): void }`) are parsed by
+ * `./classMembers.ts` while `ctx.openClassStack` is non-empty.
  */
 
 const NODE_DECL =
-  /^(?:(abstract)\s+)?(class|interface|enum|abstract)\s+(\w+)(?:\s*<<\s*(\w+)\s*>>)?\s*\{?$/u;
+  /^(?:(abstract)\s+)?(class|interface|enum|abstract)\s+(\w+)(?:\s*<\s*([^<>]+(?:<[^<>]*>[^<>]*)*)\s*>)?(?:\s*<<\s*([\w-]+)\s*>>)?(\s*\{)?$/u;
+
+/**
+ * UML package container. Authors write `package "com.bank" {` or
+ * `package com.bank {`; both forms are accepted. Nested packages are
+ * supported via the same `openGroupStack` machinery used for C4 boundaries.
+ */
+const PACKAGE_DECL = /^package\s+(?:"([^"]+)"|(\S+))(?:\s*<<[\w-]+>>)?\s*\{$/u;
 
 const EDGE_LINE =
   /^(\w+)\s+("(?:[^"\\]|\\.)*"\s+)?(\.\.\|>|--\|>|\.\.>|\*--|o--|<\|--|<\|\.\.|<--|-->|<-\.|\.->|--|\.\.) ?\s*("(?:[^"\\]|\\.)*"\s+)?(\w+)(?:\s*:\s*(.+))?$/u;
@@ -42,6 +56,34 @@ const ARROWS: Record<string, ArrowDescriptor> = {
 export function handleClassLine(ctx: ParseContext, line: SourceLine): boolean {
   const text = line.text.trim();
 
+  // Closing brace pops a class-body frame first; otherwise pops a
+  // package group frame from the shared `openGroupStack`.
+  if (text === "}") {
+    if (ctx.openClassStack.length > 0) {
+      ctx.openClassStack.pop();
+      return true;
+    }
+    if (ctx.openGroupStack.length > 0) {
+      ctx.openGroupStack.pop();
+      return true;
+    }
+    return false;
+  }
+
+  const pkg = PACKAGE_DECL.exec(text);
+  if (pkg) {
+    consumePackage(ctx, pkg);
+    return true;
+  }
+
+  // While inside a class body, route attribute / operation / enum-literal
+  // lines to the member parser before falling back to declaration / edge
+  // patterns. This keeps `class Foo {  bar: Bar  }` from being mis-parsed
+  // as another node declaration.
+  if (ctx.openClassStack.length > 0 && text !== "" && text !== "}") {
+    if (handleClassMember(ctx, text)) return true;
+  }
+
   const decl = NODE_DECL.exec(text);
   if (decl) {
     consumeNodeDecl(ctx, decl);
@@ -54,17 +96,43 @@ export function handleClassLine(ctx: ParseContext, line: SourceLine): boolean {
     return true;
   }
 
-  // Members inside a `{ ... }` block — not modelled in MVP.
-  if (text === "}") return true;
-
   return false;
+}
+
+function consumePackage(ctx: ParseContext, match: RegExpExecArray): void {
+  const quoted = match[1];
+  const bare = match[2];
+  const label = quoted ?? bare;
+  if (!label) return;
+  const id = freshId(ctx);
+  const group: DiagramGroup = {
+    id,
+    kind: "package",
+    label,
+    children: [],
+  };
+  if (bare && /^[A-Za-z0-9_.]+$/u.test(bare)) {
+    group.alias = bare;
+  }
+  ctx.groups.push(group);
+
+  // Nested package: register itself as a child of the enclosing group
+  // (boundary or package) before pushing onto the stack.
+  const top = ctx.openGroupStack[ctx.openGroupStack.length - 1];
+  if (top !== undefined) {
+    const parent = ctx.groups.find((g) => g.id === top);
+    if (parent) parent.children.push(id);
+  }
+  ctx.openGroupStack.push(id);
 }
 
 function consumeNodeDecl(ctx: ParseContext, match: RegExpExecArray): void {
   const abstractMod = match[1];
   const keyword = match[2];
   const ident = match[3];
-  const stereotype = match[4];
+  const generics = match[4];
+  const stereotype = match[5];
+  const openBrace = match[6];
   if (!keyword || !ident) return;
 
   const kind: NodeKind =
@@ -80,12 +148,27 @@ function consumeNodeDecl(ctx: ParseContext, match: RegExpExecArray): void {
   if (id === null) return;
   const node: DiagramNode = { id, kind, label: ident };
   if (stereotype) node.stereotype = stereotype;
+  applyGenerics(node, generics);
   ctx.nodes.push(node);
+
+  // Attach to the innermost open package group so `package com.bank { class
+  // Account }` reflects containment in the AST.
+  const top = ctx.openGroupStack[ctx.openGroupStack.length - 1];
+  if (top !== undefined) {
+    const parent = ctx.groups.find((g) => g.id === top);
+    if (parent) parent.children.push(id);
+  }
+
+  if (openBrace !== undefined) {
+    ctx.openClassStack.push({ nodeId: id, kind });
+  }
 }
 
 function consumeEdge(ctx: ParseContext, line: SourceLine, match: RegExpExecArray): void {
   const sourceAlias = match[1];
+  const sourceMultRaw = match[2];
   const arrow = match[3];
+  const targetMultRaw = match[4];
   const targetAlias = match[5];
   const label = match[6];
   if (!sourceAlias || !arrow || !targetAlias) return;
@@ -126,5 +209,28 @@ function consumeEdge(ctx: ParseContext, line: SourceLine, match: RegExpExecArray
     kind: descriptor.kind,
   };
   if (label !== undefined && label.trim() !== "") edge.label = label.trim();
+
+  // Per-end multiplicity strings (`Foo "1" *-- "0..*" Bar`). Swap source /
+  // target when the arrow was reversed so the AST reflects the *forward*
+  // direction (matches generator's canonical-arrow output).
+  const rawSource = descriptor.reverse ? targetMultRaw : sourceMultRaw;
+  const rawTarget = descriptor.reverse ? sourceMultRaw : targetMultRaw;
+  const sourceMult = unquoteMultiplicity(rawSource);
+  const targetMult = unquoteMultiplicity(rawTarget);
+  if (sourceMult !== undefined || targetMult !== undefined) {
+    edge.ends = {};
+    if (sourceMult !== undefined) edge.ends.source = { multiplicity: sourceMult };
+    if (targetMult !== undefined) edge.ends.target = { multiplicity: targetMult };
+  }
+
   ctx.edges.push(edge);
+}
+
+function unquoteMultiplicity(raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined;
+  const trimmed = raw.trim();
+  if (trimmed === "") return undefined;
+  const match = /^"((?:[^"\\]|\\.)*)"$/u.exec(trimmed);
+  if (!match) return undefined;
+  return match[1];
 }

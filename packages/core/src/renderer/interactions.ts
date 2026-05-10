@@ -192,9 +192,15 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
    * `nodeRectInLayout` for groups: groups don't carry a `transform`
    * attribute (their children render in absolute layout coords), so the
    * rect attributes are already in the layout space we want.
+   *
+   * Package groups render as a `<path>` so the bounding box lives on a
+   * dedicated `[data-uml-group-bounds]` rect; boundary groups still use
+   * the visible frame rect.
    */
   function groupRectInLayout(groupEl: SVGGraphicsElement): Rect {
-    const rect = groupEl.querySelector(":scope > rect.uml-group-boundary, :scope > rect");
+    const rect = groupEl.querySelector(
+      ":scope > rect[data-uml-group-bounds], :scope > rect.uml-group-boundary, :scope > rect",
+    );
     if (rect instanceof SVGRectElement) {
       return {
         x: Number(rect.getAttribute("x") ?? 0),
@@ -283,21 +289,45 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     const groupEl = contentGroupEl.querySelector(`[data-group-id="${escaped}"]`);
     if (!(groupEl instanceof SVGGraphicsElement)) return;
 
-    const frameRect = groupEl.querySelector(":scope > rect.uml-group-boundary");
+    const isPackage = groupEl.getAttribute("data-uml-group") === "package";
+
+    // Update the bounding rect (package) or visible frame rect (boundary)
+    // — both carry the full box so `groupRectInLayout` round-trips it.
+    const frameRect = groupEl.querySelector(
+      ":scope > rect[data-uml-group-bounds], :scope > rect.uml-group-boundary",
+    );
     if (frameRect instanceof SVGRectElement) {
       frameRect.setAttribute("x", String(next.x));
       frameRect.setAttribute("y", String(next.y));
       frameRect.setAttribute("width", String(next.width));
       frameRect.setAttribute("height", String(next.height));
     }
+
+    if (isPackage) {
+      applyEphemeralPackageShape(groupEl, next);
+    } else {
+      applyEphemeralBoundaryShape(groupEl, next);
+    }
+
+    // Reposition the eight resize handles around the new rect — common
+    // to both kinds.
+    const handles = groupEl.querySelectorAll<SVGRectElement>("[data-resize-handle]");
+    handles.forEach((handle) => {
+      const side = handle.getAttribute("data-resize-handle");
+      const local = handlePosition(side, next.width, next.height);
+      if (!local) return;
+      handle.setAttribute("x", String(next.x + local.x - 4));
+      handle.setAttribute("y", String(next.y + local.y - 4));
+    });
+  }
+
+  function applyEphemeralBoundaryShape(groupEl: SVGGraphicsElement, next: Rect): void {
     const labelBand = groupEl.querySelector('[data-uml-group-handle="label"]');
     if (labelBand instanceof SVGRectElement) {
       labelBand.setAttribute("x", String(next.x));
       labelBand.setAttribute("y", String(next.y));
       labelBand.setAttribute("width", String(next.width));
     }
-    // Label + type tag — we recorded the label inset constants in
-    // groups.ts; reuse the same values here.
     const LABEL_INSET_X = 16;
     const LABEL_INSET_Y = 18;
     const labelText = groupEl.querySelector(":scope > text.uml-group__label");
@@ -310,15 +340,44 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       tagText.setAttribute("x", String(next.x + LABEL_INSET_X));
       tagText.setAttribute("y", String(next.y + LABEL_INSET_Y + 14));
     }
-    // Reposition the eight resize handles around the new rect.
-    const handles = groupEl.querySelectorAll<SVGRectElement>("[data-resize-handle]");
-    handles.forEach((handle) => {
-      const side = handle.getAttribute("data-resize-handle");
-      const local = handlePosition(side, next.width, next.height);
-      if (!local) return;
-      handle.setAttribute("x", String(next.x + local.x - 4));
-      handle.setAttribute("y", String(next.y + local.y - 4));
-    });
+  }
+
+  /** Mirror of `groups.ts` package geometry for ephemeral DOM updates. */
+  const PACKAGE_TAB_HEIGHT = 18;
+  function packageTabWidth(label: string, width: number): number {
+    return Math.min(Math.max(label.length * 7 + 24, 80), width * 0.6);
+  }
+  function packagePathD(rect: Rect, tabWidth: number): string {
+    const t = PACKAGE_TAB_HEIGHT;
+    const { x, y, width: w, height: h } = rect;
+    return (
+      `M ${x} ${y} L ${x + tabWidth} ${y} L ${x + tabWidth} ${y + t} ` +
+      `L ${x + w} ${y + t} L ${x + w} ${y + h} L ${x} ${y + h} Z`
+    );
+  }
+
+  function applyEphemeralPackageShape(groupEl: SVGGraphicsElement, next: Rect): void {
+    const labelText = groupEl.querySelector(":scope > text.uml-group__label");
+    const labelStr = labelText instanceof SVGTextElement ? (labelText.textContent ?? "") : "";
+    const tabWidth = packageTabWidth(labelStr, next.width);
+    // Update the visible package outline.
+    const path = groupEl.querySelector("[data-uml-package-path]");
+    if (path instanceof SVGPathElement) {
+      path.setAttribute("d", packagePathD(next, tabWidth));
+    }
+    // Update the tab fill (also the label-band hit zone).
+    const tab = groupEl.querySelector('[data-uml-group-handle="label"]');
+    if (tab instanceof SVGRectElement) {
+      tab.setAttribute("x", String(next.x));
+      tab.setAttribute("y", String(next.y));
+      tab.setAttribute("width", String(tabWidth));
+      tab.setAttribute("height", String(PACKAGE_TAB_HEIGHT));
+    }
+    // Move the label inside the tab.
+    if (labelText instanceof SVGTextElement) {
+      labelText.setAttribute("x", String(next.x + 8));
+      labelText.setAttribute("y", String(next.y + PACKAGE_TAB_HEIGHT - 5));
+    }
   }
 
   function nodeRectInLayout(group: SVGGraphicsElement): {

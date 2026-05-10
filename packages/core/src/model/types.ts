@@ -129,7 +129,13 @@ export interface Operation {
   description?: string;
 }
 
-/** Attribute on a Class or column on an ER Entity. */
+/**
+ * Attribute on a Class or column on an ER Entity.
+ *
+ * Class-only modifiers: `readonly`, `static`.
+ * ER-only flags: `primaryKey`, `foreignKey`, `nullable` — these are ignored
+ * by the class renderer (kind-aware formatting in `renderer/nodes.ts`).
+ */
 export interface Attribute {
   id: string;
   name: string;
@@ -137,10 +143,42 @@ export interface Attribute {
   visibility?: Visibility;
   multiplicity?: string;
   default?: string;
+  /** Class-only: marks an immutable field, rendered with `{readonly}` modifier. */
+  readonly?: boolean;
+  /** Class-only: marks a class-level field, rendered with underline. */
+  static?: boolean;
+  /** ER-only. */
   primaryKey?: boolean;
+  /** ER-only. */
   foreignKey?: boolean;
+  /** ER-only. */
   nullable?: boolean;
   description?: string;
+}
+
+/** A single literal in an enum body (Class diagram). */
+export interface EnumLiteral {
+  id: string;
+  name: string;
+}
+
+/**
+ * Per-end fields on a class-diagram edge, mirroring the UML `AssociationEnd`
+ * metaclass. `multiplicity` is a UML expression (`1`, `0..1`, `1..*`); `role`
+ * is the named role at this end; `navigability` toggles the open arrow at the
+ * end. Generator emits these for class diagrams; ER diagrams keep the legacy
+ * `cardinality` shape on `DiagramEdge`.
+ */
+export interface EdgeEndpoint {
+  role?: string;
+  multiplicity?: string;
+  navigability?: "navigable" | "non-navigable" | "unspecified";
+}
+
+/** Per-edge endpoint pair (class diagrams). */
+export interface EdgeEnds {
+  source?: EdgeEndpoint;
+  target?: EdgeEndpoint;
 }
 
 /** Cardinality labels at edge endpoints (used by ER and Class). */
@@ -194,6 +232,18 @@ export interface DiagramNode {
   description?: string;
   attributes?: Attribute[];
   operations?: Operation[];
+  /**
+   * Class-only: generic type parameters in declaration order. Each entry is
+   * the raw token (e.g. `"T"`, `"K extends Comparable<K>"`) — the renderer
+   * joins them with commas inside `<…>`. Empty array is treated as absent.
+   */
+  generics?: string[];
+  /**
+   * Class-only (kind === "enum"): the literal values in declaration order.
+   * Modelled as a separate field rather than reusing `attributes` so the
+   * validator can hard-error on `enum.attributes` (see ADR-0007).
+   */
+  enumLiterals?: EnumLiteral[];
   style?: NodeStyle;
 }
 
@@ -204,7 +254,17 @@ export interface DiagramEdge {
   target: string;
   kind: EdgeKind;
   label?: string;
+  /**
+   * ER + legacy class diagrams: flat per-end multiplicity strings. Class
+   * diagrams now prefer `ends` (richer per-end shape with role + navigability).
+   */
   cardinality?: EdgeCardinality;
+  /**
+   * Class diagrams: per-end role / multiplicity / navigability. When present,
+   * the renderer/generator use this; `cardinality` is the fallback for ER.
+   * See ADR-0008.
+   */
+  ends?: EdgeEnds;
   style?: EdgeStyle;
 }
 

@@ -35,6 +35,12 @@ export const CONSTRAINT_ERROR_CODES = {
   ErEdgeNonEntity: "CONSTRAINT_ER_EDGE_NON_ENTITY",
   ErCardinalityMissing: "CONSTRAINT_ER_CARDINALITY_MISSING",
   ErCardinalityInvalid: "CONSTRAINT_ER_CARDINALITY_INVALID",
+  // Class diagram (UML Code level)
+  ClassEnumHasOperations: "CONSTRAINT_CLASS_ENUM_HAS_OPERATIONS",
+  ClassEnumHasAttributes: "CONSTRAINT_CLASS_ENUM_HAS_ATTRIBUTES",
+  ClassEnumHasGenerics: "CONSTRAINT_CLASS_ENUM_HAS_GENERICS",
+  ClassAbstractOutsideAbstractClass: "CONSTRAINT_CLASS_ABSTRACT_OUTSIDE_ABSTRACT",
+  ClassInterfaceMethodNotAbstract: "CONSTRAINT_CLASS_INTERFACE_METHOD_NOT_ABSTRACT",
 } as const;
 
 export type ConstraintErrorCode =

@@ -1,4 +1,4 @@
-import type { DiagramEdge, EdgeKind } from "../model/types.js";
+import type { DiagramEdge, EdgeEndpoint, EdgeKind } from "../model/types.js";
 import { v } from "./types.js";
 import type { NodeGeometry, VNode } from "./types.js";
 
@@ -28,10 +28,19 @@ export function renderEdge(args: RenderEdgeArgs): VNode {
   if (edge.label && edge.label.trim() !== "") {
     children.push(renderLabel(edge.label, from, to));
   }
-  if (edge.cardinality?.source) {
+  // Class diagrams: per-end role + multiplicity from `edge.ends`. ER fall-back
+  // remains via `edge.cardinality`. Both can coexist without overlap because
+  // class diagrams emit `ends` and never `cardinality`, and vice versa.
+  const sourceEndText = endpointText(edge.ends?.source);
+  const targetEndText = endpointText(edge.ends?.target);
+  if (sourceEndText) {
+    children.push(renderCardinality(sourceEndText, from, to, "source"));
+  } else if (edge.cardinality?.source) {
     children.push(renderCardinality(edge.cardinality.source, from, to, "source"));
   }
-  if (edge.cardinality?.target) {
+  if (targetEndText) {
+    children.push(renderCardinality(targetEndText, from, to, "target"));
+  } else if (edge.cardinality?.target) {
     children.push(renderCardinality(edge.cardinality.target, from, to, "target"));
   }
 
@@ -184,6 +193,14 @@ function renderLabel(label: string, from: Point, to: Point): VNode {
     ],
     { classes: ["uml-edge-label"] },
   );
+}
+
+function endpointText(end: EdgeEndpoint | undefined): string | undefined {
+  if (!end) return undefined;
+  const mult = end.multiplicity?.trim();
+  const role = end.role?.trim();
+  if (mult && role) return `${mult} ${role}`;
+  return mult || role || undefined;
 }
 
 function renderCardinality(text: string, from: Point, to: Point, side: "source" | "target"): VNode {

@@ -43,19 +43,43 @@ const C4_KINDS = new Set<NodeKind>([
  * Compute final geometry for a node, factoring in attribute / operation
  * rows that grow the box. The renderer always commits to this geometry
  * before drawing edges so port snapping uses the same rectangle.
+ *
+ * For classic-UML class kinds, an empty class still reserves two thin
+ * compartments (attributes + operations) so the resulting shape is
+ * unmistakably *a class*, not just a labelled rectangle. Enum reserves
+ * only one literals compartment.
  */
 export function computeNodeGeometry(args: RenderNodeArgs): NodeGeometry {
   const { node, x, y, width, height } = args;
-  const rowHeights =
-    node.kind === "class" || node.kind === "interface" || node.kind === "abstract-class"
-      ? (node.attributes?.length ?? 0) * ATTRIBUTE_ROW_HEIGHT +
-        (node.operations?.length ?? 0) * ATTRIBUTE_ROW_HEIGHT
-      : node.kind === "entity"
-        ? (node.attributes?.length ?? 0) * ATTRIBUTE_ROW_HEIGHT
-        : 0;
+  const rowHeights = isClassLike(node.kind)
+    ? classRowHeights(node)
+    : node.kind === "entity"
+      ? (node.attributes?.length ?? 0) * ATTRIBUTE_ROW_HEIGHT
+      : 0;
   const c4Padding = c4ExtraHeight(node);
   const finalHeight = Math.max(height, HEADER_HEIGHT + rowHeights + c4Padding);
   return { id: node.id, x, y, width, height: finalHeight };
+}
+
+const EMPTY_COMPARTMENT_HEIGHT = 14;
+
+function classRowHeights(node: DiagramNode): number {
+  const literalCount = node.enumLiterals?.length ?? 0;
+  const attrCount = node.attributes?.length ?? 0;
+  const opCount = node.operations?.length ?? 0;
+  if (node.kind === "enum") {
+    return Math.max(literalCount, 1) * ATTRIBUTE_ROW_HEIGHT;
+  }
+  // Class / interface / abstract-class: always show two compartments
+  // (attributes + operations). When a side is empty, reserve a slim filler
+  // strip so the divider lines are visible.
+  const attrSpan = attrCount > 0 ? attrCount * ATTRIBUTE_ROW_HEIGHT : EMPTY_COMPARTMENT_HEIGHT;
+  const opSpan = opCount > 0 ? opCount * ATTRIBUTE_ROW_HEIGHT : EMPTY_COMPARTMENT_HEIGHT;
+  return attrSpan + opSpan;
+}
+
+function isClassLike(kind: NodeKind): boolean {
+  return kind === "class" || kind === "interface" || kind === "abstract-class" || kind === "enum";
 }
 
 function c4ExtraHeight(node: DiagramNode): number {
@@ -77,18 +101,38 @@ export function renderNode(args: RenderNodeArgs): VNode {
   const children: VNode[] = [];
 
   children.push(renderFrame(node, geometry));
+  if (isClassLike(node.kind)) {
+    children.push(renderClassHeaderBand(geometry));
+  }
   children.push(...renderHeaderRows(node, geometry));
-  if (node.kind === "class" || node.kind === "interface" || node.kind === "abstract-class") {
-    children.push(...renderAttributeRows(node.attributes ?? [], geometry));
+  if (isClassLike(node.kind)) {
+    const literalCount = node.enumLiterals?.length ?? 0;
+    const attrCount = node.attributes?.length ?? 0;
+    const opCount = node.operations?.length ?? 0;
+    if (literalCount > 0) {
+      children.push(...renderEnumLiteralRows(node.enumLiterals ?? [], geometry));
+    }
+    if (attrCount > 0) {
+      children.push(
+        ...renderAttributeRows(
+          node.attributes ?? [],
+          geometry,
+          node.kind,
+          literalCount * ATTRIBUTE_ROW_HEIGHT,
+        ),
+      );
+    }
+    if (opCount > 0) {
+      const opOffset =
+        literalCount * ATTRIBUTE_ROW_HEIGHT +
+        (attrCount > 0 ? attrCount * ATTRIBUTE_ROW_HEIGHT : EMPTY_COMPARTMENT_HEIGHT);
+      children.push(...renderOperationRows(node.operations ?? [], geometry, opOffset));
+    }
     children.push(
-      ...renderOperationRows(
-        node.operations ?? [],
-        geometry,
-        (node.attributes?.length ?? 0) * ATTRIBUTE_ROW_HEIGHT,
-      ),
+      ...renderClassCompartmentDividers(geometry, node.kind, literalCount, attrCount, opCount),
     );
   } else if (node.kind === "entity") {
-    children.push(...renderAttributeRows(node.attributes ?? [], geometry));
+    children.push(...renderAttributeRows(node.attributes ?? [], geometry, "entity", 0));
   }
 
   // Port handles — four small circles at edge midpoints. Hidden by
@@ -159,18 +203,23 @@ function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
         stroke: "var(--uml-node-border)",
         "stroke-width": "1.5",
       });
-    default:
+    default: {
+      // Class-like kinds (class / interface / abstract-class / enum) follow
+      // classic UML notation: sharp corners, no rounding. Other fallbacks
+      // keep the soft 8px radius that C4 boxes use.
+      const sharp = isClassLike(node.kind);
       return v("rect", {
         x: 0,
         y: 0,
         width: geom.width,
         height: geom.height,
-        rx: 8,
-        ry: 8,
+        rx: sharp ? 0 : 8,
+        ry: sharp ? 0 : 8,
         fill: "var(--uml-node-bg)",
         stroke: "var(--uml-node-border)",
         "stroke-width": "1.5",
       });
+    }
   }
 }
 
@@ -416,7 +465,11 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
   const layout = headerLayoutFor(node);
   let y = layout.topOffset;
 
-  if (node.stereotype) {
+  // Class diagrams: when no explicit stereotype is set on `interface` /
+  // `abstract-class` / `enum`, synthesise the canonical UML one. Authors who
+  // set a custom stereotype keep their value.
+  const stereotype = node.stereotype ?? syntheticStereotype(node.kind);
+  if (stereotype) {
     rows.push(
       v(
         "text",
@@ -426,15 +479,22 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
           "text-anchor": "middle",
           "font-family": "var(--uml-font-sans)",
           "font-size": "var(--uml-font-size-sm)",
-          fill: "var(--uml-node-stereotype)",
+          fill: "var(--uml-class-stereotype-color, var(--uml-node-stereotype))",
         },
         undefined,
-        { text: `«${node.stereotype}»`, classes: ["uml-node-stereotype"] },
+        { text: `«${stereotype}»`, classes: ["uml-node-stereotype"] },
       ),
     );
     y += layout.lineHeight;
   }
 
+  const labelText = appendGenerics(node.label, node.generics);
+  // Italic the class label for interface / abstract-class to match UML
+  // convention (abstract class names are typeset in italics). Class kinds
+  // also get a bold weight so the type name stands out from the body — the
+  // textbook UML look on c4model.com/diagrams/code.
+  const labelItalic = node.kind === "interface" || node.kind === "abstract-class";
+  const isClassKind = isClassLike(node.kind);
   rows.push(
     v(
       "text",
@@ -444,10 +504,14 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
         "text-anchor": "middle",
         "font-family": "var(--uml-font-sans)",
         "font-size": "var(--uml-font-size-base)",
-        fill: c4TextColor(node.kind),
+        ...(isClassKind ? { "font-weight": "600" } : {}),
+        ...(labelItalic ? { "font-style": "var(--uml-class-abstract-style, italic)" } : {}),
+        fill: isClassKind
+          ? "var(--uml-class-header-text, var(--uml-node-text))"
+          : c4TextColor(node.kind),
       },
       undefined,
-      { text: node.label, classes: ["uml-node-label"] },
+      { text: labelText, classes: ["uml-node-label"] },
     ),
   );
   y += layout.lineHeight + 4;
@@ -542,20 +606,28 @@ function truncate(text: string, max: number): string {
   return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
-function renderAttributeRows(attributes: readonly Attribute[], _geom: NodeGeometry): VNode[] {
+function renderAttributeRows(
+  attributes: readonly Attribute[],
+  _geom: NodeGeometry,
+  kind: NodeKind,
+  baseOffset: number,
+): VNode[] {
   return attributes.map((attribute, index) =>
     v(
       "text",
       {
         x: 12,
-        y: HEADER_HEIGHT + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        y: HEADER_HEIGHT + baseOffset + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
+        ...(attribute.static
+          ? { "text-decoration": "var(--uml-class-static-decoration, underline)" }
+          : {}),
       },
       undefined,
       {
-        text: formatAttribute(attribute),
+        text: formatAttribute(attribute, kind),
         classes: ["uml-node-attribute"],
       },
     ),
@@ -576,6 +648,10 @@ function renderOperationRows(
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
+        ...(operation.abstract ? { "font-style": "var(--uml-class-abstract-style, italic)" } : {}),
+        ...(operation.static
+          ? { "text-decoration": "var(--uml-class-static-decoration, underline)" }
+          : {}),
       },
       undefined,
       {
@@ -586,22 +662,130 @@ function renderOperationRows(
   );
 }
 
-function formatAttribute(attribute: Attribute): string {
+function renderEnumLiteralRows(
+  literals: readonly { id: string; name: string }[],
+  _geom: NodeGeometry,
+): VNode[] {
+  return literals.map((literal, index) =>
+    v(
+      "text",
+      {
+        x: 12,
+        y: HEADER_HEIGHT + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        "font-family": "var(--uml-font-mono)",
+        "font-size": "var(--uml-font-size-sm)",
+        fill: "var(--uml-node-text)",
+      },
+      undefined,
+      {
+        text: literal.name,
+        classes: ["uml-node-enum-literal"],
+      },
+    ),
+  );
+}
+
+/**
+ * Class-diagram compartment dividers — always emit the header rule, plus a
+ * second rule between attributes and operations for class / interface /
+ * abstract-class. Empty compartments still get their divider so the shape
+ * keeps its three-band UML look.
+ *
+ * For `enum`, only the header rule is drawn — the body is one literals
+ * compartment.
+ */
+function renderClassCompartmentDividers(
+  geom: NodeGeometry,
+  kind: NodeKind,
+  literalCount: number,
+  attrCount: number,
+  opCount: number,
+): VNode[] {
+  const lines: VNode[] = [];
+  // Header divider — always present, just below the stereotype + name band.
+  lines.push(compartmentDivider(geom, HEADER_HEIGHT));
+
+  if (kind === "enum") {
+    return lines;
+  }
+
+  // Class / interface / abstract-class: split the body into attributes (top)
+  // and operations (bottom). The literal-count branch is dead for these
+  // kinds (literals only exist on enums), but we keep the offset general so
+  // the math reads symmetrically.
+  const offset = HEADER_HEIGHT + literalCount * ATTRIBUTE_ROW_HEIGHT;
+  if (literalCount > 0) {
+    lines.push(compartmentDivider(geom, offset));
+  }
+  const attrSpan = attrCount > 0 ? attrCount * ATTRIBUTE_ROW_HEIGHT : EMPTY_COMPARTMENT_HEIGHT;
+  // Skip the opSpan check — we use it implicitly via geometry.
+  void opCount;
+  lines.push(compartmentDivider(geom, offset + attrSpan));
+  return lines;
+}
+
+function renderClassHeaderBand(geom: NodeGeometry): VNode {
+  return v("rect", {
+    x: 0,
+    y: 0,
+    width: geom.width,
+    height: HEADER_HEIGHT,
+    fill: "var(--uml-class-header-bg, var(--uml-bg-elevated))",
+    stroke: "none",
+  });
+}
+
+function compartmentDivider(geom: NodeGeometry, y: number): VNode {
+  return v("line", {
+    x1: 0,
+    y1: y,
+    x2: geom.width,
+    y2: y,
+    stroke: "var(--uml-class-compartment-divider, var(--uml-node-border))",
+    "stroke-width": 1,
+  });
+}
+
+function syntheticStereotype(kind: NodeKind): string | undefined {
+  if (kind === "interface") return "interface";
+  if (kind === "abstract-class") return "abstract";
+  if (kind === "enum") return "enumeration";
+  return undefined;
+}
+
+function appendGenerics(label: string, generics: string[] | undefined): string {
+  if (!generics || generics.length === 0) return label;
+  return `${label}<${generics.join(", ")}>`;
+}
+
+function formatAttribute(attribute: Attribute, kind: NodeKind): string {
   const visibility = visibilityMarker(attribute.visibility);
   const type = attribute.type ? `: ${attribute.type}` : "";
-  const flags = [
-    attribute.primaryKey ? "PK" : null,
-    attribute.foreignKey ? "FK" : null,
-    attribute.nullable === false ? "NN" : null,
-  ].filter(Boolean);
-  const flagText = flags.length > 0 ? ` [${flags.join(",")}]` : "";
-  return `${visibility}${attribute.name}${type}${flagText}`;
+  // Class-style: append `[multiplicity]` after the type when present.
+  // ER-style: append `[PK,FK,NN]` flag block — these flags are ER-only.
+  let suffix = "";
+  if (kind === "entity") {
+    const flags = [
+      attribute.primaryKey ? "PK" : null,
+      attribute.foreignKey ? "FK" : null,
+      attribute.nullable === false ? "NN" : null,
+    ].filter(Boolean);
+    if (flags.length > 0) suffix = ` [${flags.join(",")}]`;
+  } else if (attribute.multiplicity) {
+    suffix = ` [${attribute.multiplicity}]`;
+  }
+  const readonlyTag = attribute.readonly && kind !== "entity" ? " {readonly}" : "";
+  return `${visibility}${attribute.name}${type}${suffix}${readonlyTag}`;
 }
 
 function formatOperation(operation: Operation): string {
   const visibility = visibilityMarker(operation.visibility);
   const params = (operation.parameters ?? [])
-    .map((p) => `${p.name}${p.type ? `: ${p.type}` : ""}`)
+    .map((p) => {
+      const type = p.type ? `: ${p.type}` : "";
+      const def = p.default !== undefined && p.default !== "" ? ` = ${p.default}` : "";
+      return `${p.name}${type}${def}`;
+    })
     .join(", ");
   const ret = operation.returnType ? `: ${operation.returnType}` : "";
   return `${visibility}${operation.name}(${params})${ret}`;

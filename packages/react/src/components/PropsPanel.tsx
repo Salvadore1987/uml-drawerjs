@@ -11,6 +11,9 @@ import { type HTMLAttributes, useContext, useEffect, useState } from "react";
 import { UmlEditorContext } from "../internal/context.js";
 import { useEditorState } from "../hooks/useEditorState.js";
 import { useSelection } from "../hooks/useSelection.js";
+import { ClassMembersEditor } from "./ClassMembersEditor.js";
+
+const CLASS_LIKE_KINDS = new Set(["class", "interface", "abstract-class", "enum"]);
 
 export interface PropsPanelProps extends HTMLAttributes<HTMLElement> {
   /** Heading shown above the form. Defaults to "Properties". */
@@ -181,6 +184,7 @@ export function PropsPanel({
           }}
         />
       </label>
+      {CLASS_LIKE_KINDS.has(node.kind) && <ClassMembersEditor node={node} />}
       <button
         type="button"
         className="uml-button uml-button--danger"

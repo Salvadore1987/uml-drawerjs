@@ -11,7 +11,13 @@ import { resolveDefaults } from "./types.js";
  * never hit this path.
  */
 export function layoutGrid(diagram: Diagram, options?: LayoutOptions): LayoutResult {
-  const { nodeWidth, nodeHeight, spacing } = resolveDefaults(options);
+  const defaults = resolveDefaults(options);
+  // Class diagrams have visibly taller nodes (header band + two compartments
+  // even when empty) and members read more naturally with extra room — bump
+  // the inter-node gap modestly when no explicit spacing was passed.
+  const spacing = options?.spacing ?? (diagram.type === "class" ? 80 : defaults.spacing);
+  const nodeWidth = defaults.nodeWidth;
+  const nodeHeight = defaults.nodeHeight;
   const coordinates: LayoutCoordinates = {};
 
   const total = diagram.nodes.length;

@@ -351,6 +351,94 @@ describe("generatePlantUml — output shape", () => {
     // original aliases `p` and `s` round-trip through the parser.
     expect(generated).toContain('Rel(p, s, "Uses", "HTTPS")');
   });
+
+  it("round-trips class members, generics, enum literals and per-end multiplicity", () => {
+    // Arrange — exercises every classic-UML extension landed in PR-1..3.
+    const text =
+      `@startuml\n` +
+      `interface Repository<T> {\n` +
+      `  {abstract} +findById(id: String): T\n` +
+      `}\n` +
+      `abstract class AbstractEntity {\n` +
+      `  {abstract} +validate(): void\n` +
+      `  {static} +nextId(): String\n` +
+      `}\n` +
+      `enum AccountStatus {\n` +
+      `  ACTIVE\n` +
+      `  FROZEN\n` +
+      `  CLOSED\n` +
+      `}\n` +
+      `class Account {\n` +
+      `  -balance: Decimal {readonly}\n` +
+      `  {static} +VERSION: String = "1.0"\n` +
+      `}\n` +
+      `class Transaction\n` +
+      `Account "1" *-- "0..*" Transaction : holds\n` +
+      `@enduml\n`;
+    const first = parsePlantUml(text, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+    expect(first.errors).toEqual([]);
+
+    // Act
+    const generated = generatePlantUml(first.ast);
+    const second = parsePlantUml(generated, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — round-trip is loss-free.
+    expect(second.errors).toEqual([]);
+    expect(second.ast).toEqual(first.ast);
+
+    // Spot-check the generator emitted UML modifiers and per-end multiplicity.
+    expect(generated).toContain("interface Repository<T> {");
+    expect(generated).toContain("abstract class AbstractEntity {");
+    expect(generated).toContain("{abstract} +validate(): void");
+    expect(generated).toContain("{static} +nextId(): String");
+    expect(generated).toContain("-balance: Decimal {readonly}");
+    expect(generated).toContain('{static} +VERSION: String = "1.0"');
+    expect(generated).toMatch(/Account "1" \*-- "0\.\.\*" Transaction : holds/u);
+  });
+
+  it("round-trips class-diagram packages with contained classes", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `package "com.bank" {\n` +
+      `  class Account\n` +
+      `  class Transaction\n` +
+      `}\n` +
+      `class Audit\n` +
+      `@enduml\n`;
+    const first = parsePlantUml(text, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+    expect(first.errors).toEqual([]);
+    expect(first.ast.groups).toHaveLength(1);
+    expect(first.ast.groups[0]?.children).toHaveLength(2);
+
+    // Act
+    const generated = generatePlantUml(first.ast);
+    const second = parsePlantUml(generated, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — package + contained classes survive a full round-trip.
+    expect(second.errors).toEqual([]);
+    expect(second.ast.groups).toHaveLength(1);
+    expect(second.ast.groups[0]?.label).toBe("com.bank");
+    expect(generated).toContain('package "com.bank" {');
+    expect(generated).toContain("  class Account");
+    expect(generated).toContain("  class Transaction");
+  });
 });
 
 describe("generator format helpers", () => {

@@ -270,6 +270,192 @@
   font-size: var(--uml-font-size-sm);
 }
 
+/* === class members editor ========================== */
+
+.uml-class-members {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid var(--uml-border-subtle);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.uml-class-members__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.uml-class-members__heading {
+  font-size: var(--uml-font-size-sm);
+  font-weight: 600;
+  color: var(--uml-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.uml-class-members__empty {
+  color: var(--uml-text-faint);
+  font-size: var(--uml-font-size-sm);
+  font-style: italic;
+  margin: 0;
+}
+
+.uml-class-members__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.uml-class-members__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--uml-border-subtle);
+  border-radius: var(--uml-radius-sm);
+  background-color: var(--uml-bg-elevated);
+  flex-wrap: wrap;
+}
+
+.uml-class-members__row--operation {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.uml-class-members__op-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.uml-class-members__op-flags {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 4px;
+}
+
+.uml-class-members__visibility {
+  font: inherit;
+  font-size: var(--uml-font-size-sm);
+  background-color: var(--uml-bg);
+  color: var(--uml-text);
+  border: 1px solid var(--uml-border);
+  border-radius: var(--uml-radius-sm);
+  padding: 4px 6px;
+  width: 56px;
+}
+
+.uml-class-members__name,
+.uml-class-members__type,
+.uml-class-members__params {
+  font: inherit;
+  font-size: var(--uml-font-size-sm);
+  background-color: var(--uml-bg);
+  color: var(--uml-text);
+  border: 1px solid var(--uml-border);
+  border-radius: var(--uml-radius-sm);
+  padding: 4px 6px;
+  min-width: 0;
+}
+
+select.uml-class-members__type {
+  flex: 0 1 140px;
+}
+
+.uml-class-members__params-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 0 16px;
+  border-left: 2px solid var(--uml-border-subtle);
+  margin-left: 4px;
+}
+
+.uml-class-members__param-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.uml-class-members__param-row > input,
+.uml-class-members__param-row > select {
+  font: inherit;
+  font-size: var(--uml-font-size-sm);
+  background-color: var(--uml-bg);
+  color: var(--uml-text);
+  border: 1px solid var(--uml-border);
+  border-radius: var(--uml-radius-sm);
+  padding: 4px 6px;
+  min-width: 0;
+  flex: 1 1 80px;
+}
+
+.uml-class-members__param-row > select {
+  flex: 0 1 120px;
+}
+
+.uml-class-members__name {
+  flex: 1 1 80px;
+}
+
+.uml-class-members__type {
+  flex: 1 1 80px;
+}
+
+.uml-class-members__params {
+  flex: 2 1 140px;
+}
+
+.uml-class-members__sep {
+  color: var(--uml-text-muted);
+  font-family: var(--uml-font-mono);
+  font-size: var(--uml-font-size-sm);
+}
+
+.uml-class-members__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--uml-font-size-sm);
+  color: var(--uml-text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.uml-class-members__flag input {
+  margin: 0;
+}
+
+.uml-class-members__remove {
+  font: inherit;
+  font-size: var(--uml-font-size-sm);
+  background: transparent;
+  color: var(--uml-text-muted);
+  border: none;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--uml-radius-sm);
+}
+
+.uml-class-members__remove:hover {
+  background-color: var(--uml-bg);
+  color: var(--uml-danger);
+}
+
+.uml-class-members__add {
+  align-self: flex-start;
+  font-size: var(--uml-font-size-sm);
+  padding: 4px 10px;
+}
+
 /* === text editor =================================== */
 
 .uml-text-editor__textarea {
@@ -332,12 +518,18 @@
   grid-area: 2 / 1;
   align-items: flex-end;
   justify-content: flex-start;
+  /* Reserve room above the floating canvas toolbar (zoom / fit / lock /
+     grid). The toolbar sits at `bottom: 12px` with ~46px height, so a
+     ~60px clearance keeps HUD content from being covered regardless of
+     which corner the toolbar lives in. */
+  padding-bottom: 60px;
 }
 
 .uml-hud__slot--br {
   grid-area: 2 / 2;
   align-items: flex-end;
   justify-content: flex-end;
+  padding-bottom: 60px;
 }
 
 /* === command channel =============================== */

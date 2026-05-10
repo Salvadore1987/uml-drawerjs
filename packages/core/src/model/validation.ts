@@ -130,10 +130,27 @@ const attributeSchema = z
     visibility: visibilitySchema.optional(),
     multiplicity: z.string().optional(),
     default: z.string().optional(),
+    readonly: z.boolean().optional(),
+    static: z.boolean().optional(),
     primaryKey: z.boolean().optional(),
     foreignKey: z.boolean().optional(),
     nullable: z.boolean().optional(),
     description: z.string().optional(),
+  })
+  .strict();
+
+const enumLiteralSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+  })
+  .strict();
+
+const edgeEndpointSchema = z
+  .object({
+    role: z.string().optional(),
+    multiplicity: z.string().optional(),
+    navigability: z.enum(["navigable", "non-navigable", "unspecified"]).optional(),
   })
   .strict();
 
@@ -148,6 +165,8 @@ const nodeSchema = z
     description: z.string().optional(),
     attributes: z.array(attributeSchema).optional(),
     operations: z.array(operationSchema).optional(),
+    generics: z.array(z.string()).optional(),
+    enumLiterals: z.array(enumLiteralSchema).optional(),
     style: nodeStyleSchema.optional(),
   })
   .strict();
@@ -163,6 +182,13 @@ const edgeSchema = z
       .object({
         source: z.string().optional(),
         target: z.string().optional(),
+      })
+      .strict()
+      .optional(),
+    ends: z
+      .object({
+        source: edgeEndpointSchema.optional(),
+        target: edgeEndpointSchema.optional(),
       })
       .strict()
       .optional(),
