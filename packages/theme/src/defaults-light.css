@@ -90,6 +90,14 @@
   --uml-package-bg: #f8fafc;
   --uml-package-border: #cbd5e1;
   --uml-package-tab-bg: #e2e8f0;
+
+  /* ER diagram (entity / column markers). PK underline + required-bold. */
+  --uml-entity-header-bg: var(--uml-class-header-bg);
+  --uml-entity-header-text: var(--uml-class-header-text);
+  --uml-entity-stereotype-color: var(--uml-class-stereotype-color);
+  --uml-entity-compartment-divider: var(--uml-class-compartment-divider);
+  --uml-entity-pk-decoration: underline;
+  --uml-entity-required-weight: 600;
 }
 
 /* Auto-detect: no explicit data-theme + OS prefers light (or no preference). */

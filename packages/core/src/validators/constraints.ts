@@ -48,6 +48,7 @@ export function validateConstraints(diagram: Diagram): DiagramError[] {
   if (diagram.type === "er") {
     enforceErEdgeEndpoints(diagram, errors);
     enforceErCardinality(diagram, errors);
+    enforceEntityMemberRules(diagram, errors);
   }
   if (isC4(diagram.type)) {
     enforceC4BoundaryChildren(diagram, errors);
@@ -288,6 +289,42 @@ function enforceSequenceEdgeEndpoints(diagram: Diagram, errors: DiagramError[]):
         code: CONSTRAINT_ERROR_CODES.SequenceEdgeNonLifeline,
         message: `Sequence edge '${edge.id}' must connect lifelines or actors`,
         edgeId: edge.id,
+      });
+    }
+  }
+}
+
+/**
+ * UML ER entities are attribute-only — no operations, generics, or enum
+ * literals. The fields exist on the unified `DiagramNode` shape, but
+ * carrying them on an entity is a modelling error and would silently
+ * confuse generators / exporters.
+ */
+function enforceEntityMemberRules(diagram: Diagram, errors: DiagramError[]): void {
+  for (const node of diagram.nodes) {
+    if (node.kind !== "entity") continue;
+    if ((node.operations?.length ?? 0) > 0) {
+      errors.push({
+        severity: "error",
+        code: CONSTRAINT_ERROR_CODES.ErEntityHasOperations,
+        message: `Entity '${node.label}' cannot declare operations`,
+        nodeId: node.id,
+      });
+    }
+    if ((node.enumLiterals?.length ?? 0) > 0) {
+      errors.push({
+        severity: "error",
+        code: CONSTRAINT_ERROR_CODES.ErEntityHasEnumLiterals,
+        message: `Entity '${node.label}' cannot declare enum literals`,
+        nodeId: node.id,
+      });
+    }
+    if ((node.generics?.length ?? 0) > 0) {
+      errors.push({
+        severity: "error",
+        code: CONSTRAINT_ERROR_CODES.ErEntityHasGenerics,
+        message: `Entity '${node.label}' cannot declare generic type parameters`,
+        nodeId: node.id,
       });
     }
   }
