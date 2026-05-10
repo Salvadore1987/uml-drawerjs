@@ -6,14 +6,31 @@ import {
   updateGroupCommand,
   updateNodeCommand,
 } from "@uml-drawer/core/commands";
-import type { DiagramEdge, DiagramGroup, DiagramNode } from "@uml-drawer/core/model";
+import type { DiagramEdge, DiagramGroup, DiagramNode, EdgeKind } from "@uml-drawer/core/model";
 import { type HTMLAttributes, useContext, useEffect, useState } from "react";
 import { UmlEditorContext } from "../internal/context.js";
 import { useEditorState } from "../hooks/useEditorState.js";
 import { useSelection } from "../hooks/useSelection.js";
 import { ClassMembersEditor } from "./ClassMembersEditor.js";
+import { EntityMembersEditor } from "./EntityMembersEditor.js";
 
 const CLASS_LIKE_KINDS = new Set(["class", "interface", "abstract-class", "enum"]);
+const ER_EDGE_KINDS = new Set<EdgeKind>(["one-to-one", "one-to-many", "many-to-many"]);
+const CARDINALITY_OPTIONS = ["1", "0..1", "0..*", "1..*"] as const;
+
+/**
+ * Derive the canonical ER `EdgeKind` from a (source, target) cardinality
+ * pair. Many-to-many wins when both ends are "many"; one-to-many when
+ * exactly one end is "many"; otherwise one-to-one. The generator picks
+ * the arrow shape from `EdgeKind`, so keeping `kind` in lockstep with
+ * cardinality preserves PlantUML round-trip.
+ */
+function deriveErKind(source: string, target: string): EdgeKind {
+  const isMany = (c: string): boolean => c === "0..*" || c === "1..*";
+  if (isMany(source) && isMany(target)) return "many-to-many";
+  if (isMany(source) || isMany(target)) return "one-to-many";
+  return "one-to-one";
+}
 
 export interface PropsPanelProps extends HTMLAttributes<HTMLElement> {
   /** Heading shown above the form. Defaults to "Properties". */
@@ -185,6 +202,7 @@ export function PropsPanel({
         />
       </label>
       {CLASS_LIKE_KINDS.has(node.kind) && <ClassMembersEditor node={node} />}
+      {node.kind === "entity" && <EntityMembersEditor node={node} />}
       <button
         type="button"
         className="uml-button uml-button--danger"
@@ -221,6 +239,44 @@ export function PropsPanel({
         <span>Kind</span>
         <code>{edge.kind}</code>
       </div>
+      {ER_EDGE_KINDS.has(edge.kind) && (
+        <>
+          <label className="uml-field">
+            <span>Source cardinality</span>
+            <select
+              value={edge.cardinality?.source ?? "1"}
+              onChange={(e): void => {
+                const source = e.target.value;
+                const target = edge.cardinality?.target ?? "1";
+                commitEdge({ kind: deriveErKind(source, target), cardinality: { source, target } });
+              }}
+            >
+              {CARDINALITY_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="uml-field">
+            <span>Target cardinality</span>
+            <select
+              value={edge.cardinality?.target ?? "1"}
+              onChange={(e): void => {
+                const target = e.target.value;
+                const source = edge.cardinality?.source ?? "1";
+                commitEdge({ kind: deriveErKind(source, target), cardinality: { source, target } });
+              }}
+            >
+              {CARDINALITY_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
       <button
         type="button"
         className="uml-button uml-button--danger"

@@ -5,24 +5,90 @@
     {
       "id": "id-1",
       "kind": "entity",
-      "label": "Customer"
+      "label": "Customer",
+      "attributes": [
+        {
+          "id": "id-2",
+          "name": "id",
+          "type": "UUID",
+          "primaryKey": true,
+          "nullable": false
+        },
+        {
+          "id": "id-3",
+          "name": "email",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "id": "id-4",
+          "name": "name",
+          "type": "String"
+        }
+      ]
     },
     {
-      "id": "id-2",
+      "id": "id-5",
       "kind": "entity",
-      "label": "Order"
+      "label": "Order",
+      "attributes": [
+        {
+          "id": "id-6",
+          "name": "id",
+          "type": "UUID",
+          "primaryKey": true,
+          "nullable": false
+        },
+        {
+          "id": "id-7",
+          "name": "customer_id",
+          "type": "UUID",
+          "foreignKey": true
+        },
+        {
+          "id": "id-8",
+          "name": "total",
+          "type": "Decimal",
+          "nullable": false
+        },
+        {
+          "id": "id-9",
+          "name": "created_at",
+          "type": "DateTime"
+        }
+      ]
     },
     {
-      "id": "id-3",
+      "id": "id-10",
       "kind": "entity",
-      "label": "Product"
+      "label": "Product",
+      "attributes": [
+        {
+          "id": "id-11",
+          "name": "id",
+          "type": "UUID",
+          "primaryKey": true,
+          "nullable": false
+        },
+        {
+          "id": "id-12",
+          "name": "name",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "id": "id-13",
+          "name": "price",
+          "type": "Decimal"
+        }
+      ]
     }
   ],
   "edges": [
     {
-      "id": "id-4",
+      "id": "id-14",
       "source": "id-1",
-      "target": "id-2",
+      "target": "id-5",
       "kind": "one-to-many",
       "cardinality": {
         "source": "1",
@@ -31,9 +97,9 @@
       "label": "places"
     },
     {
-      "id": "id-5",
-      "source": "id-2",
-      "target": "id-3",
+      "id": "id-15",
+      "source": "id-5",
+      "target": "id-10",
       "kind": "many-to-many",
       "cardinality": {
         "source": "0..*",

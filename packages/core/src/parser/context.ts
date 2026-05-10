@@ -17,6 +17,11 @@ export interface OpenClassFrame {
   kind: NodeKind;
 }
 
+/** A frame on `ParseContext.openEntityStack` — open entity body (ER diagrams). */
+export interface OpenEntityFrame {
+  nodeId: string;
+}
+
 export interface ParseOptions {
   /** Diagram type — fixed at creation, not inferred from source. */
   diagramType: DiagramType;
@@ -65,6 +70,13 @@ export interface ParseContext {
    * attribute / operation / enum-literal lines to the top frame's node.
    */
   openClassStack: OpenClassFrame[];
+  /**
+   * Stack of currently-open entity-body frames (ER diagrams). Pushed when an
+   * `entity Foo {` declaration is seen; popped on the matching `}`. While
+   * non-empty, the entity member parser routes column lines (`* id : UUID`)
+   * to the top frame's node.
+   */
+  openEntityStack: OpenEntityFrame[];
 }
 
 export function createParseContext(options: ParseOptions): ParseContext {
@@ -86,6 +98,7 @@ export function createParseContext(options: ParseOptions): ParseContext {
     sawEnd: false,
     openGroupStack: [],
     openClassStack: [],
+    openEntityStack: [],
   };
 }
 

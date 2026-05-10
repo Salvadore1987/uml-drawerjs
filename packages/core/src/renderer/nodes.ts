@@ -54,7 +54,7 @@ export function computeNodeGeometry(args: RenderNodeArgs): NodeGeometry {
   const rowHeights = isClassLike(node.kind)
     ? classRowHeights(node)
     : node.kind === "entity"
-      ? (node.attributes?.length ?? 0) * ATTRIBUTE_ROW_HEIGHT
+      ? entityRowHeights(node)
       : 0;
   const c4Padding = c4ExtraHeight(node);
   const finalHeight = Math.max(height, HEADER_HEIGHT + rowHeights + c4Padding);
@@ -82,6 +82,15 @@ function isClassLike(kind: NodeKind): boolean {
   return kind === "class" || kind === "interface" || kind === "abstract-class" || kind === "enum";
 }
 
+function isCompartmentNode(kind: NodeKind): boolean {
+  return isClassLike(kind) || kind === "entity";
+}
+
+function entityRowHeights(node: DiagramNode): number {
+  const attrCount = node.attributes?.length ?? 0;
+  return attrCount > 0 ? attrCount * ATTRIBUTE_ROW_HEIGHT : EMPTY_COMPARTMENT_HEIGHT;
+}
+
 function c4ExtraHeight(node: DiagramNode): number {
   if (!C4_KINDS.has(node.kind)) return 0;
   let extra = 0;
@@ -101,7 +110,7 @@ export function renderNode(args: RenderNodeArgs): VNode {
   const children: VNode[] = [];
 
   children.push(renderFrame(node, geometry));
-  if (isClassLike(node.kind)) {
+  if (isCompartmentNode(node.kind)) {
     children.push(renderClassHeaderBand(geometry));
   }
   children.push(...renderHeaderRows(node, geometry));
@@ -132,7 +141,10 @@ export function renderNode(args: RenderNodeArgs): VNode {
       ...renderClassCompartmentDividers(geometry, node.kind, literalCount, attrCount, opCount),
     );
   } else if (node.kind === "entity") {
-    children.push(...renderAttributeRows(node.attributes ?? [], geometry, "entity", 0));
+    // Entity: single attributes compartment under the header. UML/IE
+    // notation — PK underlined, FK with `+ ` prefix, NN (required) bold.
+    children.push(compartmentDivider(geometry, HEADER_HEIGHT));
+    children.push(...renderEntityAttributeRows(node.attributes ?? [], geometry));
   }
 
   // Port handles — four small circles at edge midpoints. Hidden by
@@ -204,10 +216,10 @@ function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
         "stroke-width": "1.5",
       });
     default: {
-      // Class-like kinds (class / interface / abstract-class / enum) follow
-      // classic UML notation: sharp corners, no rounding. Other fallbacks
-      // keep the soft 8px radius that C4 boxes use.
-      const sharp = isClassLike(node.kind);
+      // Compartment nodes (class / interface / abstract-class / enum / entity)
+      // follow classic UML notation: sharp corners, no rounding. Other
+      // fallbacks keep the soft 8px radius that C4 boxes use.
+      const sharp = isCompartmentNode(node.kind);
       return v("rect", {
         x: 0,
         y: 0,
@@ -494,7 +506,7 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
   // also get a bold weight so the type name stands out from the body — the
   // textbook UML look on c4model.com/diagrams/code.
   const labelItalic = node.kind === "interface" || node.kind === "abstract-class";
-  const isClassKind = isClassLike(node.kind);
+  const isClassKind = isCompartmentNode(node.kind);
   rows.push(
     v(
       "text",
@@ -662,6 +674,60 @@ function renderOperationRows(
   );
 }
 
+/**
+ * Render entity attribute rows with UML/IE notation:
+ *   - Primary key  → name underlined.
+ *   - Foreign key  → `+ ` prefix before the name.
+ *   - Required (nullable === false, including PK) → name in bold weight.
+ *   - Type segment after `: ` is always plain (no underline / no bold).
+ *
+ * Uses `<tspan>` children so the styling can be applied selectively to the
+ * name segment without leaking into the type segment.
+ */
+function renderEntityAttributeRows(attributes: readonly Attribute[], _geom: NodeGeometry): VNode[] {
+  return attributes.map((attribute, index) => {
+    const tspans: VNode[] = [];
+
+    // FK marker — only when not also PK (PK already conveys identity; the
+    // `+` would just clutter the row). Authors who set both flags lose the
+    // `+` in the canvas but keep both flags in the AST.
+    const showFkPrefix = attribute.foreignKey === true && attribute.primaryKey !== true;
+    if (showFkPrefix) {
+      tspans.push(v("tspan", undefined, undefined, { text: "+ " }));
+    }
+
+    const required = attribute.nullable === false || attribute.primaryKey === true;
+    const nameAttrs: Record<string, string | number | boolean | undefined> = {};
+    if (attribute.primaryKey) {
+      nameAttrs["text-decoration"] = "var(--uml-entity-pk-decoration, underline)";
+    }
+    if (required) {
+      nameAttrs["font-weight"] = "var(--uml-entity-required-weight, 600)";
+    }
+    tspans.push(v("tspan", nameAttrs, undefined, { text: attribute.name }));
+
+    if (attribute.type) {
+      tspans.push(v("tspan", undefined, undefined, { text: `: ${attribute.type}` }));
+    }
+    if (attribute.default !== undefined && attribute.default !== "") {
+      tspans.push(v("tspan", undefined, undefined, { text: ` = ${attribute.default}` }));
+    }
+
+    return v(
+      "text",
+      {
+        x: 12,
+        y: HEADER_HEIGHT + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        "font-family": "var(--uml-font-mono)",
+        "font-size": "var(--uml-font-size-sm)",
+        fill: "var(--uml-node-text)",
+      },
+      tspans,
+      { classes: ["uml-node-attribute"] },
+    );
+  });
+}
+
 function renderEnumLiteralRows(
   literals: readonly { id: string; name: string }[],
   _geom: NodeGeometry,
@@ -758,24 +824,15 @@ function appendGenerics(label: string, generics: string[] | undefined): string {
   return `${label}<${generics.join(", ")}>`;
 }
 
-function formatAttribute(attribute: Attribute, kind: NodeKind): string {
+function formatAttribute(attribute: Attribute, _kind: NodeKind): string {
+  // Class-only attribute formatter — entity attributes are rendered through
+  // `renderEntityAttributeRows` with `<tspan>` segments because their PK /
+  // FK / NN markers need per-segment styling (underline / weight / prefix).
   const visibility = visibilityMarker(attribute.visibility);
   const type = attribute.type ? `: ${attribute.type}` : "";
-  // Class-style: append `[multiplicity]` after the type when present.
-  // ER-style: append `[PK,FK,NN]` flag block — these flags are ER-only.
-  let suffix = "";
-  if (kind === "entity") {
-    const flags = [
-      attribute.primaryKey ? "PK" : null,
-      attribute.foreignKey ? "FK" : null,
-      attribute.nullable === false ? "NN" : null,
-    ].filter(Boolean);
-    if (flags.length > 0) suffix = ` [${flags.join(",")}]`;
-  } else if (attribute.multiplicity) {
-    suffix = ` [${attribute.multiplicity}]`;
-  }
-  const readonlyTag = attribute.readonly && kind !== "entity" ? " {readonly}" : "";
-  return `${visibility}${attribute.name}${type}${suffix}${readonlyTag}`;
+  const multiplicity = attribute.multiplicity ? ` [${attribute.multiplicity}]` : "";
+  const readonlyTag = attribute.readonly ? " {readonly}" : "";
+  return `${visibility}${attribute.name}${type}${multiplicity}${readonlyTag}`;
 }
 
 function formatOperation(operation: Operation): string {

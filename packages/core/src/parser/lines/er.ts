@@ -3,14 +3,15 @@ import { errorAtLine, SYNTAX_ERROR_CODES } from "../errors.js";
 import type { ParseContext } from "../context.js";
 import { freshId, resolveAlias } from "../context.js";
 import type { SourceLine } from "../tokenizer.js";
+import { handleEntityMember } from "./erMembers.js";
 
 /**
- * ER-diagram declarations: `entity Foo` plus crow's-foot relationship
- * arrows. The MVP recognises the four common cardinality combinations and
- * promotes them to canonical `EdgeKind` values.
+ * ER-diagram declarations: `entity Foo` (with optional `{ ... }` body),
+ * crow's-foot relationship arrows, and per-attribute primary/foreign-key
+ * markers parsed from the body lines.
  */
 
-const ENTITY_DECL = /^entity\s+(\w+)(?:\s+as\s+\w+)?\s*\{?$/u;
+const ENTITY_DECL = /^entity\s+(?:"([^"]+)"\s+as\s+(\w+)|(\w+))(?:\s+as\s+(\w+))?\s*(\{)?$/u;
 
 interface CrowDescriptor {
   pattern: RegExp;
@@ -44,9 +45,25 @@ const RELS: CrowDescriptor[] = [
 export function handleErLine(ctx: ParseContext, line: SourceLine): boolean {
   const text = line.text.trim();
 
+  // Closing brace pops an entity-body frame first; otherwise return true to
+  // remain a no-op (legacy behaviour for unmatched `}`).
+  if (text === "}") {
+    if (ctx.openEntityStack.length > 0) {
+      ctx.openEntityStack.pop();
+      return true;
+    }
+    return true;
+  }
+
+  // While inside an entity body, route attribute lines to the member parser
+  // before falling back to declaration / relationship patterns.
+  if (ctx.openEntityStack.length > 0 && text !== "" && text !== "}") {
+    if (handleEntityMember(ctx, text)) return true;
+  }
+
   const decl = ENTITY_DECL.exec(text);
-  if (decl?.[1]) {
-    consumeEntityDecl(ctx, decl[1]);
+  if (decl) {
+    consumeEntityDecl(ctx, decl);
     return true;
   }
 
@@ -58,15 +75,32 @@ export function handleErLine(ctx: ParseContext, line: SourceLine): boolean {
     }
   }
 
-  if (text === "}") return true;
   return false;
 }
 
-function consumeEntityDecl(ctx: ParseContext, alias: string): void {
+function consumeEntityDecl(ctx: ParseContext, match: RegExpExecArray): void {
+  const quotedLabel = match[1];
+  const quotedAlias = match[2];
+  const bareIdent = match[3];
+  const trailingAlias = match[4];
+  const openBrace = match[5];
+
+  // Three accepted forms:
+  //   entity "Customer Order" as customerOrder
+  //   entity Customer
+  //   entity Customer as customerAlias
+  const alias = quotedAlias ?? trailingAlias ?? bareIdent;
+  const label = quotedLabel ?? bareIdent;
+  if (!alias || !label) return;
+
   const id = resolveAlias(ctx, alias, "create");
   if (id === null) return;
-  const node: DiagramNode = { id, kind: "entity", label: alias };
+  const node: DiagramNode = { id, kind: "entity", label };
   ctx.nodes.push(node);
+
+  if (openBrace !== undefined) {
+    ctx.openEntityStack.push({ nodeId: id });
+  }
 }
 
 function consumeRel(

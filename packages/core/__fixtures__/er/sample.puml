@@ -1,9 +1,24 @@
 @startuml ER
 title E-commerce ER
 
-entity Customer
-entity Order
-entity Product
+entity Customer {
+  * id : UUID
+  email : String <<NN>>
+  name : String
+}
+
+entity Order {
+  * id : UUID
+  + customer_id : UUID
+  total : Decimal <<NN>>
+  created_at : DateTime
+}
+
+entity Product {
+  * id : UUID
+  name : String <<NN>>
+  price : Decimal
+}
 
 Customer ||--o{ Order : places
 Order }o--o{ Product : contains
