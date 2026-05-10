@@ -77,6 +77,19 @@
   --uml-c4-database-border: #3c7fc0;
   --uml-c4-database-text: #ffffff;
   --uml-c4-tech-text: #cbd5e1;
+
+  /* Class diagram (UML Code level — see docs/adr/0007 / 0008). */
+  --uml-class-header-bg: #f1f5f9;
+  --uml-class-header-text: #0f172a;
+  --uml-class-stereotype-color: #64748b;
+  --uml-class-compartment-divider: #cbd5e1;
+  --uml-class-static-decoration: underline;
+  --uml-class-abstract-style: italic;
+
+  /* Class-diagram package group. */
+  --uml-package-bg: #f8fafc;
+  --uml-package-border: #cbd5e1;
+  --uml-package-tab-bg: #e2e8f0;
 }
 
 /* Auto-detect: no explicit data-theme + OS prefers light (or no preference). */
@@ -142,5 +155,16 @@
     --uml-c4-database-border: #3c7fc0;
     --uml-c4-database-text: #ffffff;
     --uml-c4-tech-text: #cbd5e1;
+
+    --uml-class-header-bg: #f1f5f9;
+    --uml-class-header-text: #0f172a;
+    --uml-class-stereotype-color: #64748b;
+    --uml-class-compartment-divider: #cbd5e1;
+    --uml-class-static-decoration: underline;
+    --uml-class-abstract-style: italic;
+
+    --uml-package-bg: #f8fafc;
+    --uml-package-border: #cbd5e1;
+    --uml-package-tab-bg: #e2e8f0;
   }
 }

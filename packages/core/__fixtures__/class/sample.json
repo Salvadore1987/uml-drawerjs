@@ -5,59 +5,173 @@
     {
       "id": "id-1",
       "kind": "interface",
-      "label": "Renderable"
-    },
-    {
-      "id": "id-2",
-      "kind": "abstract-class",
-      "label": "Shape"
+      "label": "Renderable",
+      "operations": [
+        {
+          "id": "id-2",
+          "name": "render",
+          "visibility": "public",
+          "abstract": true,
+          "parameters": [
+            {
+              "name": "ctx",
+              "type": "Context"
+            }
+          ],
+          "returnType": "void"
+        }
+      ]
     },
     {
       "id": "id-3",
-      "kind": "class",
-      "label": "Circle"
+      "kind": "abstract-class",
+      "label": "Shape",
+      "attributes": [
+        {
+          "id": "id-4",
+          "name": "name",
+          "visibility": "protected",
+          "type": "String"
+        }
+      ],
+      "operations": [
+        {
+          "id": "id-5",
+          "name": "area",
+          "visibility": "public",
+          "abstract": true,
+          "returnType": "Decimal"
+        },
+        {
+          "id": "id-6",
+          "name": "render",
+          "visibility": "public",
+          "parameters": [
+            {
+              "name": "ctx",
+              "type": "Context"
+            }
+          ],
+          "returnType": "void"
+        }
+      ]
     },
     {
-      "id": "id-4",
+      "id": "id-7",
       "kind": "class",
-      "label": "Square"
+      "label": "Circle",
+      "attributes": [
+        {
+          "id": "id-8",
+          "name": "radius",
+          "visibility": "public",
+          "type": "Decimal"
+        }
+      ],
+      "operations": [
+        {
+          "id": "id-9",
+          "name": "area",
+          "visibility": "public",
+          "returnType": "Decimal"
+        },
+        {
+          "id": "id-10",
+          "name": "render",
+          "visibility": "public",
+          "parameters": [
+            {
+              "name": "ctx",
+              "type": "Context"
+            }
+          ],
+          "returnType": "void"
+        }
+      ]
     },
     {
-      "id": "id-5",
+      "id": "id-11",
+      "kind": "class",
+      "label": "Square",
+      "attributes": [
+        {
+          "id": "id-12",
+          "name": "side",
+          "visibility": "public",
+          "type": "Decimal"
+        }
+      ],
+      "operations": [
+        {
+          "id": "id-13",
+          "name": "area",
+          "visibility": "public",
+          "returnType": "Decimal"
+        },
+        {
+          "id": "id-14",
+          "name": "render",
+          "visibility": "public",
+          "parameters": [
+            {
+              "name": "ctx",
+              "type": "Context"
+            }
+          ],
+          "returnType": "void"
+        }
+      ]
+    },
+    {
+      "id": "id-15",
       "kind": "enum",
-      "label": "LineStyle"
+      "label": "LineStyle",
+      "enumLiterals": [
+        {
+          "id": "id-16",
+          "name": "SOLID"
+        },
+        {
+          "id": "id-17",
+          "name": "DASHED"
+        },
+        {
+          "id": "id-18",
+          "name": "DOTTED"
+        }
+      ]
     }
   ],
   "edges": [
     {
-      "id": "id-6",
+      "id": "id-19",
+      "source": "id-7",
+      "target": "id-3",
+      "kind": "inheritance"
+    },
+    {
+      "id": "id-20",
+      "source": "id-11",
+      "target": "id-3",
+      "kind": "inheritance"
+    },
+    {
+      "id": "id-21",
       "source": "id-3",
-      "target": "id-2",
-      "kind": "inheritance"
-    },
-    {
-      "id": "id-7",
-      "source": "id-4",
-      "target": "id-2",
-      "kind": "inheritance"
-    },
-    {
-      "id": "id-8",
-      "source": "id-2",
       "target": "id-1",
       "kind": "realization"
     },
     {
-      "id": "id-9",
-      "source": "id-2",
-      "target": "id-5",
+      "id": "id-22",
+      "source": "id-3",
+      "target": "id-15",
       "kind": "composition",
       "label": "style"
     },
     {
-      "id": "id-10",
-      "source": "id-3",
-      "target": "id-4",
+      "id": "id-23",
+      "source": "id-7",
+      "target": "id-11",
       "kind": "association",
       "label": "transforms"
     }

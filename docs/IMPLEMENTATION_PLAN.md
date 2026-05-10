@@ -142,6 +142,7 @@ gap'ы контракта, которые могут потребовать ра
 - ⚠️ Lezer-грамматика подмножества PlantUML под 5 типов диаграмм — **отложено** в [ADR-0003](./adr/0003-plantuml-subset.md): MVP отгружен на ручном line-based парсере с тем же публичным API; миграция на Lezer пройдёт в Phase 4b или совместно с Phase 11 (CodeMirror).
 - ⚠️ Build-скрипт `.grammar` → сгенерированный парсер (`@lezer/generator`) — отложено вместе с Lezer (см. ADR-0003 § Migration plan).
 - ✅ AST-builder, собирающий `Diagram` (диспатчер по типу диаграммы + per-type pattern matchers; на Lezer-tree свалится после миграции).
+- ✅ Class member-bodies: `{ +balance: Decimal {readonly}, {abstract} +validate(): void, …}` — visibility (`+−#~`), `{static}/{abstract}/{readonly}` modifiers, multiplicity `[0..*]`, defaults; generics `class Foo<T>`; enum literals; `package "com.bank" { … }` containers (PR-2 / 2026-05-10).
 - ✅ Opaque-block fallback для неподдерживаемых конструкций (preprocessor, !include и т. п. → `metadata.opaque`).
 - ✅ Декодер аннотаций `' @drawer:meta {...}` → `metadata.layoutOverrides`, `styles`.
 - ✅ Фикстуры: эталонные `.puml` файлы в `packages/core/__fixtures__/{c4-context,c4-container,c4-component,class,er,sequence}/` + matching `.json` снапшоты.
@@ -175,7 +176,7 @@ gap'ы контракта, которые могут потребовать ра
     - ✅ C4: whitelist `NodeKind` + проверка вложенности Boundary (только C4-кинды внутри boundary).
     - ✅ Sequence: edges только между lifeline / actor.
     - ✅ ER: связи только Entity↔Entity, обязательная cardinality, валидация cardinality-токенов (`1`, `0..*`, `*`, …).
-    - ✅ Class: whitelist `NodeKind` (class/interface/abstract-class/enum) + edge-kind whitelist.
+    - ✅ Class: whitelist `NodeKind` (class/interface/abstract-class/enum) + edge-kind whitelist; classic-UML member rules (`enum` без operations / attributes / generics; `interface` методы implicitly abstract; abstract-метод только на `abstract-class`/`interface`) — коды `CONSTRAINT_CLASS_*` (PR-5 / 2026-05-10, ADR-0007 / 0008).
 - ✅ `validators/lint.ts` — orphan-узлы (warning, исключая sequence), дубликаты labels (warning), циклы по inheritance/realization (error).
 - ✅ Реестр quick-fixes (`validators/quickfix.ts`) → `Command`-факторы для пустых labels, dangling edges, missing-children, orphan-узлов; `attachQuickFixes(errors, diagram, dispatch)` биндит `fix.apply()` к CommandBus.
 - ✅ Барель `runAllValidators(diagram, parserErrors)` объединяет уровни и дедуплицирует по `(code, location)`.
@@ -478,4 +479,4 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-09 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13a / 13 / 15 / 16 / 17 complete; Phase 14 partially complete (unit + snapshot + design-agnostic + perf + size-limit gates green; Playwright E2E + visual regression + axe-core deferred to Phase 14b post-deploy). The MVP is feature-complete pending the Phase-14b browser-test layer.*
+*Last updated: 2026-05-10 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13a / 13 / 15 / 16 / 17 complete; Phase 14 partially complete (unit + snapshot + design-agnostic + perf + size-limit gates green; Playwright E2E + visual regression + axe-core deferred to Phase 14b post-deploy). 2026-05-10: Class diagram brought to classic-UML notation (members, generics, enum literals, package groups, per-end multiplicity / role / navigability; UML semantic validators; renderer italic / underline / synthetic stereotypes / compartment dividers; theme tokens `--uml-class-*`/`--uml-package-*`; ADR-0007 / 0008). The MVP is feature-complete pending the Phase-14b browser-test layer.*

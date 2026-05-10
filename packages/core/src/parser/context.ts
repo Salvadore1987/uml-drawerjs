@@ -7,8 +7,15 @@ import type {
   DiagramNode,
   DiagramType,
   LayoutCoordinate,
+  NodeKind,
   StyleMap,
 } from "../model/types.js";
+
+/** A frame on `ParseContext.openClassStack` — open class / interface / etc. body. */
+export interface OpenClassFrame {
+  nodeId: string;
+  kind: NodeKind;
+}
 
 export interface ParseOptions {
   /** Diagram type — fixed at creation, not inferred from source. */
@@ -51,6 +58,13 @@ export interface ParseContext {
    * the top group's `children` so the AST reflects PlantUML nesting.
    */
   openGroupStack: string[];
+  /**
+   * Stack of currently-open class-body frames. Pushed when a class /
+   * interface / abstract class / enum declaration ends with `{`; popped on
+   * the matching `}`. While non-empty, the class member parser routes
+   * attribute / operation / enum-literal lines to the top frame's node.
+   */
+  openClassStack: OpenClassFrame[];
 }
 
 export function createParseContext(options: ParseOptions): ParseContext {
@@ -71,6 +85,7 @@ export function createParseContext(options: ParseOptions): ParseContext {
     sawStart: false,
     sawEnd: false,
     openGroupStack: [],
+    openClassStack: [],
   };
 }
 

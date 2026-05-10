@@ -413,6 +413,119 @@ describe("validateConstraints — diagram-type rules", () => {
     // Assert
     expect(codes).not.toContain(CONSTRAINT_ERROR_CODES.C4BoundaryTierMismatch);
   });
+
+  it("rejects an enum that declares operations", () => {
+    // Arrange
+    const diagram = classDiagramWith({
+      nodes: [
+        {
+          id: "n1",
+          kind: "enum",
+          label: "Status",
+          operations: [{ id: "o1", name: "ordinal" }],
+        },
+      ],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).toContain(CONSTRAINT_ERROR_CODES.ClassEnumHasOperations);
+  });
+
+  it("rejects an enum that declares attributes (literals belong in enumLiterals)", () => {
+    // Arrange
+    const diagram = classDiagramWith({
+      nodes: [
+        {
+          id: "n1",
+          kind: "enum",
+          label: "Status",
+          attributes: [{ id: "a1", name: "ACTIVE" }],
+        },
+      ],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).toContain(CONSTRAINT_ERROR_CODES.ClassEnumHasAttributes);
+  });
+
+  it("rejects generics on an enum", () => {
+    // Arrange
+    const diagram = classDiagramWith({
+      nodes: [{ id: "n1", kind: "enum", label: "Status", generics: ["T"] }],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).toContain(CONSTRAINT_ERROR_CODES.ClassEnumHasGenerics);
+  });
+
+  it("rejects an abstract method on a concrete class", () => {
+    // Arrange
+    const diagram = classDiagramWith({
+      nodes: [
+        {
+          id: "n1",
+          kind: "class",
+          label: "Account",
+          operations: [{ id: "o1", name: "validate", abstract: true }],
+        },
+      ],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).toContain(CONSTRAINT_ERROR_CODES.ClassAbstractOutsideAbstractClass);
+  });
+
+  it("rejects a non-abstract method on an interface", () => {
+    // Arrange
+    const diagram = classDiagramWith({
+      nodes: [
+        {
+          id: "n1",
+          kind: "interface",
+          label: "Repository",
+          operations: [{ id: "o1", name: "save", abstract: false }],
+        },
+      ],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).toContain(CONSTRAINT_ERROR_CODES.ClassInterfaceMethodNotAbstract);
+  });
+
+  it("accepts an abstract method on an abstract-class without complaint", () => {
+    // Arrange
+    const diagram = classDiagramWith({
+      nodes: [
+        {
+          id: "n1",
+          kind: "abstract-class",
+          label: "AbstractEntity",
+          operations: [{ id: "o1", name: "validate", abstract: true }],
+        },
+      ],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).not.toContain(CONSTRAINT_ERROR_CODES.ClassAbstractOutsideAbstractClass);
+  });
 });
 
 describe("validateLint — soft warnings", () => {

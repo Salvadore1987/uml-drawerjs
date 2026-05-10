@@ -1,11 +1,33 @@
 @startuml Class
 title Renderer Hierarchy
 
-interface Renderable
-abstract class Shape
-class Circle
-class Square
-enum LineStyle
+interface Renderable {
+  {abstract} +render(ctx: Context): void
+}
+
+abstract class Shape {
+  #name: String
+  {abstract} +area(): Decimal
+  +render(ctx: Context): void
+}
+
+class Circle {
+  +radius: Decimal
+  +area(): Decimal
+  +render(ctx: Context): void
+}
+
+class Square {
+  +side: Decimal
+  +area(): Decimal
+  +render(ctx: Context): void
+}
+
+enum LineStyle {
+  SOLID
+  DASHED
+  DOTTED
+}
 
 Circle --|> Shape
 Square --|> Shape

@@ -59,8 +59,78 @@ export function validateConstraints(diagram: Diagram): DiagramError[] {
   if (diagram.type === "c4-container") {
     enforceC4ContainerTier(diagram, errors);
   }
+  if (diagram.type === "class") {
+    enforceClassMemberRules(diagram, errors);
+  }
 
   return errors;
+}
+
+/**
+ * Classic-UML semantics for class-diagram members. These are not
+ * expressible at the kind-whitelist level — they constrain the *contents*
+ * of a class node:
+ *
+ *   - `enum` may carry only `enumLiterals` — operations / attributes /
+ *     generics on an enum are a UML modelling error.
+ *   - `interface` operations are implicitly abstract; an explicit
+ *     `abstract: false` is contradictory.
+ *   - Concrete classes (`class`) cannot host abstract operations — that
+ *     conflates "abstract" (no body) with "virtual" (overridable).
+ */
+function enforceClassMemberRules(diagram: Diagram, errors: DiagramError[]): void {
+  for (const node of diagram.nodes) {
+    if (node.kind === "enum") {
+      if ((node.operations?.length ?? 0) > 0) {
+        errors.push({
+          severity: "error",
+          code: CONSTRAINT_ERROR_CODES.ClassEnumHasOperations,
+          message: `Enum '${node.label}' cannot declare operations`,
+          nodeId: node.id,
+        });
+      }
+      if ((node.attributes?.length ?? 0) > 0) {
+        errors.push({
+          severity: "error",
+          code: CONSTRAINT_ERROR_CODES.ClassEnumHasAttributes,
+          message: `Enum '${node.label}' cannot declare attributes — use enumLiterals`,
+          nodeId: node.id,
+        });
+      }
+      if ((node.generics?.length ?? 0) > 0) {
+        errors.push({
+          severity: "error",
+          code: CONSTRAINT_ERROR_CODES.ClassEnumHasGenerics,
+          message: `Enum '${node.label}' cannot declare generic type parameters`,
+          nodeId: node.id,
+        });
+      }
+    }
+    if (node.kind === "interface") {
+      for (const op of node.operations ?? []) {
+        if (op.abstract === false) {
+          errors.push({
+            severity: "error",
+            code: CONSTRAINT_ERROR_CODES.ClassInterfaceMethodNotAbstract,
+            message: `Interface method '${op.name}' must be abstract`,
+            nodeId: node.id,
+          });
+        }
+      }
+    }
+    if (node.kind === "class") {
+      for (const op of node.operations ?? []) {
+        if (op.abstract === true) {
+          errors.push({
+            severity: "error",
+            code: CONSTRAINT_ERROR_CODES.ClassAbstractOutsideAbstractClass,
+            message: `Abstract method '${op.name}' is only allowed on an abstract class or interface`,
+            nodeId: node.id,
+          });
+        }
+      }
+    }
+  }
 }
 
 /**

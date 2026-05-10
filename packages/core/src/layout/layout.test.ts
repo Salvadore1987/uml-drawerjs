@@ -78,9 +78,11 @@ describe("layoutGrid — fallback", () => {
     // Act
     const result = layoutGrid(diagram);
 
-    // Assert — 4 nodes → 2 columns, 2 rows
-    const stepX = LAYOUT_DEFAULTS.nodeWidth + LAYOUT_DEFAULTS.spacing;
-    const stepY = LAYOUT_DEFAULTS.nodeHeight + LAYOUT_DEFAULTS.spacing;
+    // Assert — 4 nodes → 2 columns, 2 rows. Class diagrams default to 80px
+    // gap (vs the generic 60px) so the taller compartmented boxes breathe.
+    const classSpacing = 80;
+    const stepX = LAYOUT_DEFAULTS.nodeWidth + classSpacing;
+    const stepY = LAYOUT_DEFAULTS.nodeHeight + classSpacing;
     expect(result.coordinates).toEqual({
       a: { x: 0, y: 0 },
       b: { x: stepX, y: 0 },

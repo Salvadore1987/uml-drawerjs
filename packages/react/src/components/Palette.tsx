@@ -99,6 +99,13 @@ const PALETTE_ITEMS: readonly PaletteItem[] = [
   { kind: "interface", label: "Interface", category: "Class", diagramTypes: ["class"] },
   { kind: "abstract-class", label: "Abstract Class", category: "Class", diagramTypes: ["class"] },
   { kind: "enum", label: "Enum", category: "Class", diagramTypes: ["class"] },
+  {
+    target: "group",
+    kind: "package",
+    label: "Package",
+    category: "Class",
+    diagramTypes: ["class"],
+  },
 
   // ER
   { kind: "entity", label: "Entity", category: "Entity Relationship", diagramTypes: ["er"] },
