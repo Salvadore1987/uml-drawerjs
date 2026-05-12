@@ -1,5 +1,6 @@
 import { uuidv7 } from "../model/ids.js";
 import type {
+  CombinedFragment,
   Diagram,
   DiagramEdge,
   DiagramError,
@@ -8,6 +9,8 @@ import type {
   DiagramType,
   LayoutCoordinate,
   NodeKind,
+  SequenceDivider,
+  SequenceNote,
   StyleMap,
 } from "../model/types.js";
 
@@ -20,6 +23,35 @@ export interface OpenClassFrame {
 /** A frame on `ParseContext.openEntityStack` — open entity body (ER diagrams). */
 export interface OpenEntityFrame {
   nodeId: string;
+}
+
+/**
+ * A frame on `ParseContext.openFragmentStack` — open combined-fragment body
+ * (sequence diagrams). `currentOperandId` rotates as `else` lines are seen.
+ */
+export interface OpenFragmentFrame {
+  fragmentId: string;
+  currentOperandId: string;
+}
+
+/**
+ * A frame on `ParseContext.openNoteStack` — open multi-line note body
+ * (sequence diagrams). The note's text accumulates until `end note`.
+ */
+export interface OpenNoteFrame {
+  noteId: string;
+  lines: string[];
+}
+
+/**
+ * Per-lifeline activation tracking — open intervals are pushed when an
+ * `activate X` line (or `++` shortcut) is seen and popped when a matching
+ * `deactivate X` (or `--`) closes them. Each entry holds the activation id
+ * so the parser can fill in `toEdgeId` on close.
+ */
+export interface OpenActivation {
+  activationId: string;
+  lifelineNodeId: string;
 }
 
 export interface ParseOptions {
@@ -77,6 +109,41 @@ export interface ParseContext {
    * to the top frame's node.
    */
   openEntityStack: OpenEntityFrame[];
+  /**
+   * Sequence diagrams: stack of currently-open combined fragments. Edges
+   * parsed while the stack is non-empty append to the top frame's current
+   * operand `edges[]`. Nesting captured by `parentId` + `parentOperandId`
+   * on the popped fragment.
+   */
+  openFragmentStack: OpenFragmentFrame[];
+  /**
+   * Sequence diagrams: stack of currently-open multi-line note bodies.
+   * While non-empty, raw lines accumulate into the top frame's `lines[]`
+   * until `end note` closes it.
+   */
+  openNoteStack: OpenNoteFrame[];
+  /**
+   * Sequence diagrams: per-lifeline stack of open activation intervals.
+   * Keyed by node id; each entry records the activation id so a matching
+   * `deactivate X` (or `--` shortcut) can close it.
+   */
+  openActivations: Map<string, OpenActivation[]>;
+  /**
+   * Sequence diagrams: combined fragments, in declaration order.
+   * Populated by the parser as `alt`/`opt`/etc. blocks close.
+   */
+  fragments: CombinedFragment[];
+  /** Sequence diagrams: notes, in declaration order. */
+  notes: SequenceNote[];
+  /** Sequence diagrams: dividers, in declaration order. */
+  dividers: SequenceDivider[];
+  /**
+   * Sequence diagrams: most recently parsed edge id. Used to anchor notes,
+   * dividers, and activation intervals to a specific time-axis position.
+   */
+  lastEdgeId: string | null;
+  /** Sequence diagrams: auto-number settings declared via `autonumber …`. */
+  sequenceAutoNumber: { start: number; increment: number; format?: string } | null;
 }
 
 export function createParseContext(options: ParseOptions): ParseContext {
@@ -99,6 +166,14 @@ export function createParseContext(options: ParseOptions): ParseContext {
     openGroupStack: [],
     openClassStack: [],
     openEntityStack: [],
+    openFragmentStack: [],
+    openNoteStack: [],
+    openActivations: new Map(),
+    fragments: [],
+    notes: [],
+    dividers: [],
+    lastEdgeId: null,
+    sequenceAutoNumber: null,
   };
 }
 
@@ -129,6 +204,7 @@ export function finalize(ctx: ParseContext): Diagram {
   const metadata: Diagram["metadata"] = { schemaVersion: "0.1.0" };
   if (ctx.layoutOverrides) metadata.layoutOverrides = ctx.layoutOverrides;
   if (ctx.opaque.length > 0) metadata.opaque = ctx.opaque;
+  if (ctx.sequenceAutoNumber) metadata.sequenceAutoNumber = ctx.sequenceAutoNumber;
 
   const diagram: Diagram = {
     id: ctx.diagramId,
@@ -140,5 +216,8 @@ export function finalize(ctx: ParseContext): Diagram {
   };
   if (ctx.title) diagram.title = ctx.title;
   if (ctx.styles) diagram.styles = ctx.styles;
+  if (ctx.fragments.length > 0) diagram.fragments = ctx.fragments;
+  if (ctx.notes.length > 0) diagram.notes = ctx.notes;
+  if (ctx.dividers.length > 0) diagram.dividers = ctx.dividers;
   return diagram;
 }

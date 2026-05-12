@@ -44,6 +44,9 @@ export function validateConstraints(diagram: Diagram): DiagramError[] {
 
   if (diagram.type === "sequence") {
     enforceSequenceEdgeEndpoints(diagram, errors);
+    enforceSequenceFragments(diagram, errors);
+    enforceSequenceActivations(diagram, errors);
+    enforceSequenceNotes(diagram, errors);
   }
   if (diagram.type === "er") {
     enforceErEdgeEndpoints(diagram, errors);
@@ -224,7 +227,16 @@ const C4_CONTAINER_NODE_KINDS = new Set<NodeKind>([
 ]);
 const CLASS_NODE_KINDS = new Set<NodeKind>(["class", "interface", "abstract-class", "enum"]);
 const ER_NODE_KINDS = new Set<NodeKind>(["entity"]);
-const SEQUENCE_NODE_KINDS = new Set<NodeKind>(["lifeline", "actor"]);
+const SEQUENCE_NODE_KINDS = new Set<NodeKind>([
+  "lifeline",
+  "actor",
+  "lifeline-boundary",
+  "lifeline-control",
+  "lifeline-entity",
+  "lifeline-collections",
+  "database",
+  "queue",
+]);
 
 function isNodeKindAllowed(type: DiagramType, kind: NodeKind): boolean {
   switch (type) {
@@ -257,6 +269,8 @@ const SEQUENCE_EDGE_KINDS = new Set<EdgeKind>([
   "return",
   "create",
   "destroy",
+  "lost-message",
+  "found-message",
 ]);
 
 function isEdgeKindAllowed(type: DiagramType, kind: EdgeKind): boolean {
@@ -290,6 +304,84 @@ function enforceSequenceEdgeEndpoints(diagram: Diagram, errors: DiagramError[]):
         message: `Sequence edge '${edge.id}' must connect lifelines or actors`,
         edgeId: edge.id,
       });
+    }
+  }
+}
+
+/**
+ * Combined fragments must satisfy two structural rules:
+ *  - `alt` and `par` need at least two operands (otherwise an `opt` would
+ *    be the right kind);
+ *  - every operand needs at least one message edge.
+ *
+ * Both rules guard against malformed AST input from imports / commands and
+ * surface to the editor's error panel.
+ */
+function enforceSequenceFragments(diagram: Diagram, errors: DiagramError[]): void {
+  for (const fragment of diagram.fragments ?? []) {
+    if ((fragment.kind === "alt" || fragment.kind === "par") && fragment.operands.length < 2) {
+      errors.push({
+        severity: "error",
+        code: CONSTRAINT_ERROR_CODES.SequenceFragmentTooFewOperands,
+        message: `Combined fragment '${fragment.kind}' requires at least two operands`,
+      });
+    }
+    for (const operand of fragment.operands) {
+      if (operand.edges.length === 0 && fragment.kind !== "ref") {
+        errors.push({
+          severity: "warning",
+          code: CONSTRAINT_ERROR_CODES.SequenceFragmentEmptyOperand,
+          message: `Combined fragment '${fragment.kind}' has an empty operand`,
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Activation intervals reference message edges by id; an unbalanced /
+ * dangling reference is almost always an authoring mistake.
+ */
+function enforceSequenceActivations(diagram: Diagram, errors: DiagramError[]): void {
+  const edgeIds = new Set(diagram.edges.map((e) => e.id));
+  for (const node of diagram.nodes) {
+    for (const interval of node.activations ?? []) {
+      const fromOk = edgeIds.has(interval.fromEdgeId);
+      const toOk = interval.toEdgeId === undefined || edgeIds.has(interval.toEdgeId);
+      if (!fromOk || !toOk) {
+        errors.push({
+          severity: "error",
+          code: CONSTRAINT_ERROR_CODES.SequenceActivationUnbalanced,
+          message: `Activation '${interval.id}' on lifeline '${node.label}' references a missing message edge`,
+          nodeId: node.id,
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Notes need non-empty text and existing participants. Multi-participant
+ * `over` notes still apply: every id must resolve to a known lifeline.
+ */
+function enforceSequenceNotes(diagram: Diagram, errors: DiagramError[]): void {
+  const lifelineIds = new Set(diagram.nodes.map((n) => n.id));
+  for (const note of diagram.notes ?? []) {
+    if (note.text.trim() === "") {
+      errors.push({
+        severity: "warning",
+        code: CONSTRAINT_ERROR_CODES.SequenceNoteEmpty,
+        message: `Sequence note '${note.id}' has empty text`,
+      });
+    }
+    for (const participant of note.participants) {
+      if (!lifelineIds.has(participant)) {
+        errors.push({
+          severity: "error",
+          code: CONSTRAINT_ERROR_CODES.SequenceNoteOrphanParticipant,
+          message: `Sequence note '${note.id}' references unknown lifeline '${participant}'`,
+        });
+      }
     }
   }
 }

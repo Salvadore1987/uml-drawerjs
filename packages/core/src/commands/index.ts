@@ -50,6 +50,22 @@ export type { RemoveEdgeCommand, RemoveEdgePayload } from "./removeEdge.js";
 export { updateEdgeCommand } from "./updateEdge.js";
 export type { UpdateEdgeCommand, UpdateEdgePayload, EdgePatch } from "./updateEdge.js";
 
+export { moveEdgeCommand } from "./moveEdge.js";
+export type { MoveEdgeCommand, MoveEdgePayload } from "./moveEdge.js";
+
+export { moveSequenceFragmentCommand } from "./moveSequenceFragment.js";
+export type {
+  MoveSequenceFragmentCommand,
+  MoveSequenceFragmentPayload,
+} from "./moveSequenceFragment.js";
+
+export { resizeSequenceFragmentCommand } from "./resizeSequenceFragment.js";
+export type {
+  ResizeSequenceFragmentCommand,
+  ResizeSequenceFragmentPayload,
+  FragmentResizeSide,
+} from "./resizeSequenceFragment.js";
+
 export {
   addGroupCommand,
   updateGroupCommand,
@@ -72,6 +88,35 @@ export type { ApplyLayoutCommand, ApplyLayoutPayload } from "./applyLayout.js";
 
 export { importTextCommand } from "./importText.js";
 export type { ImportTextCommand, ImportTextPayload } from "./importText.js";
+
+export {
+  addFragmentCommand,
+  updateFragmentCommand,
+  removeFragmentCommand,
+  updateNoteCommand,
+  removeNoteCommand,
+  updateDividerCommand,
+  removeDividerCommand,
+} from "./sequenceOrnaments.js";
+export type {
+  AddFragmentCommand,
+  AddFragmentPayload,
+  UpdateFragmentCommand,
+  UpdateFragmentPayload,
+  FragmentPatch,
+  RemoveFragmentCommand,
+  RemoveFragmentPayload,
+  UpdateNoteCommand,
+  UpdateNotePayload,
+  SequenceNotePatch,
+  RemoveNoteCommand,
+  RemoveNotePayload,
+  UpdateDividerCommand,
+  UpdateDividerPayload,
+  SequenceDividerPatch,
+  RemoveDividerCommand,
+  RemoveDividerPayload,
+} from "./sequenceOrnaments.js";
 
 export { CommandBus } from "./bus.js";
 export type { CommandBusEvent, CommandBusEventMap, CommandBusListener } from "./bus.js";

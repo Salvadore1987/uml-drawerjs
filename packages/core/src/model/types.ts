@@ -42,7 +42,11 @@ export type NodeKind =
   | "entity"
   // Sequence
   | "lifeline"
-  | "actor";
+  | "actor"
+  | "lifeline-boundary"
+  | "lifeline-control"
+  | "lifeline-entity"
+  | "lifeline-collections";
 
 /** Discriminated kind of a graphical edge between two nodes. */
 export type EdgeKind =
@@ -65,7 +69,9 @@ export type EdgeKind =
   | "async-call"
   | "return"
   | "create"
-  | "destroy";
+  | "destroy"
+  | "lost-message"
+  | "found-message";
 
 /** Container kind for nested groupings (boundary / package / system scope). */
 export type GroupKind = "boundary" | "package" | "system";
@@ -163,6 +169,92 @@ export interface EnumLiteral {
 }
 
 /**
+ * Sequence-only: an interval during which a lifeline is "active" (running an
+ * execution specification). `fromEdgeId` is the message that begins the
+ * activation; `toEdgeId` is the message that closes it (open-ended if absent
+ * — closes at the bottom of the diagram).
+ */
+export interface ActivationInterval {
+  id: string;
+  fromEdgeId: string;
+  toEdgeId?: string;
+}
+
+/**
+ * Sequence-only: one operand of a combined fragment. `alt` and `par` accept
+ * many; `opt`, `loop`, `break`, `critical`, `ref` accept one. `edges` lists
+ * the message edges that fall inside this operand in chronological order.
+ */
+export interface FragmentOperand {
+  id: string;
+  guard?: string;
+  edges: string[];
+}
+
+/** Sequence-only: combined-fragment kinds (UML SD interaction operators). */
+export type FragmentKind = "alt" | "opt" | "loop" | "par" | "break" | "critical" | "ref";
+
+/**
+ * Sequence-only: combined fragment. Stored as a flat array on the diagram;
+ * nesting is captured via `parentId` + `parentOperandId`.
+ *
+ * `coveredParticipants` is an optional override for the horizontal span.
+ * When absent, the renderer derives the frame's left/right edges from the
+ * participant lifelines of the contained edges. When present, it pins
+ * the frame to a contiguous slice of `diagram.nodes` (by id) — used by
+ * the E / W resize handles in the editor so the user can cover empty
+ * lifelines that have no messages of their own inside the fragment.
+ * The list MUST be a contiguous slice of `diagram.nodes` ordered by
+ * their column position (= their order in the array).
+ */
+export interface CombinedFragment {
+  id: string;
+  kind: FragmentKind;
+  label?: string;
+  parentId?: string;
+  parentOperandId?: string;
+  operands: FragmentOperand[];
+  coveredParticipants?: string[];
+  /**
+   * Per-cell vertical overrides for the visible frame, measured in
+   * layout pixels. Default 0/absent → auto-fit to contained edges.
+   * Positive `topExtraPx` extends the frame above its first contained
+   * edge; positive `bottomExtraPx` extends below the last contained
+   * edge. Negative values shrink the frame. The N / S resize handles
+   * mutate these offsets in increments of `--uml-canvas-grid-density`
+   * (default 12 px) so the frame edge always lands on a visible grid
+   * cell — same convention as node move / resize. Operand `edges`
+   * lists are left untouched — these fields are purely visual.
+   */
+  topExtraPx?: number;
+  bottomExtraPx?: number;
+}
+
+/**
+ * Sequence-only: textual annotation attached to one or more lifelines.
+ * `placement` selects the visual anchor; `participants` references node IDs.
+ * `anchorEdgeId` pins the note to a chronological position; absent means top.
+ */
+export interface SequenceNote {
+  id: string;
+  placement: "left" | "right" | "over";
+  participants: string[];
+  text: string;
+  anchorEdgeId?: string;
+}
+
+/**
+ * Sequence-only: divider band (`==Phase X==`) that segments the diagram
+ * vertically. `afterEdgeId` anchors the divider after a specific message;
+ * absent means at the very top.
+ */
+export interface SequenceDivider {
+  id: string;
+  label: string;
+  afterEdgeId?: string;
+}
+
+/**
  * Per-end fields on a class-diagram edge, mirroring the UML `AssociationEnd`
  * metaclass. `multiplicity` is a UML expression (`1`, `0..1`, `1..*`); `role`
  * is the named role at this end; `navigability` toggles the open arrow at the
@@ -212,6 +304,16 @@ export interface DiagramMetadata {
    * skinparam blocks). Stored verbatim so generator round-trips them.
    */
   opaque?: string[];
+  /**
+   * Sequence-only: auto-numbering settings. When set, the renderer prefixes
+   * every message label with the formatted counter and the generator emits
+   * an `autonumber` line at the top of the diagram.
+   */
+  sequenceAutoNumber?: {
+    start: number;
+    increment: number;
+    format?: string;
+  };
 }
 
 /** Graphical node — a class, entity, container, lifeline, etc. */
@@ -244,6 +346,11 @@ export interface DiagramNode {
    * validator can hard-error on `enum.attributes` (see ADR-0007).
    */
   enumLiterals?: EnumLiteral[];
+  /**
+   * Sequence-only: activation intervals on this lifeline, in chronological
+   * order. Each interval refers to existing edges by ID. See ADR-0010.
+   */
+  activations?: ActivationInterval[];
   style?: NodeStyle;
 }
 
@@ -265,6 +372,10 @@ export interface DiagramEdge {
    * See ADR-0008.
    */
   ends?: EdgeEnds;
+  /** Sequence-only: shortcut — mark this message as activating its target. */
+  activatesTarget?: boolean;
+  /** Sequence-only: shortcut — mark this message as deactivating its source. */
+  deactivatesSource?: boolean;
   style?: EdgeStyle;
 }
 
@@ -294,6 +405,12 @@ export interface Diagram {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   groups: DiagramGroup[];
+  /** Sequence-only: combined fragments (alt/opt/loop/par/break/critical/ref). */
+  fragments?: CombinedFragment[];
+  /** Sequence-only: textual notes anchored to one or more lifelines. */
+  notes?: SequenceNote[];
+  /** Sequence-only: divider bands (`==Phase X==`). */
+  dividers?: SequenceDivider[];
   styles?: StyleMap;
   metadata: DiagramMetadata;
 }

@@ -18,12 +18,17 @@ import { renderEdge, renderArrowMarkerDefs } from "./edges.js";
 import { computeNodeGeometry, renderNode } from "./nodes.js";
 import { renderGridLayer } from "./grid.js";
 import { computeGroupBoxes, renderGroupLayer } from "./groups.js";
+import { renderSequenceDiagram } from "./sequence.js";
 import { layoutGrid } from "../layout/fallback.js";
+import { layoutSequence } from "../layout/sequence.js";
 import type { Diagram } from "../model/types.js";
 import { resolveRendererDefaults, v } from "./types.js";
 import type { NodeGeometry, RenderedDiagram, RendererOptions, VNode } from "./types.js";
 
-const DEFAULT_GRID_STEP = 24;
+// Drawio-style fine grid: 12 px minor lines, major every 5 × 12 = 60 px
+// (see `grid.ts`). Matches `DEFAULT_SNAP.step` (12 px) so every move /
+// resize gesture lands on a visible cell boundary.
+const DEFAULT_GRID_STEP = 12;
 
 export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): RenderedDiagram {
   const defaults = resolveRendererDefaults(options);
@@ -33,7 +38,17 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
   // the renderer always produces *something* — never empty SVG, never a
   // throw — even when called before layout has run.
   const coordinates =
-    options.coordinates ?? layoutGrid(diagram, { nodeWidth: defaults.nodeWidth }).coordinates;
+    options.coordinates ??
+    (diagram.type === "sequence"
+      ? layoutSequence(diagram, { nodeWidth: defaults.nodeWidth }).coordinates
+      : layoutGrid(diagram, { nodeWidth: defaults.nodeWidth }).coordinates);
+
+  // Sequence diagrams use a bespoke renderer because UML SD geometry —
+  // lifeline shafts, activation rectangles, combined fragments, notes —
+  // doesn't fit the generic node + edge model.
+  if (diagram.type === "sequence") {
+    return renderSequenceDiagram({ diagram, coordinates, options });
+  }
 
   const geometry = new Map<string, NodeGeometry>();
   const nodeVNodes: VNode[] = [];

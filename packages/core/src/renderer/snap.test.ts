@@ -24,28 +24,31 @@ describe("renderer/snap — snapValue", () => {
   });
 
   it("uses DEFAULT_SNAP when no options are passed", () => {
-    expect(snapValue(11)).toBe(0);
-    expect(snapValue(13)).toBe(24);
+    // step = 12 → 11 rounds down to 12*round(11/12)=12*1=12 (≥0.5 → up)
+    // Actually 11/12 = 0.916… rounds to 1 → 12. So 11 → 12.
+    // 5 rounds to 0 (5/12 = 0.416 → 0).
+    expect(snapValue(5)).toBe(0);
+    expect(snapValue(7)).toBe(12);
   });
 });
 
 describe("renderer/snap — snapPoint / snapRect", () => {
   it("snapPoint rounds both coordinates independently", () => {
-    expect(snapPoint({ x: 11, y: 13 })).toEqual({ x: 0, y: 24 });
+    expect(snapPoint({ x: 5, y: 7 })).toEqual({ x: 0, y: 12 });
   });
 
   it("snapRect rounds origin and size independently", () => {
-    expect(snapRect({ x: 11, y: 13, width: 100, height: 200 })).toEqual({
+    expect(snapRect({ x: 5, y: 7, width: 100, height: 200 })).toEqual({
       x: 0,
-      y: 24,
+      y: 12,
       width: 96,
-      height: 192,
+      height: 204,
     });
   });
 });
 
 describe("renderer/snap — DEFAULT_SNAP", () => {
-  it("is enabled with step 24", () => {
-    expect(DEFAULT_SNAP).toEqual({ enabled: true, step: 24 });
+  it("is enabled with step 12 (drawio-style fine grid)", () => {
+    expect(DEFAULT_SNAP).toEqual({ enabled: true, step: 12 });
   });
 });

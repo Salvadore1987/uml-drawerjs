@@ -6,17 +6,68 @@ import {
   updateGroupCommand,
   updateNodeCommand,
 } from "@uml-drawer/core/commands";
-import type { DiagramEdge, DiagramGroup, DiagramNode, EdgeKind } from "@uml-drawer/core/model";
+import type {
+  CombinedFragment,
+  DiagramEdge,
+  DiagramGroup,
+  DiagramNode,
+  EdgeKind,
+  NodeKind,
+  SequenceDivider,
+  SequenceNote,
+} from "@uml-drawer/core/model";
 import { type HTMLAttributes, useContext, useEffect, useState } from "react";
 import { UmlEditorContext } from "../internal/context.js";
 import { useEditorState } from "../hooks/useEditorState.js";
 import { useSelection } from "../hooks/useSelection.js";
 import { ClassMembersEditor } from "./ClassMembersEditor.js";
 import { EntityMembersEditor } from "./EntityMembersEditor.js";
+import { FragmentEditor } from "./FragmentEditor.js";
+import { NoteEditor } from "./NoteEditor.js";
+import { DividerEditor } from "./DividerEditor.js";
 
 const CLASS_LIKE_KINDS = new Set(["class", "interface", "abstract-class", "enum"]);
 const ER_EDGE_KINDS = new Set<EdgeKind>(["one-to-one", "one-to-many", "many-to-many"]);
 const CARDINALITY_OPTIONS = ["1", "0..1", "0..*", "1..*"] as const;
+
+const SEQUENCE_NODE_KINDS = new Set<NodeKind>([
+  "lifeline",
+  "actor",
+  "lifeline-boundary",
+  "lifeline-control",
+  "lifeline-entity",
+  "lifeline-collections",
+  "database",
+  "queue",
+]);
+const LIFELINE_KIND_OPTIONS: ReadonlyArray<{ value: NodeKind; label: string }> = [
+  { value: "lifeline", label: "Participant" },
+  { value: "actor", label: "Actor" },
+  { value: "lifeline-boundary", label: "Boundary" },
+  { value: "lifeline-control", label: "Control" },
+  { value: "lifeline-entity", label: "Entity" },
+  { value: "database", label: "Database" },
+  { value: "queue", label: "Queue" },
+  { value: "lifeline-collections", label: "Collections" },
+];
+const SEQUENCE_EDGE_KINDS = new Set<EdgeKind>([
+  "sync-call",
+  "async-call",
+  "return",
+  "create",
+  "destroy",
+  "lost-message",
+  "found-message",
+]);
+const SEQUENCE_EDGE_KIND_OPTIONS: ReadonlyArray<{ value: EdgeKind; label: string }> = [
+  { value: "sync-call", label: "Sync call (->)" },
+  { value: "async-call", label: "Async call (->>)" },
+  { value: "return", label: "Return (-->)" },
+  { value: "create", label: "Create (**)" },
+  { value: "destroy", label: "Destroy (!!)" },
+  { value: "found-message", label: "Found message ([->)" },
+  { value: "lost-message", label: "Lost message (->])" },
+];
 
 /**
  * Derive the canonical ER `EdgeKind` from a (source, target) cardinality
@@ -89,6 +140,25 @@ export function PropsPanel({
   const selectedGroup =
     selectedId && !selectedNode && !selectedEdge
       ? (ast.groups.find((g) => g.id === selectedId) ?? null)
+      : null;
+  // Sequence ornament lookups — only one of these resolves per selection,
+  // and each ornament id is disjoint from nodes / edges / groups.
+  const selectedFragment: CombinedFragment | null =
+    selectedId && !selectedNode && !selectedEdge && !selectedGroup
+      ? (ast.fragments?.find((f) => f.id === selectedId) ?? null)
+      : null;
+  const selectedNote: SequenceNote | null =
+    selectedId && !selectedNode && !selectedEdge && !selectedGroup && !selectedFragment
+      ? (ast.notes?.find((n) => n.id === selectedId) ?? null)
+      : null;
+  const selectedDivider: SequenceDivider | null =
+    selectedId &&
+    !selectedNode &&
+    !selectedEdge &&
+    !selectedGroup &&
+    !selectedFragment &&
+    !selectedNote
+      ? (ast.dividers?.find((d) => d.id === selectedId) ?? null)
       : null;
 
   useEffect(() => {
@@ -203,6 +273,21 @@ export function PropsPanel({
       </label>
       {CLASS_LIKE_KINDS.has(node.kind) && <ClassMembersEditor node={node} />}
       {node.kind === "entity" && <EntityMembersEditor node={node} />}
+      {SEQUENCE_NODE_KINDS.has(node.kind) && (
+        <label className="uml-field">
+          <span>Lifeline kind</span>
+          <select
+            value={node.kind}
+            onChange={(e): void => commitNode({ kind: e.target.value as NodeKind })}
+          >
+            {LIFELINE_KIND_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <button
         type="button"
         className="uml-button uml-button--danger"
@@ -235,10 +320,46 @@ export function PropsPanel({
           }}
         />
       </label>
-      <div className="uml-field">
-        <span>Kind</span>
-        <code>{edge.kind}</code>
-      </div>
+      {SEQUENCE_EDGE_KINDS.has(edge.kind) ? (
+        <label className="uml-field">
+          <span>Kind</span>
+          <select
+            value={edge.kind}
+            onChange={(e): void => commitEdge({ kind: e.target.value as EdgeKind })}
+          >
+            {SEQUENCE_EDGE_KIND_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <div className="uml-field">
+          <span>Kind</span>
+          <code>{edge.kind}</code>
+        </div>
+      )}
+      {SEQUENCE_EDGE_KINDS.has(edge.kind) && (
+        <>
+          <label className="uml-field uml-field--inline">
+            <input
+              type="checkbox"
+              checked={Boolean(edge.activatesTarget)}
+              onChange={(e): void => commitEdge({ activatesTarget: e.target.checked })}
+            />
+            <span>Activates target</span>
+          </label>
+          <label className="uml-field uml-field--inline">
+            <input
+              type="checkbox"
+              checked={Boolean(edge.deactivatesSource)}
+              onChange={(e): void => commitEdge({ deactivatesSource: e.target.checked })}
+            />
+            <span>Deactivates source</span>
+          </label>
+        </>
+      )}
       {ER_EDGE_KINDS.has(edge.kind) && (
         <>
           <label className="uml-field">
@@ -362,6 +483,9 @@ export function PropsPanel({
   else if (selectedNode) body = renderNode(selectedNode);
   else if (selectedEdge) body = renderEdge(selectedEdge);
   else if (selectedGroup) body = renderGroup(selectedGroup);
+  else if (selectedFragment) body = <FragmentEditor fragment={selectedFragment} />;
+  else if (selectedNote) body = <NoteEditor note={selectedNote} />;
+  else if (selectedDivider) body = <DividerEditor divider={selectedDivider} />;
   else body = renderEmpty();
 
   return (

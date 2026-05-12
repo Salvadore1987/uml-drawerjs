@@ -46,6 +46,14 @@ export function renderGridLayer(options: GridLayerOptions): VNode {
   const w = options.bbox.width + overscan * 2;
   const h = options.bbox.height + overscan * 2;
 
+  // Drawio-style two-tier grid: fine minor lines every `step` px and
+  // darker major lines every 5×step px. The minor pattern paints the
+  // bulk of the canvas; the major pattern sits on top and only
+  // contributes the heavy boundary lines, mirroring the look of
+  // app.diagrams.net's editing canvas. Each pattern tile draws an
+  // L-shape (top-left corner of the cell) — adjacent tiles complete
+  // the grid without visible seams.
+  const major = step * 5;
   return v("g", { "data-uml-layer": "grid" }, [
     v("defs", undefined, [
       v(
@@ -57,11 +65,30 @@ export function renderGridLayer(options: GridLayerOptions): VNode {
           patternUnits: "userSpaceOnUse",
         },
         [
-          v("circle", {
-            cx: step / 2,
-            cy: step / 2,
-            r: 1,
-            fill: "var(--uml-canvas-grid)",
+          v("path", {
+            d: `M ${step} 0 L 0 0 L 0 ${step}`,
+            fill: "none",
+            stroke: "var(--uml-canvas-grid)",
+            "stroke-width": "0.5",
+            "shape-rendering": "crispEdges",
+          }),
+        ],
+      ),
+      v(
+        "pattern",
+        {
+          id: `${id}-major`,
+          width: major,
+          height: major,
+          patternUnits: "userSpaceOnUse",
+        },
+        [
+          v("path", {
+            d: `M ${major} 0 L 0 0 L 0 ${major}`,
+            fill: "none",
+            stroke: "var(--uml-canvas-grid-major, var(--uml-canvas-grid))",
+            "stroke-width": "1",
+            "shape-rendering": "crispEdges",
           }),
         ],
       ),
@@ -72,6 +99,14 @@ export function renderGridLayer(options: GridLayerOptions): VNode {
       width: w,
       height: h,
       fill: `url(#${id})`,
+      "pointer-events": "none",
+    }),
+    v("rect", {
+      x,
+      y,
+      width: w,
+      height: h,
+      fill: `url(#${id}-major)`,
       "pointer-events": "none",
     }),
   ]);

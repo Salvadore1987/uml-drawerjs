@@ -697,6 +697,42 @@ select.uml-class-members__type {
   pointer-events: auto;
 }
 
+/* Sequence-fragment resize handles — same visibility contract as node
+   handles. N / S grow or shrink the chronological span by adding /
+   removing edges to the first or last operand. E / W extend or contract
+   the contiguous slice of lifelines stored in `coveredParticipants`. */
+.uml-sequence-fragment-resize-handle {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+[data-uml-content][data-selected-count="single"]
+  [data-fragment-id][data-selected="true"]
+  .uml-sequence-fragment-resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Selected fragment: accent the visible frame so users see what they
+   grabbed. Mirrors the `data-selected` outline added to nodes / groups
+   by `paintSelection`. */
+[data-fragment-id][data-selected="true"] .uml-sequence-fragment {
+  stroke: var(--uml-accent);
+  stroke-width: 2;
+}
+
+/* Selected sequence edge — including self-calls (rendered as a path).
+   `paintSelection` writes `data-selected="true"` on the wrapping
+   `<g data-edge-id>` so the user can see which message they grabbed
+   during drag-to-reorder. The descendant `line` / `path` selector skips
+   the transparent hit-overlay (it has no stroke colour to override). */
+[data-edge-id][data-selected="true"] > line:not([stroke="transparent"]),
+[data-edge-id][data-selected="true"] > path:not([stroke="transparent"]) {
+  stroke: var(--uml-accent);
+  stroke-width: 2;
+}
+
 /* Boundary group: highlight stroke + handles when selected. The frame
    uses pointer-events:stroke so click only registers on the dashed
    border or the label band — clicks on enclosed nodes still reach

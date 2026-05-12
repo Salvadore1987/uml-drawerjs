@@ -45,6 +45,12 @@ export const CONSTRAINT_ERROR_CODES = {
   ErEntityHasOperations: "CONSTRAINT_ER_ENTITY_HAS_OPERATIONS",
   ErEntityHasEnumLiterals: "CONSTRAINT_ER_ENTITY_HAS_ENUM_LITERALS",
   ErEntityHasGenerics: "CONSTRAINT_ER_ENTITY_HAS_GENERICS",
+  // Sequence diagram (UML SD)
+  SequenceActivationUnbalanced: "CONSTRAINT_SEQUENCE_ACTIVATION_UNBALANCED",
+  SequenceFragmentEmptyOperand: "CONSTRAINT_SEQUENCE_FRAGMENT_EMPTY_OPERAND",
+  SequenceFragmentTooFewOperands: "CONSTRAINT_SEQUENCE_FRAGMENT_TOO_FEW_OPERANDS",
+  SequenceNoteOrphanParticipant: "CONSTRAINT_SEQUENCE_NOTE_ORPHAN_PARTICIPANT",
+  SequenceNoteEmpty: "CONSTRAINT_SEQUENCE_NOTE_EMPTY",
 } as const;
 
 export type ConstraintErrorCode =

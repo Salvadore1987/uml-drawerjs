@@ -51,30 +51,6 @@ export function HudTopRight(): JSX.Element {
   );
 }
 
-const LEGEND: ReadonlyArray<{ kind: string; label: string; token: string }> = [
-  { kind: "person", label: "Actor", token: "var(--magenta, #ff4d9e)" },
-  { kind: "system", label: "System", token: "var(--cyan, #4deeea)" },
-  { kind: "container", label: "Container", token: "var(--cyan, #4deeea)" },
-  { kind: "component", label: "Component", token: "var(--cyan, #4deeea)" },
-  { kind: "class", label: "Class", token: "var(--phos, #b8ff3d)" },
-  { kind: "entity", label: "Entity", token: "var(--warn, #ffb347)" },
-  { kind: "lifeline", label: "Lifeline", token: "var(--ink-soft, #8b9aae)" },
-];
-
-/** BL — type-coloured legend. */
-export function HudBottomLeft(): JSX.Element {
-  return (
-    <div role="list">
-      {LEGEND.map((entry) => (
-        <div key={entry.kind} className="uml-hud__legend-row" role="listitem">
-          <span className="uml-hud__legend-swatch" style={{ background: entry.token }} />
-          <span>{entry.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /** BR — telemetry: parse / regen timing per change. */
 export function HudBottomRight(): JSX.Element {
   const state = useEditorState();

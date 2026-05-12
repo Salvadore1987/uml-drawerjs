@@ -29,13 +29,18 @@
 import {
   addEdgeCommand,
   addNodeToGroupCommand,
+  moveEdgeCommand,
   moveGroupCommand,
   moveNodeCommand,
+  moveSequenceFragmentCommand,
   removeNodeFromGroupCommand,
   resizeGroupCommand,
   resizeNodeCommand,
+  resizeSequenceFragmentCommand,
+  updateEdgeCommand,
   updateNodeCommand,
 } from "../commands/index.js";
+import type { FragmentResizeSide } from "../commands/index.js";
 import type { CommandBus } from "../commands/index.js";
 import type { History } from "../history/index.js";
 import { uuidv7 } from "../model/index.js";
@@ -74,10 +79,18 @@ export interface InteractionsOptions {
   readonly getLocked?: () => boolean;
   /**
    * Snap-to-grid options for both move-drag and resize-drag. Defaults to
-   * the renderer's `DEFAULT_SNAP` (24 px step, enabled). The `Alt` key
+   * the renderer's `DEFAULT_SNAP` (12 px step, enabled). The `Alt` key
    * temporarily disables snap during a gesture for fine adjustment.
    */
   readonly getSnap?: () => SnapOptions;
+  /**
+   * Optional override for the edge kind used when the user drag-to-
+   * connects two nodes. When the function returns a value, it replaces
+   * the per-diagram-type default in `defaultEdgeKindFor`. Used by the
+   * sequence-diagram playground toolbar so the user can pick `return` /
+   * `async-call` / `lost-message` / etc. before drawing.
+   */
+  readonly getEdgeKindOverride?: () => EdgeKind | undefined;
 }
 
 export interface InteractionsController {
@@ -148,6 +161,56 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
   let drag: DragState | null = null;
   let renameOverlay: { foreignObject: SVGForeignObjectElement; input: HTMLInputElement } | null =
     null;
+  let edgeReorder: {
+    edgeId: string;
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    /** Self-call edges (source === target) support both vertical
+     *  reorder and horizontal lifeline reassignment; non-self-call
+     *  edges are vertical-only. Captured at gesture start so the
+     *  direction decision is stable through the drag. */
+    isSelfCall: boolean;
+    /** Layout-space lifeline cx values, sorted L→R, captured at
+     *  gesture start. Used by the horizontal branch to snap the
+     *  reassigned self-call to the nearest column. */
+    lifelineColumns: ReadonlyArray<{ id: string; cx: number }>;
+    /** Direction is decided lazily on the first move that exceeds
+     *  `DRAG_THRESHOLD_PX`; once set, it sticks for the rest of the
+     *  gesture so the guide doesn't flip mid-drag. */
+    direction: "vertical" | "horizontal" | null;
+  } | null = null;
+  let edgeReorderHorizontalGuide: SVGLineElement | null = null;
+  let fragmentReorder: {
+    fragmentId: string;
+    pointerId: number;
+    startClientY: number;
+    hasMoved: boolean;
+  } | null = null;
+  let fragmentResize: {
+    fragmentId: string;
+    side: "n" | "s" | "e" | "w";
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    /** Pointerdown position in *layout* coordinates. Necessary because
+     *  `event.clientY` lives in screen space; at any zoom ≠ 1 the
+     *  client-space dy does not equal the layout-space dy, so the
+     *  grid-cell snap math (in layout px) wouldn't match the visible
+     *  grid. */
+    startLayoutX: number;
+    startLayoutY: number;
+    /** For E / W resize: lifeline cx positions captured at gesture start
+     *  so the snap-to-nearest-column logic stays stable through the
+     *  drag even if the diagram auto-fits underneath. */
+    lifelineColumns: ReadonlyArray<{ id: string; cx: number }>;
+    /** Layout-space anchor: the cx of the lifeline column that is
+     *  currently flush with the dragged edge. Used to derive
+     *  `deltaColumns` on pointerup. */
+    anchorColumnIndex: number;
+    hasMoved: boolean;
+  } | null = null;
+  let fragmentResizeGuide: SVGLineElement | null = null;
 
   // Subscribe to selection so the SVG reflects the current ids.
   let unsubscribeSelection: (() => void) | null = selection.subscribe((ids) => {
@@ -185,6 +248,438 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     if (!(target instanceof Element)) return null;
     const group = target.closest("[data-group-id]");
     return (group as SVGGraphicsElement) ?? null;
+  }
+
+  /**
+   * Sequence-only ornament hit-test. Combined fragments, notes, and
+   * dividers carry `data-fragment-id` / `data-note-id` / `data-divider-id`
+   * but no `data-node-id`, so they are invisible to `findNodeAt`. This
+   * helper finds the innermost matching element so a click selects the
+   * ornament. Hit-test ordering — note → fragment → divider — mirrors
+   * visual nesting (notes sit inside fragments; fragments are the
+   * largest ornaments; dividers span the full width and lose to anything
+   * overlapping).
+   */
+  function findOrnamentAt(
+    target: EventTarget | null,
+  ): { id: string; kind: "note" | "fragment" | "divider" } | null {
+    if (!(target instanceof Element)) return null;
+    const noteEl = target.closest("[data-note-id]");
+    if (noteEl) {
+      const id = noteEl.getAttribute("data-note-id");
+      if (id) return { id, kind: "note" };
+    }
+    const fragmentEl = target.closest("[data-fragment-id]");
+    if (fragmentEl) {
+      const id = fragmentEl.getAttribute("data-fragment-id");
+      if (id) return { id, kind: "fragment" };
+    }
+    const dividerEl = target.closest("[data-divider-id]");
+    if (dividerEl) {
+      const id = dividerEl.getAttribute("data-divider-id");
+      if (id) return { id, kind: "divider" };
+    }
+    return null;
+  }
+
+  // ---------- Sequence drag-to-reorder ----------
+
+  // Mirror of the sequence renderer's row height (`renderer/sequence.ts`).
+  // The drag converts pointer dy into row units to snap insertion to
+  // the same grid the renderer paints messages on.
+  const SEQUENCE_ROW_HEIGHT = 32;
+  let edgeReorderGuide: SVGLineElement | null = null;
+
+  function startEdgeReorder(event: PointerEvent, edgeId: string): void {
+    const diagram = bus.getState();
+    const edge = diagram.edges.find((e) => e.id === edgeId);
+    const isSelfCall = !!edge && edge.source === edge.target;
+    edgeReorder = {
+      edgeId,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      isSelfCall,
+      lifelineColumns: isSelfCall ? readLifelineColumnsFromDOM() : [],
+      direction: null,
+    };
+    selection.set([edgeId]);
+    svg.setPointerCapture?.(event.pointerId);
+    event.stopPropagation();
+  }
+
+  function rowsMoved(event: PointerEvent): number {
+    if (!edgeReorder) return 0;
+    const dy = event.clientY - edgeReorder.startClientY;
+    return Math.round(dy / SEQUENCE_ROW_HEIGHT);
+  }
+
+  function paintEdgeReorderGuide(event: PointerEvent): void {
+    if (!edgeReorder) return;
+
+    // Horizontal mode (self-call lifeline reassignment): paint a
+    // vertical dashed guide at the nearest lifeline cx. Skip the
+    // vertical-reorder logic below.
+    if (edgeReorder.direction === "horizontal" && edgeReorder.isSelfCall) {
+      if (edgeReorder.lifelineColumns.length === 0) return;
+      const cursor = clientToLayout(event.clientX, event.clientY);
+      const targetIdx = nearestColumnIndex(edgeReorder.lifelineColumns, cursor.x);
+      const targetCol = edgeReorder.lifelineColumns[targetIdx];
+      if (!targetCol) return;
+      if (!edgeReorderHorizontalGuide) {
+        edgeReorderHorizontalGuide = svg.ownerDocument!.createElementNS(SVG_NS, "line");
+        edgeReorderHorizontalGuide.setAttribute("class", "uml-edge-reorder-guide");
+        edgeReorderHorizontalGuide.setAttribute("stroke", "var(--uml-accent)");
+        edgeReorderHorizontalGuide.setAttribute("stroke-width", "2");
+        edgeReorderHorizontalGuide.setAttribute("stroke-dasharray", "4 4");
+        edgeReorderHorizontalGuide.setAttribute("pointer-events", "none");
+        contentGroup.appendChild(edgeReorderHorizontalGuide);
+      }
+      const bbox = contentGroup.getBBox();
+      edgeReorderHorizontalGuide.setAttribute("x1", String(targetCol.cx));
+      edgeReorderHorizontalGuide.setAttribute("y1", String(bbox.y));
+      edgeReorderHorizontalGuide.setAttribute("x2", String(targetCol.cx));
+      edgeReorderHorizontalGuide.setAttribute("y2", String(bbox.y + bbox.height));
+      return;
+    }
+
+    const diagram = bus.getState();
+    const fromIndex = diagram.edges.findIndex((e) => e.id === edgeReorder!.edgeId);
+    if (fromIndex < 0) return;
+    const moved = rowsMoved(event);
+    if (moved === 0) {
+      edgeReorderGuide?.remove();
+      edgeReorderGuide = null;
+      return;
+    }
+    const target = Math.max(0, Math.min(fromIndex + moved, diagram.edges.length - 1));
+    const escaped = diagram.edges[target]!.id.replaceAll('"', '\\"');
+    // Regular messages render as `<line>`, self-calls as `<path>`. We
+    // tolerate either so the drop-target guide also renders when the
+    // dragged or target edge is a loopback. `y1` for the line; bbox-y
+    // for the path (the self-call path starts at the message row).
+    const targetGroup = contentGroup.querySelector(`[data-edge-id="${escaped}"]`);
+    if (!(targetGroup instanceof SVGGraphicsElement)) return;
+    const lineEl = targetGroup.querySelector(":scope > line");
+    const pathEl = targetGroup.querySelector(":scope > path");
+    let y: number;
+    if (lineEl instanceof SVGLineElement) {
+      y = Number(lineEl.getAttribute("y1") ?? 0);
+    } else if (pathEl instanceof SVGPathElement) {
+      try {
+        y = pathEl.getBBox().y;
+      } catch {
+        return;
+      }
+    } else {
+      return;
+    }
+    if (!edgeReorderGuide) {
+      edgeReorderGuide = svg.ownerDocument!.createElementNS(SVG_NS, "line");
+      edgeReorderGuide.setAttribute("class", "uml-edge-reorder-guide");
+      edgeReorderGuide.setAttribute("stroke", "var(--uml-accent)");
+      edgeReorderGuide.setAttribute("stroke-width", "2");
+      edgeReorderGuide.setAttribute("stroke-dasharray", "4 4");
+      edgeReorderGuide.setAttribute("pointer-events", "none");
+      contentGroup.appendChild(edgeReorderGuide);
+    }
+    const bbox = contentGroup.getBBox();
+    edgeReorderGuide.setAttribute("x1", String(bbox.x));
+    edgeReorderGuide.setAttribute("y1", String(y));
+    edgeReorderGuide.setAttribute("x2", String(bbox.x + bbox.width));
+    edgeReorderGuide.setAttribute("y2", String(y));
+  }
+
+  function finishEdgeReorder(event: PointerEvent): void {
+    if (!edgeReorder) return;
+    const finished = edgeReorder;
+    edgeReorder = null;
+    svg.releasePointerCapture?.(event.pointerId);
+    edgeReorderGuide?.remove();
+    edgeReorderGuide = null;
+    edgeReorderHorizontalGuide?.remove();
+    edgeReorderHorizontalGuide = null;
+
+    const diagram = bus.getState();
+    const fromIndex = diagram.edges.findIndex((e) => e.id === finished.edgeId);
+    if (fromIndex < 0) return;
+
+    // Horizontal branch: self-call drop on a different lifeline →
+    // reassign the edge's source + target to that lifeline. Only
+    // engages when the gesture's locked direction is horizontal — i.e.
+    // dx beat dy past the initial threshold and the edge is a
+    // self-call (non-self-call sequence edges stay vertical-only).
+    if (finished.direction === "horizontal" && finished.isSelfCall) {
+      if (finished.lifelineColumns.length === 0) return;
+      const cursor = clientToLayout(event.clientX, event.clientY);
+      const targetIdx = nearestColumnIndex(finished.lifelineColumns, cursor.x);
+      const targetCol = finished.lifelineColumns[targetIdx];
+      if (!targetCol) return;
+      const edge = diagram.edges.find((e) => e.id === finished.edgeId);
+      if (!edge) return;
+      if (edge.source === targetCol.id && edge.target === targetCol.id) return;
+      history.dispatch(
+        updateEdgeCommand(finished.edgeId, { source: targetCol.id, target: targetCol.id }, diagram),
+      );
+      return;
+    }
+
+    const dy = event.clientY - finished.startClientY;
+    const moved = Math.round(dy / SEQUENCE_ROW_HEIGHT);
+    if (moved === 0) return;
+    const toIndex = Math.max(0, Math.min(fromIndex + moved, diagram.edges.length - 1));
+    if (toIndex === fromIndex) return;
+    history.dispatch(moveEdgeCommand(finished.edgeId, toIndex, diagram));
+  }
+
+  /**
+   * Fragment drag-to-move. A combined fragment's chronological span is
+   * derived from the indices of its edges in `diagram.edges`, so "moving"
+   * the fragment vertically means reordering its edges as a contiguous
+   * block. Pointerdown on a fragment border captures startClientY; on
+   * pointerup we dispatch `moveSequenceFragmentCommand` with deltaRows
+   * derived from dy / SEQUENCE_ROW_HEIGHT. A pure click (no movement)
+   * leaves the fragment selected — that path is handled by the caller
+   * in `onPointerDown`.
+   */
+  function startFragmentReorder(event: PointerEvent, fragmentId: string): void {
+    fragmentReorder = {
+      fragmentId,
+      pointerId: event.pointerId,
+      startClientY: event.clientY,
+      hasMoved: false,
+    };
+    svg.setPointerCapture?.(event.pointerId);
+    event.stopPropagation();
+  }
+
+  function paintFragmentReorderGuide(event: PointerEvent): void {
+    if (!fragmentReorder) return;
+    const dy = event.clientY - fragmentReorder.startClientY;
+    const moved = Math.round(dy / SEQUENCE_ROW_HEIGHT);
+    // Translate the visible fragment frame ephemerally so the user sees
+    // the block follow the pointer. The data-fragment-id rect stays put;
+    // only the visible (non-hit) rect carries the transform via a CSS
+    // transform on the host group.
+    const escaped = fragmentReorder.fragmentId.replaceAll('"', '\\"');
+    const els = contentGroup.querySelectorAll(`[data-fragment-id="${escaped}"]`);
+    els.forEach((el) => {
+      if (el instanceof SVGGraphicsElement) {
+        el.setAttribute("transform", `translate(0, ${moved * SEQUENCE_ROW_HEIGHT})`);
+      }
+    });
+  }
+
+  /**
+   * Fragment N / S handle resize. Drags a handle vertically; on
+   * pointerup we dispatch `resizeSequenceFragmentCommand` with
+   * `deltaRows = round(dy / SEQUENCE_ROW_HEIGHT)`. The command
+   * structurally grows / shrinks the fragment by adding / removing
+   * edges to / from the first or last operand — the visible frame
+   * follows because its geometry is derived from those operands.
+   */
+  /**
+   * Read lifeline cx values straight off the rendered DOM, sorted L→R.
+   * Used by horizontal fragment-resize to snap the dragged edge to the
+   * nearest lifeline column.
+   */
+  function readLifelineColumnsFromDOM(): Array<{ id: string; cx: number }> {
+    const result: Array<{ id: string; cx: number }> = [];
+    const els = contentGroup.querySelectorAll("g[data-node-id]");
+    els.forEach((el) => {
+      if (!(el instanceof SVGGraphicsElement)) return;
+      const id = el.getAttribute("data-node-id");
+      if (!id) return;
+      const transform = el.getAttribute("transform") ?? "";
+      const match = transform.match(/translate\(\s*(-?[\d.]+)[ ,]\s*(-?[\d.]+)\s*\)/);
+      const tx = match ? Number(match[1]) : 0;
+      const rect = el.querySelector(":scope > rect");
+      const w = rect instanceof SVGRectElement ? Number(rect.getAttribute("width") ?? 0) : 0;
+      result.push({ id, cx: tx + w / 2 });
+    });
+    result.sort((a, b) => a.cx - b.cx);
+    return result;
+  }
+
+  /**
+   * Find the lifeline whose cx is closest to `x`, in the layout-coords
+   * column list captured at gesture start.
+   */
+  function nearestColumnIndex(
+    columns: ReadonlyArray<{ id: string; cx: number }>,
+    x: number,
+  ): number {
+    let bestIdx = 0;
+    let bestDist = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < columns.length; i += 1) {
+      const col = columns[i];
+      if (!col) continue;
+      const d = Math.abs(col.cx - x);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+    }
+    return bestIdx;
+  }
+
+  /**
+   * Resolve the current "anchor" column index for an E or W resize. We
+   * read the rendered fragment frame's left / right edge and find the
+   * nearest lifeline cx — that index becomes the baseline from which
+   * `deltaColumns` is measured on pointerup.
+   */
+  function anchorColumnForFragmentEdge(
+    fragmentId: string,
+    side: "e" | "w",
+    columns: ReadonlyArray<{ id: string; cx: number }>,
+  ): number {
+    const escaped = fragmentId.replaceAll('"', '\\"');
+    const groupEl = contentGroup.querySelector(`g[data-fragment-id="${escaped}"]`);
+    if (!(groupEl instanceof SVGGraphicsElement)) return 0;
+    const frame = groupEl.querySelector(":scope > rect.uml-sequence-fragment");
+    if (!(frame instanceof SVGRectElement)) return 0;
+    const frameX = Number(frame.getAttribute("x") ?? 0);
+    const frameW = Number(frame.getAttribute("width") ?? 0);
+    const edgeX = side === "w" ? frameX : frameX + frameW;
+    return nearestColumnIndex(columns, edgeX);
+  }
+
+  function startFragmentResize(
+    event: PointerEvent,
+    fragmentId: string,
+    side: "n" | "s" | "e" | "w",
+  ): void {
+    const lifelineColumns = side === "e" || side === "w" ? readLifelineColumnsFromDOM() : [];
+    const anchorColumnIndex =
+      side === "e" || side === "w"
+        ? anchorColumnForFragmentEdge(fragmentId, side, lifelineColumns)
+        : 0;
+    const startLayout = clientToLayout(event.clientX, event.clientY);
+    fragmentResize = {
+      fragmentId,
+      side,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startLayoutX: startLayout.x,
+      startLayoutY: startLayout.y,
+      lifelineColumns,
+      anchorColumnIndex,
+      hasMoved: false,
+    };
+    selection.set([fragmentId]);
+    svg.setPointerCapture?.(event.pointerId);
+    event.stopPropagation();
+  }
+
+  function paintFragmentResizeGuide(event: PointerEvent): void {
+    if (!fragmentResize) return;
+    const escaped = fragmentResize.fragmentId.replaceAll('"', '\\"');
+    const groupEl = contentGroup.querySelector(`g[data-fragment-id="${escaped}"]`);
+    if (!(groupEl instanceof SVGGraphicsElement)) return;
+    const frame = groupEl.querySelector(":scope > rect.uml-sequence-fragment");
+    if (!(frame instanceof SVGRectElement)) return;
+    const frameY = Number(frame.getAttribute("y") ?? 0);
+    const frameH = Number(frame.getAttribute("height") ?? 0);
+    const frameX = Number(frame.getAttribute("x") ?? 0);
+    const frameW = Number(frame.getAttribute("width") ?? 0);
+
+    if (!fragmentResizeGuide) {
+      fragmentResizeGuide = svg.ownerDocument!.createElementNS(SVG_NS, "line");
+      fragmentResizeGuide.setAttribute("class", "uml-fragment-resize-guide");
+      fragmentResizeGuide.setAttribute("stroke", "var(--uml-accent)");
+      fragmentResizeGuide.setAttribute("stroke-width", "2");
+      fragmentResizeGuide.setAttribute("stroke-dasharray", "4 4");
+      fragmentResizeGuide.setAttribute("pointer-events", "none");
+      contentGroup.appendChild(fragmentResizeGuide);
+    }
+
+    if (fragmentResize.side === "n" || fragmentResize.side === "s") {
+      // Snap to the visible grid step (matches snap.ts DEFAULT_SNAP)
+      // so the frame edge always lands on a grid cell — same behaviour
+      // the user gets when dragging nodes / boundaries. dy is computed
+      // in layout coordinates so the snap math is zoom-invariant.
+      const snap = getSnap();
+      const cell = snap.enabled && snap.step > 0 ? snap.step : 1;
+      const cursor = clientToLayout(event.clientX, event.clientY);
+      const dy = cursor.y - fragmentResize.startLayoutY;
+      const deltaPx = Math.round(dy / cell) * cell;
+      const guideY = fragmentResize.side === "n" ? frameY + deltaPx : frameY + frameH + deltaPx;
+      fragmentResizeGuide.setAttribute("x1", String(frameX));
+      fragmentResizeGuide.setAttribute("y1", String(guideY));
+      fragmentResizeGuide.setAttribute("x2", String(frameX + frameW));
+      fragmentResizeGuide.setAttribute("y2", String(guideY));
+    } else {
+      // E / W: paint a vertical guide at the nearest lifeline cx to the
+      // pointer in layout coords. Falls back to free-form X if no
+      // lifeline columns were captured.
+      const cursor = clientToLayout(event.clientX, event.clientY);
+      const columns = fragmentResize.lifelineColumns;
+      const guideX =
+        columns.length > 0
+          ? (columns[nearestColumnIndex(columns, cursor.x)]?.cx ?? cursor.x)
+          : cursor.x;
+      fragmentResizeGuide.setAttribute("x1", String(guideX));
+      fragmentResizeGuide.setAttribute("y1", String(frameY));
+      fragmentResizeGuide.setAttribute("x2", String(guideX));
+      fragmentResizeGuide.setAttribute("y2", String(frameY + frameH));
+    }
+  }
+
+  function finishFragmentResize(event: PointerEvent): void {
+    if (!fragmentResize) return;
+    const finished = fragmentResize;
+    fragmentResize = null;
+    svg.releasePointerCapture?.(event.pointerId);
+    fragmentResizeGuide?.remove();
+    fragmentResizeGuide = null;
+    if (!finished.hasMoved) return;
+
+    if (finished.side === "n" || finished.side === "s") {
+      // Vertical fragment resize snaps to the grid step (one cell at
+      // a time) and the command stores the result directly in pixels.
+      // dy in layout coords keeps the snap math zoom-invariant.
+      const snap = getSnap();
+      const cell = snap.enabled && snap.step > 0 ? snap.step : 1;
+      const cursor = clientToLayout(event.clientX, event.clientY);
+      const dy = cursor.y - finished.startLayoutY;
+      const deltaPx = Math.round(dy / cell) * cell;
+      if (deltaPx === 0) return;
+      const side: FragmentResizeSide = finished.side === "n" ? "top" : "bottom";
+      history.dispatch(
+        resizeSequenceFragmentCommand(finished.fragmentId, side, deltaPx, bus.getState()),
+      );
+      return;
+    }
+
+    if (finished.lifelineColumns.length === 0) return;
+    const cursor = clientToLayout(event.clientX, event.clientY);
+    const targetIdx = nearestColumnIndex(finished.lifelineColumns, cursor.x);
+    const deltaColumns = targetIdx - finished.anchorColumnIndex;
+    if (deltaColumns === 0) return;
+    const side: FragmentResizeSide = finished.side === "w" ? "left" : "right";
+    history.dispatch(
+      resizeSequenceFragmentCommand(finished.fragmentId, side, deltaColumns, bus.getState()),
+    );
+  }
+
+  function finishFragmentReorder(event: PointerEvent): void {
+    if (!fragmentReorder) return;
+    const finished = fragmentReorder;
+    fragmentReorder = null;
+    svg.releasePointerCapture?.(event.pointerId);
+    // Strip the ephemeral transform — the real re-render lands once the
+    // command dispatches below.
+    const escaped = finished.fragmentId.replaceAll('"', '\\"');
+    contentGroup.querySelectorAll(`[data-fragment-id="${escaped}"]`).forEach((el) => {
+      if (el instanceof SVGGraphicsElement) el.removeAttribute("transform");
+    });
+    if (!finished.hasMoved) return;
+    const dy = event.clientY - finished.startClientY;
+    const moved = Math.round(dy / SEQUENCE_ROW_HEIGHT);
+    if (moved === 0) return;
+    history.dispatch(moveSequenceFragmentCommand(finished.fragmentId, moved, bus.getState()));
   }
 
   /**
@@ -660,6 +1155,72 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       }
     }
 
+    // Fragment resize handle — must run before the generic ornament
+    // selection branch below, because the handle is itself nested inside
+    // the fragment group and would otherwise resolve to a fragment
+    // click. Resize takes priority over reorder when the handle is hit.
+    if (!group) {
+      const resizeHandleEl =
+        event.target instanceof Element
+          ? event.target.closest("[data-fragment-resize-handle]")
+          : null;
+      if (resizeHandleEl) {
+        const sideAttr = resizeHandleEl.getAttribute("data-fragment-resize-handle");
+        const fragmentEl = resizeHandleEl.closest("[data-fragment-id]");
+        const fragmentId = fragmentEl?.getAttribute("data-fragment-id");
+        if (
+          fragmentId &&
+          (sideAttr === "n" || sideAttr === "s" || sideAttr === "e" || sideAttr === "w")
+        ) {
+          startFragmentResize(event, fragmentId, sideAttr);
+          return;
+        }
+      }
+    }
+
+    // Sequence ornaments — fragments, notes, dividers — are not nodes
+    // but still selectable. Click sets the selection to the ornament id.
+    // Fragments additionally support drag-to-move: dragging a fragment
+    // vertically shifts its contained edges as a contiguous block in
+    // `diagram.edges`. Notes and dividers don't drag — their visual
+    // position is fully derived from their anchor edge / participants.
+    if (!group) {
+      const ornament = findOrnamentAt(event.target);
+      if (ornament) {
+        if (event.shiftKey) {
+          selection.toggle(ornament.id);
+        } else {
+          selection.set([ornament.id]);
+        }
+        if (ornament.kind === "fragment") {
+          startFragmentReorder(event, ornament.id);
+          return;
+        }
+        event.stopPropagation();
+        return;
+      }
+    }
+
+    // Sequence message edges — drag-to-reorder. The user grabs an arrow
+    // and drags it vertically; on release the edge is moved to the new
+    // chronological slot in `diagram.edges`. Other diagram types route
+    // edge clicks through the React layer's selection wiring; here we
+    // only intercept sequence so we don't disturb existing UX.
+    if (!group) {
+      const edgeEl =
+        event.target instanceof Element ? event.target.closest("[data-edge-id]") : null;
+      if (edgeEl) {
+        const diagram = bus.getState();
+        if (diagram.type === "sequence") {
+          const edgeId = edgeEl.getAttribute("data-edge-id");
+          if (edgeId) {
+            startEdgeReorder(event, edgeId);
+            return;
+          }
+        }
+      }
+    }
+
     // Empty canvas: shift+drag starts marquee selection; plain click
     // clears selection and lets PanZoom take over for pan.
     if (!group) {
@@ -907,6 +1468,44 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
   }
 
   function onPointerMove(event: PointerEvent): void {
+    // Edge-reorder gesture (sequence-only): paint a horizontal guide
+    // at the proposed insertion row, OR — for self-calls — a vertical
+    // guide at the target lifeline when the user drags horizontally.
+    // Direction is locked on the first move that exceeds
+    // `DRAG_THRESHOLD_PX` so the guide doesn't flip mid-drag.
+    if (edgeReorder && edgeReorder.pointerId === event.pointerId) {
+      if (edgeReorder.direction === null) {
+        const dx = event.clientX - edgeReorder.startClientX;
+        const dy = event.clientY - edgeReorder.startClientY;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        edgeReorder.direction =
+          edgeReorder.isSelfCall && Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
+      }
+      paintEdgeReorderGuide(event);
+      return;
+    }
+    // Fragment-reorder gesture (sequence-only): translate the visible
+    // frame ephemerally so the user sees the block follow the pointer.
+    // Threshold-gated so a pure click doesn't trigger movement.
+    if (fragmentReorder && fragmentReorder.pointerId === event.pointerId) {
+      const dy = event.clientY - fragmentReorder.startClientY;
+      if (!fragmentReorder.hasMoved && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
+      fragmentReorder.hasMoved = true;
+      paintFragmentReorderGuide(event);
+      return;
+    }
+    // Fragment-resize gesture (sequence-only): paint a horizontal
+    // (N/S) or vertical (E/W) guide at the proposed new edge position.
+    if (fragmentResize && fragmentResize.pointerId === event.pointerId) {
+      const isVerticalSide = fragmentResize.side === "n" || fragmentResize.side === "s";
+      const delta = isVerticalSide
+        ? event.clientY - fragmentResize.startClientY
+        : event.clientX - fragmentResize.startClientX;
+      if (!fragmentResize.hasMoved && Math.abs(delta) < DRAG_THRESHOLD_PX) return;
+      fragmentResize.hasMoved = true;
+      paintFragmentResizeGuide(event);
+      return;
+    }
     if (!drag || drag.pointerId !== event.pointerId) return;
     const dx = event.clientX - drag.startClient.x;
     const dy = event.clientY - drag.startClient.y;
@@ -1006,6 +1605,18 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
   }
 
   function onPointerUp(event: PointerEvent): void {
+    if (edgeReorder && edgeReorder.pointerId === event.pointerId) {
+      finishEdgeReorder(event);
+      return;
+    }
+    if (fragmentReorder && fragmentReorder.pointerId === event.pointerId) {
+      finishFragmentReorder(event);
+      return;
+    }
+    if (fragmentResize && fragmentResize.pointerId === event.pointerId) {
+      finishFragmentResize(event);
+      return;
+    }
     if (!drag || drag.pointerId !== event.pointerId) return;
     const finished = drag;
     drag = null;
@@ -1124,14 +1735,20 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       const dropTarget = svg.ownerDocument!.elementFromPoint(event.clientX, event.clientY);
       const targetGroup = findNodeAt(dropTarget);
       const targetId = targetGroup?.getAttribute("data-node-id") ?? null;
-      if (targetId && targetId !== finished.nodeId) {
+      if (targetId) {
         const diagram = bus.getState();
+        // Sequence diagrams allow self-messages (drop on the same lifeline
+        // creates a self-call rendered as a curved loopback arc). Other
+        // diagram types still reject self-edges — they're modelling
+        // mistakes there (a class associating with itself, etc.).
+        if (targetId === finished.nodeId && diagram.type !== "sequence") return;
+        const override = initial.getEdgeKindOverride?.();
         history.dispatch(
           addEdgeCommand({
             id: idFactory(),
             source: finished.nodeId,
             target: targetId,
-            kind: defaultEdgeKindFor(diagram.type),
+            kind: override ?? defaultEdgeKindFor(diagram.type),
           }),
         );
       }
@@ -1195,11 +1812,19 @@ function paintSelection(contentGroup: SVGGraphicsElement, ids: ReadonlySet<strin
   previouslySelected.forEach((el) => el.removeAttribute("data-selected"));
   for (const id of ids) {
     const escaped = id.replaceAll('"', '\\"');
-    // Boundary groups carry `data-group-id` instead of `data-node-id`,
-    // so we paint both candidates — exactly one will exist for any id.
-    const target = contentGroup.querySelector(
-      `[data-node-id="${escaped}"], [data-group-id="${escaped}"]`,
-    );
+    // Boundary groups carry `data-group-id`; sequence ornaments carry
+    // `data-fragment-id` / `data-note-id` / `data-divider-id`. We probe
+    // each candidate selector — exactly one will exist for any id.
+    // Painting `data-selected` on the ornament wrapper lets CSS reveal
+    // its resize handles (fragment N/S handles only show while
+    // selected, mirroring node behaviour).
+    const target =
+      contentGroup.querySelector(`g[data-node-id="${escaped}"]`) ??
+      contentGroup.querySelector(`g[data-group-id="${escaped}"]`) ??
+      contentGroup.querySelector(`g[data-fragment-id="${escaped}"]`) ??
+      contentGroup.querySelector(`g[data-note-id="${escaped}"]`) ??
+      contentGroup.querySelector(`g[data-divider-id="${escaped}"]`) ??
+      contentGroup.querySelector(`g[data-edge-id="${escaped}"]`);
     if (target) target.setAttribute("data-selected", "true");
   }
   // Mark the cardinality of the selection on the content group so
