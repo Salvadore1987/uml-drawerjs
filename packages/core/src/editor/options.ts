@@ -11,7 +11,7 @@ import type { ExportJsonOptions, ExportPngOptions, ExportSvgOptions } from "../e
 import type { ImportJsonResult, ImportPumlResult } from "../exporters/index.js";
 import type { History, HistoryOptions } from "../history/index.js";
 import type { LayoutOptions } from "../layout/index.js";
-import type { Diagram, DiagramError, DiagramType } from "../model/types.js";
+import type { Diagram, DiagramError, DiagramType, EdgeKind } from "../model/types.js";
 import type {
   KeyboardNavigationOptions,
   PanZoomController,
@@ -151,6 +151,15 @@ export interface EditorInstance {
   readonly panZoom: PanZoomController | null;
   /** Selection model — exposed so React / DOM adapters can subscribe. */
   readonly selection: SelectionModel;
+  /**
+   * Set the edge kind drag-to-connect should produce. `null` clears the
+   * override and the per-diagram-type default takes over again. Used by
+   * the playground sequence-diagram toolbar so users can pre-pick
+   * `return` / `async-call` / `lost-message` / etc. before drawing.
+   */
+  setEdgeKindOverride(kind: EdgeKind | null): void;
+  /** Read the current override, or `null` when no override is set. */
+  getEdgeKindOverride(): EdgeKind | null;
   /** Detach all listeners and remove the rendered SVG from the host. */
   destroy(): void;
 }

@@ -182,6 +182,8 @@ const FORWARD_ARROWS: Record<EdgeKind, string | null> = {
   return: null,
   create: null,
   destroy: null,
+  "lost-message": null,
+  "found-message": null,
 };
 
 function formatClassEdge(edge: DiagramEdge, aliases: Map<string, string>): string {

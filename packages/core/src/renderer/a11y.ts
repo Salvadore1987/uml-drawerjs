@@ -73,6 +73,10 @@ function arrow(kind: Diagram["edges"][number]["kind"]): string {
       return "creates";
     case "destroy":
       return "destroys";
+    case "lost-message":
+      return "sends (lost)";
+    case "found-message":
+      return "receives (found)";
   }
 }
 

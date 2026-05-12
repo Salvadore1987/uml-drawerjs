@@ -43,8 +43,9 @@
   --uml-edge-label-text: #475569;
 
   /* canvas */
-  --uml-canvas-bg: #f8fafc;
-  --uml-canvas-grid: #cbd5e1;
+  --uml-canvas-bg: #ffffff;
+  --uml-canvas-grid: #e5e7eb;
+  --uml-canvas-grid-major: #cbd5e1;
 
   /* selection / focus */
   --uml-selection-fill: rgba(37, 99, 235, 0.1);
@@ -98,6 +99,29 @@
   --uml-entity-compartment-divider: var(--uml-class-compartment-divider);
   --uml-entity-pk-decoration: underline;
   --uml-entity-required-weight: 600;
+
+  /* Sequence diagram (UML SD — lifelines, activations, fragments, notes). */
+  --uml-sequence-shaft-stroke: var(--uml-edge-stroke);
+  --uml-sequence-shaft-dasharray: 4 4;
+  --uml-sequence-shaft-width: 1;
+  --uml-sequence-icon-stroke: var(--uml-text);
+  --uml-sequence-icon-fill: var(--uml-bg);
+  --uml-sequence-icon-stroke-width: 1.5;
+  --uml-sequence-activation-fill: var(--uml-bg-elevated);
+  --uml-sequence-activation-stroke: var(--uml-text);
+  --uml-sequence-activation-stroke-width: 1;
+  --uml-sequence-fragment-stroke: var(--uml-edge-stroke);
+  --uml-sequence-fragment-tab-bg: var(--uml-bg-elevated);
+  --uml-sequence-fragment-title-color: var(--uml-text);
+  --uml-sequence-fragment-divider-dash: 4 4;
+  --uml-sequence-note-fill: var(--uml-bg-elevated);
+  --uml-sequence-note-stroke: var(--uml-edge-stroke);
+  --uml-sequence-note-fold: var(--uml-bg);
+  --uml-sequence-note-text: var(--uml-text);
+  --uml-sequence-divider-bg: var(--uml-bg-elevated);
+  --uml-sequence-divider-text: var(--uml-text);
+  --uml-sequence-autonumber-color: var(--uml-text-muted);
+  --uml-sequence-lost-found-fill: var(--uml-text);
 }
 
 /* Auto-detect: no explicit data-theme + OS prefers light (or no preference). */
@@ -132,8 +156,9 @@
     --uml-edge-label-bg: #ffffff;
     --uml-edge-label-text: #475569;
 
-    --uml-canvas-bg: #f8fafc;
-    --uml-canvas-grid: #cbd5e1;
+    --uml-canvas-bg: #ffffff;
+    --uml-canvas-grid: #e5e7eb;
+    --uml-canvas-grid-major: #cbd5e1;
 
     --uml-selection-fill: rgba(37, 99, 235, 0.1);
     --uml-selection-stroke: #2563eb;
@@ -174,5 +199,34 @@
     --uml-package-bg: #f8fafc;
     --uml-package-border: #cbd5e1;
     --uml-package-tab-bg: #e2e8f0;
+
+    --uml-entity-header-bg: var(--uml-class-header-bg);
+    --uml-entity-header-text: var(--uml-class-header-text);
+    --uml-entity-stereotype-color: var(--uml-class-stereotype-color);
+    --uml-entity-compartment-divider: var(--uml-class-compartment-divider);
+    --uml-entity-pk-decoration: underline;
+    --uml-entity-required-weight: 600;
+
+    --uml-sequence-shaft-stroke: var(--uml-edge-stroke);
+    --uml-sequence-shaft-dasharray: 4 4;
+    --uml-sequence-shaft-width: 1;
+    --uml-sequence-icon-stroke: var(--uml-text);
+    --uml-sequence-icon-fill: var(--uml-bg);
+    --uml-sequence-icon-stroke-width: 1.5;
+    --uml-sequence-activation-fill: var(--uml-bg-elevated);
+    --uml-sequence-activation-stroke: var(--uml-text);
+    --uml-sequence-activation-stroke-width: 1;
+    --uml-sequence-fragment-stroke: var(--uml-edge-stroke);
+    --uml-sequence-fragment-tab-bg: var(--uml-bg-elevated);
+    --uml-sequence-fragment-title-color: var(--uml-text);
+    --uml-sequence-fragment-divider-dash: 4 4;
+    --uml-sequence-note-fill: var(--uml-bg-elevated);
+    --uml-sequence-note-stroke: var(--uml-edge-stroke);
+    --uml-sequence-note-fold: var(--uml-bg);
+    --uml-sequence-note-text: var(--uml-text);
+    --uml-sequence-divider-bg: var(--uml-bg-elevated);
+    --uml-sequence-divider-text: var(--uml-text);
+    --uml-sequence-autonumber-color: var(--uml-text-muted);
+    --uml-sequence-lost-found-fill: var(--uml-text);
   }
 }

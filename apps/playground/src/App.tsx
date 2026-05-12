@@ -19,7 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { PLAYGROUND_COMMANDS } from "./channel/commands.js";
 import { CanvasToolbar } from "./components/CanvasToolbar.js";
-import { HudBottomLeft, HudBottomRight, HudTopLeft, HudTopRight } from "./hud/HudPanels.js";
+import { HudBottomRight, HudTopLeft, HudTopRight } from "./hud/HudPanels.js";
 import { DIAGRAM_TYPE_LABELS, DIAGRAM_TYPES, SAMPLES } from "./samples/index.js";
 
 type Theme = "dark" | "light";
@@ -84,12 +84,7 @@ export function App(): JSX.Element {
         label: "Designer",
         content: (
           <Canvas data-testid="playground-canvas">
-            <HUD
-              tl={<HudTopLeft />}
-              tr={<HudTopRight />}
-              bl={<HudBottomLeft />}
-              br={<HudBottomRight />}
-            />
+            <HUD tl={<HudTopLeft />} tr={<HudTopRight />} br={<HudBottomRight />} />
             <CanvasToolbar />
           </Canvas>
         ),

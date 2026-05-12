@@ -20,7 +20,7 @@ import { runAutoLayout } from "../layout/index.js";
 import type { LayoutOptions } from "../layout/index.js";
 import { createEmptyDiagram } from "../model/factory.js";
 import { cloneDiagram } from "../model/clone.js";
-import type { Diagram, DiagramError } from "../model/types.js";
+import type { Diagram, DiagramError, EdgeKind } from "../model/types.js";
 import { adoptParserErrors, runAllValidators } from "../validators/index.js";
 import {
   attachInteractions,
@@ -99,6 +99,7 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
   // Grid visibility — toolbar/keyboard toggles flip this and trigger a
   // silent rerender that swaps the grid layer. Snap is independent.
   let gridVisible = interactive.grid?.visible ?? true;
+  let edgeKindOverride: EdgeKind | null = null;
   const gridListeners = new Set<(visible: boolean) => void>();
   const notifyGridListeners = (): void => {
     for (const listener of [...gridListeners]) listener(gridVisible);
@@ -201,6 +202,7 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
     redoAndRerender,
     () => toggleGridFlag(),
   );
+  const getEdgeKindOverride = (): EdgeKind | undefined => edgeKindOverride ?? undefined;
   let interactions: InteractionsController | null = bootstrapInteractions(
     interactive.pointer,
     mount?.root ?? null,
@@ -210,6 +212,7 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
     options.idFactory,
     getLocked,
     getSnap,
+    getEdgeKindOverride,
   );
 
   const setGridVisibleFlag = (value: boolean): void => {
@@ -355,6 +358,12 @@ export function createEditor(host: Element, options: CreateEditorOptions): Edito
       return () => {
         gridListeners.delete(listener);
       };
+    },
+    setEdgeKindOverride(kind: EdgeKind | null): void {
+      edgeKindOverride = kind;
+    },
+    getEdgeKindOverride(): EdgeKind | null {
+      return edgeKindOverride;
     },
 
     bus,
@@ -508,6 +517,7 @@ function bootstrapInteractions(
   idFactory: (() => string) | undefined,
   getLocked: () => boolean,
   getSnap: () => SnapOptions,
+  getEdgeKindOverride: () => EdgeKind | undefined,
 ): InteractionsController | null {
   if (flag === false) return null;
   if (flag === undefined) return null;
@@ -522,6 +532,7 @@ function bootstrapInteractions(
     selection,
     getLocked,
     getSnap,
+    getEdgeKindOverride,
     ...(idFactory ? { idFactory } : {}),
   });
 }

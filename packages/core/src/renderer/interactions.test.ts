@@ -295,9 +295,10 @@ describe("renderer/interactions — pointer flow", () => {
     controller.dispose();
   });
 
-  it("move-drag snaps the delta to the grid step (default 24 px)", () => {
-    // Arrange — drag node A by (+13, +13). Snap should round the delta
-    // to (24, 24), so the final coordinate becomes (24, 24) from (0, 0).
+  it("move-drag snaps the delta to the grid step (default 12 px)", () => {
+    // Arrange — drag node A by (+13, +13). With the drawio-style fine
+    // grid (step = 12), the snapped delta rounds to (12, 12), so the
+    // final coordinate becomes (12, 12) from (0, 0).
     const { mount, controller, bus } = setup();
     const nodeA = mount.root.querySelector('[data-node-id="a"]') as Element;
 
@@ -308,7 +309,7 @@ describe("renderer/interactions — pointer flow", () => {
 
     // Assert — final coordinate is the original + snapped delta.
     const overrides = bus.getState().metadata.layoutOverrides ?? {};
-    expect(overrides["a"]).toEqual({ x: 24, y: 24 });
+    expect(overrides["a"]).toEqual({ x: 12, y: 12 });
     controller.dispose();
   });
 });

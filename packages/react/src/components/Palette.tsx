@@ -1,12 +1,24 @@
-import { addGroupCommand, addNodeCommand } from "@uml-drawer/core/commands";
-import type { DiagramType, GroupKind, NodeKind } from "@uml-drawer/core/model";
+import {
+  addEdgeCommand,
+  addFragmentCommand,
+  addGroupCommand,
+  addNodeCommand,
+} from "@uml-drawer/core/commands";
+import type {
+  CombinedFragment,
+  DiagramType,
+  EdgeKind,
+  FragmentKind,
+  GroupKind,
+  NodeKind,
+} from "@uml-drawer/core/model";
 import { uuidv7 } from "@uml-drawer/core/model";
 import { useContext, useMemo, type HTMLAttributes } from "react";
 import { UmlEditorContext } from "../internal/context.js";
 
 export interface PaletteItem {
   /** AST kind to instantiate when the user activates the item. */
-  readonly kind: NodeKind | GroupKind;
+  readonly kind: NodeKind | GroupKind | FragmentKind | EdgeKind;
   /** Display label. */
   readonly label: string;
   /** Visual / semantic group (rendered as a section heading). */
@@ -15,11 +27,18 @@ export interface PaletteItem {
   readonly diagramTypes: readonly DiagramType[];
   /**
    * What kind of element this item creates. Defaults to `"node"` so
-   * existing palette tables stay backward-compatible. Set to `"group"`
-   * for boundary-style entries — clicking such an item dispatches an
-   * `addGroupCommand` instead of `addNodeCommand`.
+   * existing palette tables stay backward-compatible.
+   *   - `"node"`     → `addNodeCommand`
+   *   - `"group"`    → `addGroupCommand` (boundary / package / system)
+   *   - `"fragment"` → `addFragmentCommand` (sequence combined fragment;
+   *     wraps the current selection's message edges or every edge in the
+   *     diagram when nothing is selected)
+   *   - `"self-call"` → sequence-only self-message: `addEdgeCommand`
+   *     with `source === target` set to the currently-selected lifeline
+   *     (falls back to the first lifeline in the diagram when nothing
+   *     is selected). `kind` is treated as the `EdgeKind` to apply.
    */
-  readonly target?: "node" | "group";
+  readonly target?: "node" | "group" | "fragment" | "self-call";
 }
 
 export type PaletteFilter = (item: PaletteItem) => boolean;
@@ -110,9 +129,38 @@ const PALETTE_ITEMS: readonly PaletteItem[] = [
   // ER
   { kind: "entity", label: "Entity", category: "Entity Relationship", diagramTypes: ["er"] },
 
-  // Sequence
+  // Sequence — single lifeline item. The visual kind (actor /
+  // boundary / control / entity / collections / database / queue) is
+  // picked in the props panel via the Kind dropdown after the
+  // participant is dropped on the canvas — see
+  // `LIFELINE_KIND_OPTIONS` in `PropsPanel.tsx`. Keeping one palette
+  // entry mirrors how class / ER tabs work, where the visual sub-type
+  // is also a property, not a separate palette button.
   { kind: "lifeline", label: "Lifeline", category: "Sequence", diagramTypes: ["sequence"] },
-  { kind: "actor", label: "Actor", category: "Sequence", diagramTypes: ["sequence"] },
+  // Self-call: attaches a self-message to the currently-selected
+  // lifeline (or the first lifeline in the diagram when nothing is
+  // selected). Rendered by the sequence renderer as a loopback arc.
+  {
+    target: "self-call",
+    kind: "sync-call",
+    label: "Self call",
+    category: "Sequence",
+    diagramTypes: ["sequence"],
+  },
+
+  // Sequence — combined fragment. A single palette item: clicking it
+  // creates a fragment with the default kind (`opt`), and the user
+  // picks the actual kind (alt / opt / loop / par / break / critical /
+  // ref) in the props-panel `FragmentEditor`. `opt` is the safest
+  // default because it accepts a single operand and trips no validator
+  // immediately.
+  {
+    target: "fragment",
+    kind: "opt",
+    label: "Fragment",
+    category: "Sequence Fragments",
+    diagramTypes: ["sequence"],
+  },
 ];
 
 export interface PaletteProps extends HTMLAttributes<HTMLElement> {
@@ -183,6 +231,107 @@ export function Palette({
           { x: 0, y: 0, width: 320, height: 200 },
         ),
       );
+      return;
+    }
+    if (item.target === "self-call") {
+      const state = editor.getState();
+      if (state.type !== "sequence") return;
+      const selectedIds = new Set([...editor.selection.get()]);
+      // Pick the first selected lifeline; fall back to the first
+      // lifeline in the diagram so the click is never a no-op when
+      // any lifelines exist. Self-call needs `source === target`, so
+      // we just reuse the chosen id for both ends.
+      const target = state.nodes.find((n) => selectedIds.has(n.id)) ?? state.nodes[0];
+      if (!target) return;
+      const edgeId = uuidv7();
+      editor.dispatch(
+        addEdgeCommand({
+          id: edgeId,
+          source: target.id,
+          target: target.id,
+          kind: item.kind as EdgeKind,
+        }),
+      );
+      editor.selection.set([edgeId]);
+      return;
+    }
+    if (item.target === "fragment") {
+      const state = editor.getState();
+      if (state.type !== "sequence") return;
+      const selectedIds = new Set([...editor.selection.get()]);
+      const existingFragments = state.fragments ?? [];
+
+      // Detect a parent fragment from the current selection. Two
+      // paths qualify:
+      //   1. The selection points directly at an existing fragment
+      //      — the user explicitly chose where to nest.
+      //   2. The selection points at message edges that all live
+      //      inside one existing fragment's operand — the new
+      //      fragment naturally nests inside that operand.
+      const selectedFragment = existingFragments.find((f) => selectedIds.has(f.id));
+      const selectedEdgeIds = state.edges
+        .filter((edge) => selectedIds.has(edge.id))
+        .map((edge) => edge.id);
+      let parentFragment = selectedFragment;
+      let parentOperandId: string | undefined;
+      if (!parentFragment && selectedEdgeIds.length > 0) {
+        for (const f of existingFragments) {
+          for (const op of f.operands) {
+            const opSet = new Set(op.edges);
+            if (selectedEdgeIds.every((id) => opSet.has(id))) {
+              parentFragment = f;
+              parentOperandId = op.id;
+              break;
+            }
+          }
+          if (parentFragment) break;
+        }
+      }
+
+      // Decide which edges the new fragment wraps. Selection always
+      // wins. When the parent is selected (no edges), wrap a single
+      // edge from the parent so the child is *strictly smaller* —
+      // otherwise child + parent share geometry and visually merge.
+      // Top-level fallback: free edges (not in any fragment) or the
+      // last edge as a last resort.
+      let targetEdges: string[];
+      if (selectedEdgeIds.length > 0) {
+        targetEdges = selectedEdgeIds;
+      } else if (selectedFragment) {
+        const firstOp = selectedFragment.operands.find((op) => op.edges.length > 0);
+        const firstEdge = firstOp?.edges[0];
+        targetEdges = firstEdge ? [firstEdge] : [];
+        if (firstOp) parentOperandId = firstOp.id;
+      } else {
+        const usedEdgeIds = new Set<string>();
+        for (const f of existingFragments) {
+          for (const op of f.operands) for (const id of op.edges) usedEdgeIds.add(id);
+        }
+        const freeEdgeIds = state.edges.filter((e) => !usedEdgeIds.has(e.id)).map((e) => e.id);
+        const fallbackEdgeId =
+          state.edges.length > 0 ? state.edges[state.edges.length - 1]!.id : null;
+        targetEdges = freeEdgeIds.length > 0 ? freeEdgeIds : fallbackEdgeId ? [fallbackEdgeId] : [];
+      }
+      if (targetEdges.length === 0) return;
+
+      const kind = item.kind as FragmentKind;
+      const fragment: CombinedFragment = {
+        id: uuidv7(),
+        kind,
+        operands: [{ id: uuidv7(), edges: targetEdges }],
+      };
+      if (parentFragment) {
+        fragment.parentId = parentFragment.id;
+        if (parentOperandId) fragment.parentOperandId = parentOperandId;
+      }
+      // alt / par need >= 2 operands to satisfy SequenceFragmentTooFewOperands.
+      // The second operand starts empty — the user fills it from the
+      // props-panel editor.
+      if (kind === "alt" || kind === "par") {
+        fragment.operands.push({ id: uuidv7(), edges: [], guard: "else" });
+      }
+      editor.dispatch(addFragmentCommand(fragment));
+      editor.selection.set([fragment.id]);
       return;
     }
     editor.dispatch(

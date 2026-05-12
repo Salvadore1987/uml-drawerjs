@@ -52,6 +52,10 @@ const nodeKindSchema = z.enum([
   "entity",
   "lifeline",
   "actor",
+  "lifeline-boundary",
+  "lifeline-control",
+  "lifeline-entity",
+  "lifeline-collections",
 ]);
 
 const edgeKindSchema = z.enum([
@@ -71,6 +75,8 @@ const edgeKindSchema = z.enum([
   "return",
   "create",
   "destroy",
+  "lost-message",
+  "found-message",
 ]);
 
 const groupKindSchema = z.enum(["boundary", "package", "system"]);
@@ -146,6 +152,56 @@ const enumLiteralSchema = z
   })
   .strict();
 
+const activationIntervalSchema = z
+  .object({
+    id: z.string(),
+    fromEdgeId: z.string(),
+    toEdgeId: z.string().optional(),
+  })
+  .strict();
+
+const fragmentKindSchema = z.enum(["alt", "opt", "loop", "par", "break", "critical", "ref"]);
+
+const fragmentOperandSchema = z
+  .object({
+    id: z.string(),
+    guard: z.string().optional(),
+    edges: z.array(z.string()),
+  })
+  .strict();
+
+const combinedFragmentSchema = z
+  .object({
+    id: z.string(),
+    kind: fragmentKindSchema,
+    label: z.string().optional(),
+    parentId: z.string().optional(),
+    parentOperandId: z.string().optional(),
+    operands: z.array(fragmentOperandSchema),
+    coveredParticipants: z.array(z.string()).optional(),
+    topExtraPx: z.number().int().optional(),
+    bottomExtraPx: z.number().int().optional(),
+  })
+  .strict();
+
+const sequenceNoteSchema = z
+  .object({
+    id: z.string(),
+    placement: z.enum(["left", "right", "over"]),
+    participants: z.array(z.string()),
+    text: z.string(),
+    anchorEdgeId: z.string().optional(),
+  })
+  .strict();
+
+const sequenceDividerSchema = z
+  .object({
+    id: z.string(),
+    label: z.string(),
+    afterEdgeId: z.string().optional(),
+  })
+  .strict();
+
 const edgeEndpointSchema = z
   .object({
     role: z.string().optional(),
@@ -167,6 +223,7 @@ const nodeSchema = z
     operations: z.array(operationSchema).optional(),
     generics: z.array(z.string()).optional(),
     enumLiterals: z.array(enumLiteralSchema).optional(),
+    activations: z.array(activationIntervalSchema).optional(),
     style: nodeStyleSchema.optional(),
   })
   .strict();
@@ -192,6 +249,8 @@ const edgeSchema = z
       })
       .strict()
       .optional(),
+    activatesTarget: z.boolean().optional(),
+    deactivatesSource: z.boolean().optional(),
     style: edgeStyleSchema.optional(),
   })
   .strict();
@@ -220,6 +279,14 @@ const metadataSchema = z
     schemaVersion: z.string(),
     layoutOverrides: z.record(z.string(), layoutCoordinateSchema).optional(),
     opaque: z.array(z.string()).optional(),
+    sequenceAutoNumber: z
+      .object({
+        start: z.number(),
+        increment: z.number(),
+        format: z.string().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -232,6 +299,9 @@ export const diagramSchema = z
     nodes: z.array(nodeSchema),
     edges: z.array(edgeSchema),
     groups: z.array(groupSchema),
+    fragments: z.array(combinedFragmentSchema).optional(),
+    notes: z.array(sequenceNoteSchema).optional(),
+    dividers: z.array(sequenceDividerSchema).optional(),
     styles: z.record(z.string(), z.union([nodeStyleSchema, edgeStyleSchema])).optional(),
     metadata: metadataSchema,
   })

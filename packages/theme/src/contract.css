@@ -40,8 +40,10 @@
   --uml-edge-stroke-width: 1.5px;
 
   /* === canvas geometry (theme-independent) =================== */
-  /* Spacing between dot-grid points on the canvas backdrop (px). */
-  --uml-canvas-grid-density: 24px;
+  /* Spacing between minor grid lines on the canvas backdrop (px).
+     Major lines fall every 5 × density. Mirrors app.diagrams.net's
+     fine reference grid; independent of snap step. */
+  --uml-canvas-grid-density: 12px;
 
   /* === motion ================================================ */
   /* Duration applied to `background-color` / `color` transitions when

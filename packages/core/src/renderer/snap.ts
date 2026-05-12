@@ -4,7 +4,8 @@
  * diagram; the caller chooses what to snap (a delta, a final coordinate,
  * a width). Splitting it out keeps the rule in one place and lets the
  * playground / unit tests share a single source of truth for the grid
- * step (default `24` px, matching the `--uml-canvas-grid-density` token).
+ * step (default `12` px, matching the `--uml-canvas-grid-density` token
+ * — both move-drag and resize-drag land on whole grid cells).
  */
 
 export interface SnapOptions {
@@ -13,7 +14,7 @@ export interface SnapOptions {
   readonly step: number;
 }
 
-export const DEFAULT_SNAP: SnapOptions = { enabled: true, step: 24 };
+export const DEFAULT_SNAP: SnapOptions = { enabled: true, step: 12 };
 
 /** Round a single value to the nearest multiple of the grid step. */
 export function snapValue(value: number, options: SnapOptions = DEFAULT_SNAP): number {

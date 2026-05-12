@@ -245,7 +245,7 @@ function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
  * the node's local space (origin at top-left of the frame), so the
  * outer `<g transform="translate(x,y)">` positions them correctly.
  */
-function renderResizeHandles(geom: NodeGeometry): VNode[] {
+export function renderResizeHandles(geom: NodeGeometry): VNode[] {
   type Side = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
   const positions: ReadonlyArray<{
     side: Side;
@@ -290,7 +290,7 @@ function renderResizeHandles(geom: NodeGeometry): VNode[] {
  * starting edge-creation drags. Hidden by default — CSS reveals them on
  * `:hover` of the node group and when `data-selected="true"`.
  */
-function renderPortHandles(geom: NodeGeometry): VNode[] {
+export function renderPortHandles(geom: NodeGeometry): VNode[] {
   const positions: ReadonlyArray<{ side: "n" | "e" | "s" | "w"; x: number; y: number }> = [
     { side: "n", x: geom.width / 2, y: 0 },
     { side: "e", x: geom.width, y: geom.height / 2 },
