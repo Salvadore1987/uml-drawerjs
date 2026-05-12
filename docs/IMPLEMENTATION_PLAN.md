@@ -120,11 +120,16 @@ gap'ы контракта, которые могут потребовать ра
     - ✅ `AddNodeCommand`
     - ✅ `RemoveNodeCommand` (каскадно убирает edges; восстанавливает индексы и `layoutOverrides` на invert)
     - ✅ `MoveNodeCommand` (writeback в `metadata.layoutOverrides`)
+    - ✅ `ResizeNodeCommand` (writeback `width`/`height` в `metadata.layoutOverrides`)
     - ✅ `UpdateNodeCommand`
     - ✅ `AddEdgeCommand`
     - ✅ `RemoveEdgeCommand`
     - ✅ `UpdateEdgeCommand`
+    - ✅ `MoveEdgeCommand` (rerouting via per-edge `points[]` в `metadata.layoutOverrides`)
     - ✅ `GroupCommand` (`addGroupCommand` / `updateGroupCommand` / `removeGroupCommand`)
+    - ✅ `MoveGroupCommand` / `ResizeGroupCommand` (boundary как first-class)
+    - ✅ `MoveSequenceFragmentCommand` / `ResizeSequenceFragmentCommand` (UML SD frame handles)
+    - ✅ `SequenceOrnamentCommand` (add/remove/update notes / dividers / autonumber)
     - ✅ `ApplyLayoutCommand`
     - ✅ `ImportTextCommand` (полная замена AST)
 - ✅ CommandBus с синхронным dispatch + before/after-events.
@@ -142,7 +147,10 @@ gap'ы контракта, которые могут потребовать ра
 - ⚠️ Lezer-грамматика подмножества PlantUML под 5 типов диаграмм — **отложено** в [ADR-0003](./adr/0003-plantuml-subset.md): MVP отгружен на ручном line-based парсере с тем же публичным API; миграция на Lezer пройдёт в Phase 4b или совместно с Phase 11 (CodeMirror).
 - ⚠️ Build-скрипт `.grammar` → сгенерированный парсер (`@lezer/generator`) — отложено вместе с Lezer (см. ADR-0003 § Migration plan).
 - ✅ AST-builder, собирающий `Diagram` (диспатчер по типу диаграммы + per-type pattern matchers; на Lezer-tree свалится после миграции).
-- ✅ Class member-bodies: `{ +balance: Decimal {readonly}, {abstract} +validate(): void, …}` — visibility (`+−#~`), `{static}/{abstract}/{readonly}` modifiers, multiplicity `[0..*]`, defaults; generics `class Foo<T>`; enum literals; `package "com.bank" { … }` containers (PR-2 / 2026-05-10).
+- ✅ Class member-bodies: `{ +balance: Decimal {readonly}, {abstract} +validate(): void, …}` — visibility (`+−#~`), `{static}/{abstract}/{readonly}` modifiers, multiplicity `[0..*]`, defaults; generics `class Foo<T>`; enum literals; `package "com.bank" { … }` containers (PR-2 / 2026-05-10, см. [ADR-0007](./adr/0007-class-enum-modelling.md) / [ADR-0008](./adr/0008-class-edge-endpoints.md)).
+- ✅ ER attribute bodies: `entity Foo { * id : UUID, + tenant_id : UUID, email : String <<NN>>, … }` — PK (`*`), FK (`+`), `<<NN>>` / `<<not null>>` stereotypes, defaults; per-end cardinality auto-derives `edge.kind` ([ADR-0009](./adr/0009-er-attribute-modelling.md)).
+- ✅ Sequence — полная UML SD нотация: `participant` / `actor` + специализированные lifelines (`boundary` / `control` / `entity` / `database` / `queue` / `collections`), `activate` / `deactivate` + `++` / `--` shortcuts, `note left|right of`/`note over` (single + multi-line), combined fragments (`alt` / `else` / `opt` / `loop` / `par` / `break` / `critical` / `ref over`), `==dividers==`, `autonumber [start [inc]] ["format"]`, self-messages, create / destroy ([ADR-0010](./adr/0010-sequence-uml-notation.md)).
+- ✅ C4 stdlib full coverage: `Person_Ext`, `System_Ext`, `SystemDb` / `SystemDb_Ext`, `SystemQueue` / `SystemQueue_Ext`, `Container_Ext`, `ContainerDb`, `ContainerQueue` / `ContainerQueue_Ext`, `Component_Ext`, `ComponentDb`, `ComponentQueue` / `ComponentQueue_Ext`, `Enterprise_Boundary` / `Container_Boundary` / generic `Boundary` (commits `5b82579`, `cb311d3`, `0647017`).
 - ✅ Opaque-block fallback для неподдерживаемых конструкций (preprocessor, !include и т. п. → `metadata.opaque`).
 - ✅ Декодер аннотаций `' @drawer:meta {...}` → `metadata.layoutOverrides`, `styles`.
 - ✅ Фикстуры: эталонные `.puml` файлы в `packages/core/__fixtures__/{c4-context,c4-container,c4-component,class,er,sequence}/` + matching `.json` снапшоты.
@@ -174,7 +182,7 @@ gap'ы контракта, которые могут потребовать ра
 - ✅ `validators/semantic.ts` — уникальность id (nodes / edges / groups), существование endpoints у edges, references group children, пустые labels.
 - ✅ `validators/constraints.ts` — правила на тип диаграммы:
     - ✅ C4: whitelist `NodeKind` + проверка вложенности Boundary (только C4-кинды внутри boundary).
-    - ✅ Sequence: edges только между lifeline / actor.
+    - ✅ Sequence: edges только между lifeline-кинды / actor; новые коды `CONSTRAINT_SEQUENCE_ACTIVATION_UNBALANCED`, `CONSTRAINT_SEQUENCE_FRAGMENT_EMPTY_OPERAND`, `CONSTRAINT_SEQUENCE_FRAGMENT_TOO_FEW_OPERANDS`, `CONSTRAINT_SEQUENCE_NOTE_ORPHAN_PARTICIPANT`, `CONSTRAINT_SEQUENCE_NOTE_EMPTY` (см. ADR-0010).
     - ✅ ER: связи только Entity↔Entity, обязательная cardinality, валидация cardinality-токенов (`1`, `0..*`, `*`, …).
     - ✅ Class: whitelist `NodeKind` (class/interface/abstract-class/enum) + edge-kind whitelist; classic-UML member rules (`enum` без operations / attributes / generics; `interface` методы implicitly abstract; abstract-метод только на `abstract-class`/`interface`) — коды `CONSTRAINT_CLASS_*` (PR-5 / 2026-05-10, ADR-0007 / 0008).
 - ✅ `validators/lint.ts` — orphan-узлы (warning, исключая sequence), дубликаты labels (warning), циклы по inheritance/realization (error).
@@ -205,10 +213,14 @@ gap'ы контракта, которые могут потребовать ра
 
 - ✅ Мини декларативный SVG-слой (без D3): VNode-tree (`renderer/types.ts`) → реальные узлы через `mountSvg` (`renderer/mount.ts`).
 - ✅ Рендереры по `NodeKind` (`renderer/nodes.ts`) — кадры, header, стереотип-бейджи, attribute-rows для Class/Interface/Abstract/Entity, operation-rows для классов; геометрия растёт под содержимое.
-- ✅ Рендереры по `EdgeKind` (`renderer/edges.ts`) — strokes per kind (`realization`/`dependency`/`return` штриховые), стрелочные маркеры (`triangle` / `diamond filled` / `diamond open` / `open` / `arrow`), label-pill, ER cardinality-метки на обоих концах.
+- ✅ Рендереры по `EdgeKind` (`renderer/edges.ts`) — strokes per kind (`realization`/`dependency`/`return` штриховые), стрелочные маркеры (`triangle` / `diamond filled` / `diamond open` / `open` / `arrow`), label-pill, ER cardinality-метки на обоих концах, class per-end multiplicity / role / navigability (см. ADR-0008).
+- ✅ Boundary-как-first-class (`renderer/groups.ts`): рамка с заголовком, drag / move / resize, drag-into-boundary membership, переключение alias / label через props panel — без потери дочерних узлов; ELK uplift координат потомков (commits `7568e56`, `8e2a6d0`, `e003a5d`, `c9202f4`).
+- ✅ Sequence-renderer (`renderer/sequence.ts`) — выделенный pipeline для UML SD: вертикальные lifelines, шахты активаций, фреймы combined fragments, multi-section operands `[else]`, note-rectangles, divider bands, autonumber-prefixed labels, self-message loopback, create / destroy arrows (см. ADR-0010).
+- ✅ Dot-grid фон (`renderer/grid.ts`) — пер-canvas SVG-pattern, scale-aware, `--uml-canvas-grid-*` токены; используется как visual cue для snap'а (commit `d82cf41`).
 - ✅ Port snapping: `portSnap()` шринкует сегмент до пересечения с прямоугольной рамкой узла; покрыто тестом + дегенерация при overlap.
 - ✅ Все стили — через `--uml-*` контракт (`var(--uml-node-bg)`, `var(--uml-edge-stroke)`, …), guard-тест проверяет отсутствие hex-литералов в сериализованной vnode-tree.
 - ✅ Pan/zoom (`renderer/panZoom.ts`): wheel-zoom вокруг курсора, pointer-drag, pinch (двухпальцевый), clamp `[minScale, maxScale]`, `dispose()` снимает все listeners. Применяет transform на target `<g>`.
+- ✅ Interactive слой (`renderer/interactions.ts`): pointer drag для узлов и групп, resize-handles (4 угла + 4 ребра, `renderer/resizeGeometry.ts`), snap на grid-density, отдельная команда `MoveSequenceFragmentCommand` / `ResizeSequenceFragmentCommand` для SD-фреймов (commit `feaeeb4`).
 - ✅ Minimap (`renderer/minimap.ts`): scaled-down rect-per-node + viewport-rect от текущего pan/zoom состояния.
 - ✅ Selection model (`renderer/selection.ts`): headless store с subscribe/add/remove/toggle/clear, идемпотентные no-op'ы.
 - ✅ Keyboard (`renderer/keyboard.ts`): Tab/Shift+Tab/Arrow{Up,Down,Left,Right} (Shift = ×10 step) / Delete / Backspace / Enter / Cmd+Z / Cmd+Shift+Z, dispose() отвязывает.
@@ -264,9 +276,9 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** идиоматичный React-API поверх ядра. Компоненты headless-ish: только структурный CSS + theming hooks через `--uml-*`. Никакой бренд-эстетики.
 
-- ✅ `<UmlEditor>` root: controlled (`value`) / uncontrolled (`defaultValue`); `onChange`, `onValidate`. Diagram type зафиксирован пропсом `diagramType`. Контроль `value` синхронизируется через `editor.loadFromText`.
-- ✅ Core sub-components: `<Canvas>`, `<Palette>`, `<PropsPanel>`, `<TextEditor>`, `<Outline>`. Все хуки внутри tolerant к моменту между mount UmlEditor и регистрацией Canvas-host'а — рендерят placeholder, не падают.
-- ✅ Optional supplementary headless-компоненты: `<HUD>`, `<CommandChannel>`, `<Statusbar>` — тонкие primitives с структурным CSS, без декоративного визуала. CommandChannel ничего не диспатчит сам — хост передаёт `commands` map (`/add-class`, `/connect`, …).
+- ✅ `<UmlEditor>` root: controlled (`value`) / uncontrolled (`defaultValue`); `onChange`, `onValidate`. Diagram type зафиксирован пропсом `diagramType`. Контроль `value` синхронизируется через `editor.loadFromText`. После initial load + auto-layout вызывается `editor.centerView()`, чтобы холст открывался с диаграммой по центру в масштабе 100%.
+- ✅ Core sub-components: `<Canvas>`, `<Palette>` (с дефолтным каталогом — узлы + Boundary как palette-item), `<PropsPanel>` (per-kind редакторы: `<ClassMembersEditor>`, `<EntityMembersEditor>`, `<FragmentEditor>`, `<NoteEditor>`, `<DividerEditor>`), `<TextEditor>`, `<Outline>`. Все хуки внутри tolerant к моменту между mount UmlEditor и регистрацией Canvas-host'а — рендерят placeholder, не падают.
+- ✅ Optional supplementary headless-компоненты: `<HUD>`, `<CommandChannel>`, `<Statusbar>`, `<Tabs>` (designer/text-tab переключение) — тонкие primitives с структурным CSS, без декоративного визуала. CommandChannel ничего не диспатчит сам — хост передаёт `commands` map (`/add-class`, `/connect`, …).
 - ✅ Хуки: `useEditor`, `useEditorState`, `useDiagramErrors`, `useSelection`. `useEditor()` возвращает `EditorInstance | null` (null до готовности); throw, если вызван вне `<UmlEditor>`.
 - ✅ Prop `layout={{ palette, props, text }}` управляет расположением панелей через CSS grid-areas (`uml-editor--palette-…`, `uml-editor--props-…`, `uml-editor--text-…`).
 - ✅ Prop `paletteFilter` — фильтрация компонентов палитры.
@@ -302,7 +314,8 @@ gap'ы контракта, которые могут потребовать ра
 
 **Цель:** showcase-приложение поверх готовой библиотеки и cyber-topographic скина (P13a). Демонстрирует, что design-agnostic ядро достаточно для построения тяжело-стилизованного редактора. Visual regression и e2e тестбед.
 
-- ✅ Vite-приложение, повторяющее структуру шаблона `02-cyber-topographic.html`: topbar (brand + breadcrumb + live-pill + theme-switch + CTA), anchors-column (Palette + Outline), canvas-column (canvas + 4 HUD-оверлея + text editor), right column (PropsPanel + CommandChannel), statusbar.
+- ✅ Vite-приложение, повторяющее структуру шаблона `02-cyber-topographic.html`: topbar (brand + breadcrumb + live-pill + theme-switch + CTA), anchors-column (Palette + Outline), workzone-column (unified `<Tabs>` Designer / PlantUML — Alt+1 / Alt+2 swap; canvas получает 4 HUD-оверлея + CanvasToolbar), right column (PropsPanel + CommandChannel), statusbar (commit `bf415d1`).
+- ✅ Дефолт при загрузке — C4 · Context (первый пункт breadcrumb'а, commit `17f51f5`).
 - ✅ На корне приложения подключён класс `.cyber-topographic-skin` (через `useEffect` на `document.body`) и импортирован `apps/playground/src/skins/cyber-topographic/index.css`.
 - ✅ Подключение реального `@uml-drawer/react` `<UmlEditor>`. Доп. supplementary-компоненты (`<HUD>`, `<CommandChannel>`, `<Statusbar>`) использованы для построения композиции; Palette + Outline + PropsPanel + TextEditor + Canvas обёрнуты в Playground-grid через override `.uml-playground .uml-editor`.
 - ✅ HUD-биндинги (`apps/playground/src/hud/HudPanels.tsx`):
@@ -382,8 +395,12 @@ gap'ы контракта, которые могут потребовать ра
 - ✅ `docs/adr/0002-undo-granularity.md` — атомарные команды vs семантическая группировка typing-burst. Default = atomic, opt-in coalesce window via `History` predicate.
 - ✅ `docs/adr/0003-plantuml-subset.md` — какое подмножество PlantUML поддерживается в MVP (написан в Phase 4).
 - ✅ `docs/adr/0004-collab-readiness.md` — пять инвариантов CRDT-готовности + миграционный путь к Yjs.
-- ✅ `docs/adr/0005-drilldown-out-of-scope.md` — drill-down (sub-diagrams) исключён из 0.x; обоснование + roadmap для последующего ADR-0007.
+- ✅ `docs/adr/0005-drilldown-out-of-scope.md` — drill-down (sub-diagrams) исключён из 0.x; обоснование + roadmap.
 - ✅ `docs/adr/0006-ai-extension.md` — AI-помощник как отдельный пакет (`@uml-drawer/ai`); MVP-пакеты остаются AI-free.
+- ✅ `docs/adr/0007-class-enum-modelling.md` — `enum` литералы как dedicated `EnumLiteral[]` поле на `DiagramNode`, не shoehorned в `attributes`.
+- ✅ `docs/adr/0008-class-edge-endpoints.md` — class-edges получают nested `ends?: { source?, target? }` с per-end role / multiplicity / navigability; ER остаётся на `cardinality`.
+- ✅ `docs/adr/0009-er-attribute-modelling.md` — ER-колонки переиспользуют `Attribute` с kind-aware флагами PK / FK / NN; UML/IE notation (`*` PK, `+` FK, `<<NN>>`).
+- ✅ `docs/adr/0010-sequence-uml-notation.md` — полная UML SD нотация: distinct `lifeline-*` kinds; flat `fragments[]` + `notes[]` + `dividers[]`; activations как intervals на узле; self-message как edge с `source === target`.
 - ✅ `docs/design/interaction-matrix.md` — touch/mobile UX матрица; hover-only запрещён, каждое действие имеет keyboard + touch + slash-command путь.
 
 ---
@@ -415,21 +432,24 @@ uml-drawerjs/
 │  ├─ codemirror-plantuml/
 │  │  └─ src/{language.ts, highlight.ts, lint.ts, autocomplete.ts, snippets.ts, index.ts}
 │  └─ react/
-│     └─ src/{UmlEditor.tsx, Canvas.tsx, Palette.tsx, PropsPanel.tsx,
+│     └─ src/components/{UmlEditor.tsx, Canvas.tsx, Palette.tsx, PropsPanel.tsx,
 │              TextEditor.tsx, Outline.tsx, HUD.tsx, CommandChannel.tsx,
-│              Statusbar.tsx, hooks/, index.ts}
+│              Statusbar.tsx, Tabs.tsx, ClassMembersEditor.tsx,
+│              EntityMembersEditor.tsx, FragmentEditor.tsx, NoteEditor.tsx,
+│              DividerEditor.tsx}, hooks/, index.ts
 ├─ apps/
 │  ├─ playground/
 │  │  └─ src/
-│  │     ├─ App.tsx, layout/, hud/, channel/, samples/, index.html
+│  │     ├─ App.tsx, components/CanvasToolbar.tsx, hud/, channel/, samples/, main.tsx
 │  │     └─ skins/cyber-topographic/      # P13a — showcase skin, NOT in npm
 │  │        └─ {tokens.css, mapping.css, bg.css, fonts.css, decorations.css, index.css, README.md}
-│  └─ docs/                              # VitePress / Starlight
+│  └─ docs/                              # VitePress (concepts/ diagrams/ recipes/ api/ getting-started.md theming.md migration.md)
 └─ docs/
    ├─ uml-drawer.md                      # источник требований
    ├─ design/02-cyber-topographic.html   # визуальный референс
+   ├─ design/interaction-matrix.md       # touch / mobile / keyboard матрица
    ├─ IMPLEMENTATION_PLAN.md             # этот файл
-   └─ adr/000{1..6}-*.md
+   └─ adr/000{1..10}-*.md
 ```
 
 ---
@@ -479,4 +499,20 @@ uml-drawerjs/
 
 ---
 
-*Last updated: 2026-05-10 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13a / 13 / 15 / 16 / 17 complete; Phase 14 partially complete (unit + snapshot + design-agnostic + perf + size-limit gates green; Playwright E2E + visual regression + axe-core deferred to Phase 14b post-deploy). 2026-05-10: Class diagram brought to classic-UML notation (members, generics, enum literals, package groups, per-end multiplicity / role / navigability; UML semantic validators; renderer italic / underline / synthetic stereotypes / compartment dividers; theme tokens `--uml-class-*`/`--uml-package-*`; ADR-0007 / 0008). The MVP is feature-complete pending the Phase-14b browser-test layer.*
+*Last updated: 2026-05-12 — Phases 0 / 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13a / 13 / 15 / 16 / 17 complete; Phase 14 partially complete (unit + snapshot + design-agnostic + perf + size-limit gates green; Playwright E2E + visual regression + axe-core deferred to Phase 14b post-deploy).*
+
+*Post-MVP feature rounds (all merged to `main`):*
+
+*— 2026-05-10: Class diagram brought to classic-UML notation (members, generics, enum literals, package groups, per-end multiplicity / role / navigability; UML semantic validators; renderer italic / underline / synthetic stereotypes / compartment dividers; theme tokens `--uml-class-*` / `--uml-package-*`; ADR-0007 / 0008).*
+
+*— 2026-05-10: ER diagram receives full attribute support — `entity Foo { * id : UUID, + tenant_id : UUID, email : String <<NN>>, … }`; PK / FK / NN UML-IE notation (underline / `+` prefix / bold); per-end cardinality auto-derives `edge.kind`; `<EntityMembersEditor>` props-panel component; ADR-0009.*
+
+*— 2026-05-11: Designer / PlantUML tab split in the playground via `<Tabs>` (commit `bf415d1`); drag-and-drop + zoom rewrite (`feaeeb4`); dot-grid (`d82cf41`); arrowhead markers (`1f50dd6`).*
+
+*— 2026-05-11: Boundary as first-class element — visible frame on canvas, palette item, drag / move / resize, properties panel + alias editing, drag-into-boundary membership (commits `7568e56` → `c9202f4`).*
+
+*— 2026-05-11: C4 Context / Container / Component aligned with c4model.com — full stdlib coverage (`Person_Ext`, `SystemDb` / `SystemDb_Ext`, `SystemQueue` / `SystemQueue_Ext`, `Container_Ext`, `ContainerDb`, `ContainerQueue` / `ContainerQueue_Ext`, `Component_Ext`, `ComponentDb`, `ComponentQueue` / `ComponentQueue_Ext`, `Enterprise_Boundary`, generic `Boundary`); commits `5b82579` / `cb311d3` / `0647017`.*
+
+*— 2026-05-12: Sequence diagram brought to full UML SD — distinct `lifeline-boundary` / `-control` / `-entity` / `-collections` kinds + `database` / `queue` / `actor` reuse; combined fragments (`alt` / `opt` / `loop` / `par` / `break` / `critical` / `ref`) with operands / guards; activations as intervals; notes (`left` / `right` / `over`); divider bands; autonumber; self-messages; create / destroy; props-panel editors for fragments / notes / dividers; new commands `MoveSequenceFragmentCommand`, `ResizeSequenceFragmentCommand`, `SequenceOrnamentCommand`; five new `CONSTRAINT_SEQUENCE_*` validators; ADR-0010 (commit `d6c4f0b`).*
+
+*The MVP is feature-complete pending the Phase-14b browser-test layer.*

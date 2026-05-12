@@ -64,7 +64,7 @@ import "@uml-drawer/react/styles.css";
 const initial = `@startuml
 class Order
 class Customer
-Order --> Customer : owner
+Order "1" --> "*" Customer : owner
 @enduml
 `;
 
@@ -81,7 +81,30 @@ export function App() {
 }
 ```
 
-`<UmlEditor>` — это провайдер: он владеет одним экземпляром `createEditor` и общей моделью выделения. Дочерние компоненты безопасно работают до момента монтирования `<Canvas>` (хуки вернут `null`, не упадут).
+`<UmlEditor>` — это провайдер: он владеет одним экземпляром `createEditor` и общей моделью выделения. Дочерние компоненты безопасно работают до момента монтирования `<Canvas>` (хуки вернут `null`, не упадут). После initial load + auto-layout холст автоматически центрируется в масштабе 100% — расчёт snap'а и grid'а ведётся в layout-пикселях, поэтому стартовать с не-1 scale было бы дезориентирующе.
+
+### Designer / PlantUML в одном workzone
+
+Если вы хотите воспроизвести композицию playground'а (canvas и редактор PlantUML в одном пространстве с tab-переключением), используйте `<Tabs>`:
+
+```tsx
+import { UmlEditor, Canvas, Palette, PropsPanel, Tabs, TextEditor } from "@uml-drawer/react";
+
+<UmlEditor diagramType="sequence" defaultValue={initial} layout={{ text: "hidden" }}>
+  <Palette />
+  <Tabs
+    keepMounted
+    tabsPosition="bottom"
+    tabs={[
+      { id: "designer", label: "Designer", content: <Canvas /> },
+      { id: "plantuml", label: "PlantUML", content: <TextEditor /> },
+    ]}
+  />
+  <PropsPanel />
+</UmlEditor>;
+```
+
+`layout={{ text: "hidden" }}` гасит дефолтный нижний слот `<TextEditor>`, чтобы редактор не дублировался. `keepMounted` сохраняет состояние неактивной вкладки между переключениями.
 
 ### Поддерживаемые типы диаграмм
 
@@ -180,6 +203,7 @@ runAutoLayout(opts?)          → Promise<void>
 applyTheme("light"|"dark"|"auto")
 dispatch(command)             → Diagram
 getState() / getErrors()
+centerView() / fitToView()    (выравнивание viewport'а)
 bus / history / panZoom       (для продвинутых сценариев)
 destroy()
 ```
@@ -292,20 +316,59 @@ Layout-координаты сохраняются в `' @drawer:meta {…}` Pla
 Любая мутация AST идёт через команду. Свои команды диспатчатся через `editor.dispatch(...)` и автоматически попадают в undo-стек:
 
 ```ts
-import { CreateNodeCommand } from "@uml-drawer/core/commands";
+import { addNodeCommand, addEdgeCommand, addGroupCommand } from "@uml-drawer/core/commands";
 
-editor.dispatch(
-  new CreateNodeCommand({
-    diagramType: "class",
-    kind: "class",
-    label: "Invoice",
-  }),
-);
+editor.dispatch(addNodeCommand({ kind: "class", label: "Invoice" }));
+editor.dispatch(addEdgeCommand({ source: "n_invoice", target: "n_order", kind: "association" }));
+editor.dispatch(addGroupCommand({ kind: "boundary", label: "Billing", children: ["n_invoice"] }));
 ```
+
+Доступные фабрики (см. `packages/core/src/commands/`):
+
+| Команда                                                         | Назначение                                               |
+| --------------------------------------------------------------- | -------------------------------------------------------- |
+| `addNodeCommand` / `removeNodeCommand` / `updateNodeCommand`    | CRUD узлов, каскадно убирает edges                       |
+| `moveNodeCommand` / `resizeNodeCommand`                         | Writeback в `metadata.layoutOverrides`                   |
+| `addEdgeCommand` / `removeEdgeCommand` / `updateEdgeCommand`    | CRUD связей; поддерживает `ends` (class) и `cardinality` |
+| `moveEdgeCommand`                                               | Rerouting через per-edge `points[]`                      |
+| `addGroupCommand` / `updateGroupCommand` / `removeGroupCommand` | Boundary / package / system как first-class элементы     |
+| `moveGroupCommand` / `resizeGroupCommand`                       | Drag / resize boundary'ев                                |
+| `moveSequenceFragmentCommand` / `resizeSequenceFragmentCommand` | UML SD frame handles                                     |
+| `sequenceOrnamentCommand`                                       | Add / remove / update notes / dividers / autonumber      |
+| `applyLayoutCommand`                                            | Применить ELK / sequence / fallback layout               |
+| `importTextCommand`                                             | Полная замена AST из текста                              |
 
 Прямые мутации AST запрещены — иначе разъедется история и потенциальный CRDT-режим.
 
-## 13. Чек-лист интеграции
+## 13. Особенности типов диаграмм
+
+### Class
+
+Per-end role / multiplicity / navigability ([ADR-0008](./docs/adr/0008-class-edge-endpoints.md)) — в `DiagramEdge` используется `ends?: { source?: EdgeEndpoint; target?: EdgeEndpoint }` вместо устаревшего `cardinality`. Enum-литералы хранятся отдельно в `node.enumLiterals` ([ADR-0007](./docs/adr/0007-class-enum-modelling.md)). `<PropsPanel>` подхватывает `<ClassMembersEditor>` для редактирования атрибутов / операций / generic параметров.
+
+### Entity Relationship
+
+PK / FK / NN маркеры рендерятся в UML/IE notation: PK — подчёркнут, FK — префикс `+ `, NN — bold ([ADR-0009](./docs/adr/0009-er-attribute-modelling.md)). Парсер принимает оба синтаксиса `<<NN>>` и `<<not null>>`. Per-end cardinality в props-панели авто-выводит `edge.kind` (`one-to-one` / `one-to-many` / `many-to-many`), а генератор подбирает arrow shape (`||--||`, `||--o{`, `}o--o{`).
+
+### Sequence
+
+Полная UML SD-нотация ([ADR-0010](./docs/adr/0010-sequence-uml-notation.md)):
+
+- Lifeline kinds: `actor`, `lifeline`, `lifeline-boundary`, `lifeline-control`, `lifeline-entity`, `lifeline-collections`, `database`, `queue`.
+- Combined fragments (`alt` / `opt` / `loop` / `par` / `break` / `critical` / `ref`) — flat array в `diagram.fragments[]` с `parentId` / `parentOperandId` для вложенности.
+- Activation intervals — `node.activations[] = [{ fromEdgeId, toEdgeId? }]`; renderer рисует шахту, генератор эмитит `activate` / `deactivate` (или `++` / `--` shortcuts через `edge.activatesTarget` / `deactivatesSource`).
+- Notes — `diagram.notes[]` с `placement: "left" | "right" | "over"` и опциональным `anchorEdgeId`.
+- Dividers — `diagram.dividers[]` с `afterEdgeId`.
+- Autonumber — `metadata.sequenceAutoNumber = { start, increment, format? }`.
+- Self-messages — обычный edge с `source === target`; renderer рисует loopback-арку.
+
+`<FragmentEditor>`, `<NoteEditor>`, `<DividerEditor>` в props-панели редактируют эти элементы; canvas использует `MoveSequenceFragmentCommand` / `ResizeSequenceFragmentCommand` для drag/resize фреймов.
+
+### C4 (Context / Container / Component)
+
+Поддерживается полный stdlib c4model.com: `Person`, `Person_Ext`, `System`, `System_Ext`, `SystemDb`, `SystemDb_Ext`, `SystemQueue`, `SystemQueue_Ext`, `Container`, `Container_Ext`, `ContainerDb`, `ContainerQueue`, `ContainerQueue_Ext`, `Component`, `Component_Ext`, `ComponentDb`, `ComponentQueue`, `ComponentQueue_Ext`, плюс `Enterprise_Boundary` / `System_Boundary` / `Container_Boundary` / generic `Boundary`. `Boundary` — first-class элемент на canvas: drag / move / resize, alias + label через props-panel, drag-into-boundary membership.
+
+## 14. Чек-лист интеграции
 
 - [ ] Установлены `@uml-drawer/core` + `@uml-drawer/theme` (+ `@uml-drawer/react` при необходимости).
 - [ ] На входе приложения один раз импортирован `@uml-drawer/theme`.
@@ -316,14 +379,14 @@ editor.dispatch(
 - [ ] При смене `diagramType` компонент пересоздаётся через `key`, а не мутируется.
 - [ ] Перед размонтированием в vanilla-режиме вызван `editor.destroy()`.
 
-## 14. Отладка
+## 15. Отладка
 
 - Текст не парсится — посмотри `editor.getErrors()`: валидатор ходит уровнями `syntax → semantic → constraints → lint`, каждый возвращает `DiagramError` с диапазоном.
 - Не отображаются узлы — убедись, что `<Canvas>` смонтирован и хост имеет ненулевой размер; до монтирования хуки возвращают `null`.
 - ELK не грузится — проверь, что бандлер не блокирует динамический import (`@uml-drawer/core/layout/elk-loader`).
 - Тема не переключается — атрибут `data-theme` нужно ставить на хост редактора, не на `:root`. В React это делает `theme` prop у `<UmlEditor>`.
 
-## 15. Дальше
+## 16. Дальше
 
 - `apps/docs/concepts/ast.md` — почему AST это единственный source of truth.
 - `apps/docs/concepts/sync.md` — как двунаправленная синхронизация работает в обе стороны.

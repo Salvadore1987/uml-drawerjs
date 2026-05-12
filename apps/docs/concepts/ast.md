@@ -24,19 +24,31 @@ interface Diagram {
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   groups: DiagramGroup[];
+  // Sequence-only:
+  fragments?: CombinedFragment[];
+  notes?: SequenceNote[];
+  dividers?: SequenceDivider[];
   styles?: StyleMap;
-  metadata: DiagramMetadata; // schemaVersion, layoutOverrides, opaque
+  metadata: DiagramMetadata; // schemaVersion, layoutOverrides, opaque, sequenceAutoNumber
 }
 ```
 
 Full type definitions live in [`packages/core/src/model/types.ts`](https://github.com/Salvadore1987/uml-drawerjs/blob/main/packages/core/src/model/types.ts). The shape is uniform across diagram types — per-type rules are enforced by the constraints validator, not the type system, so a `Diagram` deserialised from disk is always structurally valid.
 
-## Layout overrides + opaque
+## Per-diagram-type fields
 
-Two metadata fields make round-tripping safe:
+- **Class** — `node.attributes[]`, `node.operations[]`, `node.generics[]` (per-class generics list), `node.enumLiterals[]` (only when `kind === "enum"`, see [ADR-0007](https://github.com/Salvadore1987/uml-drawerjs/blob/main/docs/adr/0007-class-enum-modelling.md)). Edges use `ends?: { source?, target? }` with role / multiplicity / navigability per end (see [ADR-0008](https://github.com/Salvadore1987/uml-drawerjs/blob/main/docs/adr/0008-class-edge-endpoints.md)).
+- **ER** — `node.attributes[]` with `primaryKey` / `foreignKey` / `nullable` flags honoured (see [ADR-0009](https://github.com/Salvadore1987/uml-drawerjs/blob/main/docs/adr/0009-er-attribute-modelling.md)); edges use flat `cardinality?: { source?, target? }`.
+- **Sequence** — `node.activations[]` (intervals anchored to message edges), top-level `diagram.fragments[]` (flat with `parentId` / `parentOperandId` for nesting), `diagram.notes[]`, `diagram.dividers[]`, `metadata.sequenceAutoNumber` (see [ADR-0010](https://github.com/Salvadore1987/uml-drawerjs/blob/main/docs/adr/0010-sequence-uml-notation.md)).
+- **C4** — `node.technology` carries the `[tech]` rider; `group.kind` distinguishes `boundary` / `package` / `system`.
 
-- `metadata.layoutOverrides` — a map of `nodeId → { x, y }`. Persisted into PlantUML as `' @drawer:meta layoutOverrides {...}` comments that other PlantUML renderers ignore. Survives across export → import round trips.
+## Layout overrides + opaque + autonumber
+
+`metadata` carries three round-trip-safe metadata fields:
+
+- `metadata.layoutOverrides` — a map of `nodeId → { x, y, width?, height? }` plus per-edge `points[]` for re-routed edges. Persisted into PlantUML as `' @drawer:meta layoutOverrides {...}` comments that other PlantUML renderers ignore.
 - `metadata.opaque` — verbatim text the parser didn't recognise (preprocessor, `!include`, raw skinparam blocks, etc.). The generator emits these unchanged so the editor never silently loses content.
+- `metadata.sequenceAutoNumber` — `{ start, increment, format? }` for SD diagrams. The renderer prefixes every message label with the formatted counter; the generator emits an `autonumber` line at the top.
 
 ## Why immutable
 

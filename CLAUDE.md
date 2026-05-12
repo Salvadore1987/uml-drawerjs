@@ -4,31 +4,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository State
 
-**This repository is greenfield.** As of writing, the only artifacts that exist are documentation:
+**This repository is MVP feature-complete** and has shipped several post-MVP feature rounds (class members + generics + enum literals + per-end edge endpoints; full ER attribute notation; full UML Sequence Diagram notation; c4model.com stdlib alignment; boundary as a first-class canvas element; unified Designer / PlantUML tab workzone in the playground). The implementation lives across `packages/*` and `apps/*`:
 
-- [`docs/uml-drawer.md`](./docs/uml-drawer.md) — the full SRS/SDD specification (in Russian). This is the **authoritative source of requirements**: functional + non-functional requirements, AST shape, API surface, UI design, validation levels, testing plan, deployment.
-- [`docs/design/02-cyber-topographic.html`](./docs/design/02-cyber-topographic.html) — visual reference for **one specific showcase skin** (cyber-topographic), not for the library itself. The library is design-agnostic: components are styled exclusively through the `--uml-*` theming contract. The cyber-topographic skin is implemented separately in `apps/playground/src/skins/cyber-topographic/` *after* the library is feature-complete (Phase 13a), and is never imported by `packages/*`.
-- [`docs/IMPLEMENTATION_PLAN.md`](./docs/IMPLEMENTATION_PLAN.md) — phase-organized TODO checklist with dependency map, exit criteria per phase, and a requirements-coverage table.
+- `packages/core` — parser + AST + generator + validators + layout + renderer + commands + history + exporters + vanilla `createEditor`.
+- `packages/react` — `<UmlEditor>` adapter + sub-components (`<Canvas>`, `<Palette>`, `<PropsPanel>`, `<TextEditor>`, `<Outline>`, `<HUD>`, `<CommandChannel>`, `<Statusbar>`, `<Tabs>`, plus per-kind editors: `<ClassMembersEditor>`, `<EntityMembersEditor>`, `<FragmentEditor>`, `<NoteEditor>`, `<DividerEditor>`).
+- `packages/codemirror-plantuml` — CM6 language extension (StreamLanguage MVP; Lezer deferred per ADR-0003).
+- `packages/theme` — design-agnostic `--uml-*` contract + neutral light/dark defaults.
+- `apps/playground` — showcase under the cyber-topographic skin with unified Designer / PlantUML tabs (Alt+1 / Alt+2).
+- `apps/docs` — VitePress documentation site.
 
-There is no `package.json`, no source code, no build system yet. The implementation has not started.
+Authoritative documents:
 
-**When asked to implement something, first consult `docs/IMPLEMENTATION_PLAN.md` to find the relevant phase and its exit criteria, then verify against `docs/uml-drawer.md` for the exact requirement.**
+- [`docs/uml-drawer.md`](./docs/uml-drawer.md) — full SRS/SDD specification (in Russian). **Authoritative source of requirements**: functional + non-functional requirements, AST shape, API surface, UI design, validation levels, testing plan, deployment.
+- [`docs/design/02-cyber-topographic.html`](./docs/design/02-cyber-topographic.html) — visual reference for **one specific showcase skin** (cyber-topographic), not for the library itself. The library is design-agnostic: components are styled exclusively through the `--uml-*` theming contract. The cyber-topographic skin lives in `apps/playground/src/skins/cyber-topographic/` and is never imported by `packages/*`.
+- [`docs/IMPLEMENTATION_PLAN.md`](./docs/IMPLEMENTATION_PLAN.md) — phase-organized checklist with dependency map, exit criteria per phase, requirements-coverage table, and a post-MVP changelog at the bottom.
+- [`docs/adr/0001..0010-*.md`](./docs/adr/) — Architecture Decision Records for every contentious design decision (sequence layout, undo granularity, PlantUML subset, CRDT readiness, drill-down scope, AI extension, enum modelling, class edge endpoints, ER attribute notation, full UML SD notation).
+- [`INTEGRATION.md`](./INTEGRATION.md) — consumer integration guide (Russian) — install, theme, React + vanilla bootstrap, CodeMirror, per-diagram-type features, CQRS extension surface.
+
+**When asked to implement something, first consult `docs/IMPLEMENTATION_PLAN.md` to find the relevant phase and its exit criteria, then verify against `docs/uml-drawer.md` for the exact requirement.** For diagram-type-specific decisions, also check the matching ADR.
 
 ## Project Vision (from the spec)
 
-UML Drawer JS will be a **framework-agnostic TypeScript library** with a React adapter for editing UML diagrams. The defining feature is **bidirectional synchronization** between a visual editor and PlantUML-compatible DSL — both views are kept in sync via a single AST as the source of truth.
+UML Drawer JS is a **framework-agnostic TypeScript library** with a React adapter for editing UML diagrams. The defining feature is **bidirectional synchronization** between a visual editor and PlantUML-compatible DSL — both views are kept in sync via a single AST as the source of truth.
 
 Five diagram types are supported, fixed at diagram creation: C4 Context, C4 Container, C4 Component, Class, Entity Relationship, Sequence.
 
-## Planned Architecture (when implementation begins)
-
-The spec mandates a specific structure — do not invent alternatives without strong reason:
+## Architecture
 
 - **pnpm monorepo** with workspaces under `packages/*` and `apps/*`.
-- **Hexagonal architecture** in the core: `parser/` (Lezer), `model/` (AST), `generator/` (AST → PlantUML), `validators/` (4 levels: syntax / semantic / constraints / lint), `layout/` (ELK.js + custom Sequence layout), `renderer/` (mini SVG layer, no D3), `commands/` (CQRS), `history/` (undo/redo over commands), `exporters/` (puml/svg/png/json), `editor/` (vanilla `createEditor` bootstrap).
+- **Hexagonal architecture** in the core: `parser/` (hand-rolled line-based; Lezer deferred per ADR-0003), `model/` (AST), `generator/` (AST → PlantUML), `validators/` (4 levels: syntax / semantic / constraints / lint), `layout/` (ELK.js + custom Sequence layout + grid fallback), `renderer/` (mini SVG layer + sequence pipeline + interactions + grid, no D3), `commands/` (CQRS), `history/` (undo/redo over commands), `exporters/` (puml/svg/png/json), `editor/` (vanilla `createEditor` bootstrap).
 - **All AST mutations go through CQRS commands** — this is what enables undo/redo and keeps the door open for CRDT/Yjs collaboration later. Do not mutate AST directly.
-- **Text edits and visual edits both converge on the same AST.** Lezer parses incrementally; commands apply structurally. Layout coordinates live in `metadata.layoutOverrides` and are encoded in `' @drawer:meta {...}` PlantUML comments so other PlantUML tools ignore them.
-- **Four planned packages:** `@uml-drawer/core`, `@uml-drawer/react`, `@uml-drawer/codemirror-plantuml`, `@uml-drawer/theme` (CSS-only design-agnostic theming contract — `--uml-*` namespace + neutral light/dark defaults; **no brand aesthetics here**). Plus `apps/playground` (showcase that bundles its own cyber-topographic skin on top of the library + visual regression bed) and `apps/docs`.
+- **Text edits and visual edits both converge on the same AST.** The parser is line-based and incremental enough for MVP; commands apply structurally. Layout coordinates live in `metadata.layoutOverrides` and are encoded in `' @drawer:meta {...}` PlantUML comments so other PlantUML tools ignore them.
+- **Four published packages:** `@uml-drawer/core`, `@uml-drawer/react`, `@uml-drawer/codemirror-plantuml`, `@uml-drawer/theme` (CSS-only design-agnostic theming contract — `--uml-*` namespace + neutral light/dark defaults; **no brand aesthetics here**). Plus `apps/playground` (showcase that bundles its own cyber-topographic skin on top of the library + visual regression bed) and `apps/docs` (VitePress).
 
 ## Project-Specific Conventions
 
@@ -42,7 +49,17 @@ The spec mandates a specific structure — do not invent alternatives without st
 
 ## Commands
 
-No build system is configured yet. Once Phase 0 of `docs/IMPLEMENTATION_PLAN.md` lands, this section should be updated with the actual `pnpm` scripts (`pnpm install`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm bench`, Playwright commands, etc.). Until then there is nothing to run.
+```bash
+pnpm install                    # install workspace dependencies
+pnpm typecheck                  # tsc --noEmit across every package
+pnpm lint                       # ESLint (with max-warnings=0)
+pnpm test                       # Vitest across every package
+pnpm build                      # build all publishable packages + apps
+pnpm bench                      # perf bench (parse + regen budget)
+pnpm size                       # size-limit gate (core + react + ELK ≤ 500 KB gzip)
+pnpm guard:design-agnostic      # regex grep — no hex/rgb in packages/* CSS
+pnpm changeset                  # author a changeset for the next release
+```
 
 ## Plan mode
 - Always show in console what you need to change
@@ -59,6 +76,19 @@ No build system is configured yet. Once Phase 0 of `docs/IMPLEMENTATION_PLAN.md`
 - Create commit with message `git commit -am {generated message from tasks}`
 - After each phase need to update README.md if needed
 
-## Open Questions Tracked as ADRs
+## ADRs
 
-The spec leaves several decisions explicitly open (Sequence layout strategy, undo granularity for text edits, PlantUML subset for MVP, CRDT-readiness checks, drill-down scope, AI-assistant placement, touch UX). These are tracked in Phase 17 of the implementation plan and should be resolved as ADRs in `docs/adr/000{1..6}-*.md` when encountered — do not silently make these choices in code.
+Every contentious design decision is captured as an ADR. Existing records:
+
+- `0001-sequence-layout.md` — bespoke synchronous SD algorithm vs ELK post-processor.
+- `0002-undo-granularity.md` — atomic commands + opt-in coalesce window.
+- `0003-plantuml-subset.md` — PlantUML subset for MVP; Lezer migration deferred.
+- `0004-collab-readiness.md` — five CRDT-readiness invariants + migration path to Yjs.
+- `0005-drilldown-out-of-scope.md` — sub-diagram drill-down deferred post-1.0.
+- `0006-ai-extension.md` — AI assistant as a separate `@uml-drawer/ai` package.
+- `0007-class-enum-modelling.md` — enum literals as a dedicated `EnumLiteral[]` field.
+- `0008-class-edge-endpoints.md` — class edges adopt nested `ends?: { source?, target? }`.
+- `0009-er-attribute-modelling.md` — entity columns reuse `Attribute` with kind-aware PK / FK / NN.
+- `0010-sequence-uml-notation.md` — full UML SD notation; flat `fragments[]` / `notes[]` / `dividers[]`; activations on nodes; self-message reuses normal edges.
+
+When introducing a new structural decision, capture the trade-offs as the next ADR rather than smuggling the choice into code.
