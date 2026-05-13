@@ -4,9 +4,11 @@ node_modules/
 
 # Build outputs
 dist/
+dist-tarballs/
 build/
 out/
 *.tsbuildinfo
+*.tgz
 
 # Test outputs
 coverage/

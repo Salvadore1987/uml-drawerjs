@@ -22,21 +22,80 @@ Framework-agnostic TypeScript-библиотека для редактирова
 
 ## 3. Установка
 
-### React-путь (рекомендуется)
+Пакеты пока не опубликованы в npm registry — `0.1.0` будет первым релизом. До тех пор есть три способа подключить библиотеку в стороннее приложение:
+
+### Способ 1. Через tarball'ы (рекомендуется для проб)
+
+В корне репозитория выполни:
 
 ```bash
+pnpm install
+pnpm build
+mkdir -p dist-tarballs
+for pkg in theme core codemirror-plantuml react; do
+  (cd packages/$pkg && pnpm pack --pack-destination $(pwd)/../../dist-tarballs)
+done
+```
+
+После этого в `dist-tarballs/` появятся четыре `.tgz`:
+
+```
+uml-drawer-theme-0.0.0.tgz                 ~8  KB
+uml-drawer-core-0.0.0.tgz                  ~300 KB
+uml-drawer-react-0.0.0.tgz                 ~72 KB
+uml-drawer-codemirror-plantuml-0.0.0.tgz   ~23 KB
+```
+
+В целевом проекте установи их по абсолютным путям:
+
+```bash
+# React-путь
+pnpm add /absolute/path/to/dist-tarballs/uml-drawer-theme-0.0.0.tgz \
+        /absolute/path/to/dist-tarballs/uml-drawer-core-0.0.0.tgz \
+        /absolute/path/to/dist-tarballs/uml-drawer-react-0.0.0.tgz \
+        react react-dom
+
+# Vanilla-путь
+pnpm add /absolute/path/to/dist-tarballs/uml-drawer-theme-0.0.0.tgz \
+        /absolute/path/to/dist-tarballs/uml-drawer-core-0.0.0.tgz
+
+# + CodeMirror (опционально)
+pnpm add /absolute/path/to/dist-tarballs/uml-drawer-codemirror-plantuml-0.0.0.tgz \
+        @codemirror/state @codemirror/view @codemirror/language \
+        @codemirror/lint @codemirror/autocomplete
+```
+
+`pnpm` (как и `npm` / `yarn`) понимает абсолютный путь к `.tgz` как источник пакета: имена в `package.json` уже корректные (`@uml-drawer/core`, `@uml-drawer/react`, …), поэтому импорты в коде проекта остаются стандартными.
+
+### Способ 2. Через `file:` / `link:` (для активной разработки рядом)
+
+Если разрабатываешь библиотеку и приложение одновременно:
+
+```jsonc
+// app/package.json
+{
+  "dependencies": {
+    "@uml-drawer/core": "file:../uml-drawerjs/packages/core",
+    "@uml-drawer/theme": "file:../uml-drawerjs/packages/theme",
+    "@uml-drawer/react": "file:../uml-drawerjs/packages/react",
+  },
+}
+```
+
+Затем — `pnpm install` + `pnpm --filter @uml-drawer/* build` в монорепо после каждого изменения (или `pnpm --filter @uml-drawer/core dev` для watch-режима, если он у пакета есть).
+
+> ⚠️ `file:` копирует содержимое в `node_modules`, `link:` делает симлинк. Vite / Next.js резолвят оба варианта; React-инстансы требуют либо `npm link --global react` в обоих, либо `peerDependencies` (что и реализовано).
+
+### Способ 3. Из npm (после релиза 0.1.0)
+
+```bash
+# React-путь (рекомендуется)
 pnpm add @uml-drawer/react @uml-drawer/core @uml-drawer/theme react react-dom
-```
 
-### Vanilla-путь (без React)
-
-```bash
+# Vanilla-путь (без React)
 pnpm add @uml-drawer/core @uml-drawer/theme
-```
 
-### CodeMirror-интеграция (опционально, если нужна подсветка / диагностика PlantUML)
-
-```bash
+# CodeMirror-интеграция (опционально)
 pnpm add @uml-drawer/codemirror-plantuml @uml-drawer/core \
   @codemirror/state @codemirror/view @codemirror/language \
   @codemirror/lint @codemirror/autocomplete
