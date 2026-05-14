@@ -1,4 +1,5 @@
 import {
+  addActivationCommand,
   addEdgeCommand,
   addFragmentCommand,
   addGroupCommand,
@@ -37,8 +38,13 @@ export interface PaletteItem {
    *     with `source === target` set to the currently-selected lifeline
    *     (falls back to the first lifeline in the diagram when nothing
    *     is selected). `kind` is treated as the `EdgeKind` to apply.
+   *   - `"activation"` → sequence-only standalone activation bar:
+   *     `addActivationCommand` attaching a free-standing
+   *     `ActivationInterval` (no `fromEdgeId`) to the currently-selected
+   *     lifeline (falls back to the first lifeline). The user resizes
+   *     the bar via the N / S handles that appear when it's selected.
    */
-  readonly target?: "node" | "group" | "fragment" | "self-call";
+  readonly target?: "node" | "group" | "fragment" | "self-call" | "activation";
 }
 
 export type PaletteFilter = (item: PaletteItem) => boolean;
@@ -144,6 +150,17 @@ const PALETTE_ITEMS: readonly PaletteItem[] = [
     target: "self-call",
     kind: "sync-call",
     label: "Self call",
+    category: "Sequence",
+    diagramTypes: ["sequence"],
+  },
+  // Activation bar: a standalone execution specification rectangle
+  // attached to the currently-selected lifeline (falls back to the
+  // first lifeline). Created without `fromEdgeId` — it lives in pure
+  // layout pixels and is resizable via N / S handles when selected.
+  {
+    target: "activation",
+    kind: "lifeline",
+    label: "Activation bar",
     category: "Sequence",
     diagramTypes: ["sequence"],
   },
@@ -253,6 +270,27 @@ export function Palette({
         }),
       );
       editor.selection.set([edgeId]);
+      return;
+    }
+    if (item.target === "activation") {
+      const state = editor.getState();
+      if (state.type !== "sequence") return;
+      const selectedIds = new Set([...editor.selection.get()]);
+      // Same lifeline-selection policy as self-call: prefer the
+      // selected lifeline, fall back to the first lifeline in the
+      // diagram. Without lifelines an activation has nothing to anchor
+      // to, so we bail out.
+      const lifeline = state.nodes.find((n) => selectedIds.has(n.id)) ?? state.nodes[0];
+      if (!lifeline) return;
+      const activationId = uuidv7();
+      editor.dispatch(
+        addActivationCommand(lifeline.id, {
+          id: activationId,
+          topPx: 24,
+          heightPx: 96,
+        }),
+      );
+      editor.selection.set([activationId]);
       return;
     }
     if (item.target === "fragment") {

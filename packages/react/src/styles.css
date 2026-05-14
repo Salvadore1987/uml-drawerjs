@@ -722,6 +722,29 @@ select.uml-class-members__type {
   stroke-width: 2;
 }
 
+/* Sequence-activation resize handles — N / S grips on the activation
+   bar. Same visibility contract as nodes / fragments: hidden by default,
+   revealed once the wrapping `[data-activation-id]` group is selected. */
+.uml-sequence-activation-resize-handle {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+[data-uml-content][data-selected-count="single"]
+  [data-activation-id][data-selected="true"]
+  .uml-sequence-activation-resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Selected activation: accent the bar outline so users see what they
+   grabbed before pulling a handle. */
+[data-activation-id][data-selected="true"] .uml-sequence-activation {
+  stroke: var(--uml-accent);
+  stroke-width: 2;
+}
+
 /* Selected sequence edge — including self-calls (rendered as a path).
    `paintSelection` writes `data-selected="true"` on the wrapping
    `<g data-edge-id>` so the user can see which message they grabbed

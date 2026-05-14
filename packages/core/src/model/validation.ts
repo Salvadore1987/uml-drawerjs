@@ -155,8 +155,12 @@ const enumLiteralSchema = z
 const activationIntervalSchema = z
   .object({
     id: z.string(),
-    fromEdgeId: z.string(),
+    fromEdgeId: z.string().optional(),
     toEdgeId: z.string().optional(),
+    topPx: z.number().optional(),
+    heightPx: z.number().optional(),
+    topExtraPx: z.number().optional(),
+    bottomExtraPx: z.number().optional(),
   })
   .strict();
 

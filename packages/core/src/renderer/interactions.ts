@@ -29,18 +29,21 @@
 import {
   addEdgeCommand,
   addNodeToGroupCommand,
+  moveActivationToLifelineCommand,
   moveEdgeCommand,
   moveGroupCommand,
   moveNodeCommand,
   moveSequenceFragmentCommand,
   removeNodeFromGroupCommand,
+  resizeActivationCommand,
   resizeGroupCommand,
   resizeNodeCommand,
   resizeSequenceFragmentCommand,
+  updateActivationCommand,
   updateEdgeCommand,
   updateNodeCommand,
 } from "../commands/index.js";
-import type { FragmentResizeSide } from "../commands/index.js";
+import type { ActivationResizeSide, FragmentResizeSide } from "../commands/index.js";
 import type { CommandBus } from "../commands/index.js";
 import type { History } from "../history/index.js";
 import { uuidv7 } from "../model/index.js";
@@ -211,6 +214,33 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     hasMoved: boolean;
   } | null = null;
   let fragmentResizeGuide: SVGLineElement | null = null;
+  let activationResize: {
+    activationId: string;
+    side: "n" | "s";
+    pointerId: number;
+    startClientY: number;
+    startLayoutY: number;
+    hasMoved: boolean;
+  } | null = null;
+  let activationResizeGuide: SVGLineElement | null = null;
+  let activationMove: {
+    activationId: string;
+    nodeId: string;
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startLayoutY: number;
+    hasMoved: boolean;
+    /** Locked on the first move past `DRAG_THRESHOLD_PX`. Vertical
+     *  drags retain the bar on its lifeline and translate `topPx` /
+     *  `*ExtraPx`; horizontal drags reassign the bar to the nearest
+     *  lifeline column at pointerup. */
+    direction: "vertical" | "horizontal" | null;
+    /** Layout-space cx values of every lifeline, sorted L→R. Captured
+     *  at gesture start so the snap math is stable through the drag. */
+    lifelineColumns: ReadonlyArray<{ id: string; cx: number }>;
+  } | null = null;
+  let activationMoveHorizontalGuide: SVGLineElement | null = null;
 
   // Subscribe to selection so the SVG reflects the current ids.
   let unsubscribeSelection: (() => void) | null = selection.subscribe((ids) => {
@@ -662,6 +692,215 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     history.dispatch(
       resizeSequenceFragmentCommand(finished.fragmentId, side, deltaColumns, bus.getState()),
     );
+  }
+
+  /**
+   * Activation N / S handle resize. Drags the handle vertically; on
+   * pointerup we dispatch `resizeActivationCommand` with the grid-snapped
+   * `deltaPx`. The command picks the right storage field for the
+   * activation flavour (standalone vs edge-anchored).
+   */
+  function startActivationResize(event: PointerEvent, activationId: string, side: "n" | "s"): void {
+    const startLayout = clientToLayout(event.clientX, event.clientY);
+    activationResize = {
+      activationId,
+      side,
+      pointerId: event.pointerId,
+      startClientY: event.clientY,
+      startLayoutY: startLayout.y,
+      hasMoved: false,
+    };
+    selection.set([activationId]);
+    svg.setPointerCapture?.(event.pointerId);
+    event.stopPropagation();
+  }
+
+  function paintActivationResizeGuide(event: PointerEvent): void {
+    if (!activationResize) return;
+    const escaped = activationResize.activationId.replaceAll('"', '\\"');
+    const groupEl = contentGroup.querySelector(`g[data-activation-id="${escaped}"]`);
+    if (!(groupEl instanceof SVGGraphicsElement)) return;
+    const rect = groupEl.querySelector(":scope > rect.uml-sequence-activation");
+    if (!(rect instanceof SVGRectElement)) return;
+    const x = Number(rect.getAttribute("x") ?? 0);
+    const w = Number(rect.getAttribute("width") ?? 0);
+    const y = Number(rect.getAttribute("y") ?? 0);
+    const h = Number(rect.getAttribute("height") ?? 0);
+
+    const snap = getSnap();
+    const cell = snap.enabled && snap.step > 0 ? snap.step : 1;
+    const cursor = clientToLayout(event.clientX, event.clientY);
+    const dy = cursor.y - activationResize.startLayoutY;
+    const deltaPx = Math.round(dy / cell) * cell;
+    const guideY = activationResize.side === "n" ? y + deltaPx : y + h + deltaPx;
+
+    if (!activationResizeGuide) {
+      activationResizeGuide = svg.ownerDocument!.createElementNS(SVG_NS, "line");
+      activationResizeGuide.setAttribute("class", "uml-activation-resize-guide");
+      activationResizeGuide.setAttribute("stroke", "var(--uml-accent)");
+      activationResizeGuide.setAttribute("stroke-width", "2");
+      activationResizeGuide.setAttribute("stroke-dasharray", "4 4");
+      activationResizeGuide.setAttribute("pointer-events", "none");
+      contentGroup.appendChild(activationResizeGuide);
+    }
+    activationResizeGuide.setAttribute("x1", String(x - 4));
+    activationResizeGuide.setAttribute("y1", String(guideY));
+    activationResizeGuide.setAttribute("x2", String(x + w + 4));
+    activationResizeGuide.setAttribute("y2", String(guideY));
+  }
+
+  function finishActivationResize(event: PointerEvent): void {
+    if (!activationResize) return;
+    const finished = activationResize;
+    activationResize = null;
+    svg.releasePointerCapture?.(event.pointerId);
+    activationResizeGuide?.remove();
+    activationResizeGuide = null;
+    if (!finished.hasMoved) return;
+
+    const snap = getSnap();
+    const cell = snap.enabled && snap.step > 0 ? snap.step : 1;
+    const cursor = clientToLayout(event.clientX, event.clientY);
+    const dy = cursor.y - finished.startLayoutY;
+    const deltaPx = Math.round(dy / cell) * cell;
+    if (deltaPx === 0) return;
+    const side: ActivationResizeSide = finished.side === "n" ? "top" : "bottom";
+    history.dispatch(resizeActivationCommand(finished.activationId, side, deltaPx, bus.getState()));
+  }
+
+  /**
+   * Drag-to-move on an activation bar. Vertical-only — the bar stays on
+   * its lifeline column (horizontal lifeline reassignment is handled via
+   * the props panel; the renderer derives x from the parent node id).
+   * Standalone activations get their `topPx` mutated; edge-anchored
+   * activations adjust both `topExtraPx` and `bottomExtraPx` by the same
+   * (sign-inverted) delta so the bar translates without changing height.
+   */
+  function startActivationMove(event: PointerEvent, activationId: string, nodeId: string): void {
+    const startLayout = clientToLayout(event.clientX, event.clientY);
+    activationMove = {
+      activationId,
+      nodeId,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startLayoutY: startLayout.y,
+      hasMoved: false,
+      direction: null,
+      lifelineColumns: readLifelineColumnsFromDOM(),
+    };
+    svg.setPointerCapture?.(event.pointerId);
+  }
+
+  function paintActivationMoveGuide(event: PointerEvent): void {
+    if (!activationMove) return;
+    const escaped = activationMove.activationId.replaceAll('"', '\\"');
+    const groupEl = contentGroup.querySelector(`g[data-activation-id="${escaped}"]`);
+
+    if (activationMove.direction === "horizontal") {
+      // Vertical dashed guide at the nearest lifeline cx. The bar
+      // itself stays put; on pointerup the activation is reassigned to
+      // the chosen lifeline.
+      if (groupEl instanceof SVGGraphicsElement) groupEl.removeAttribute("transform");
+      if (activationMove.lifelineColumns.length === 0) return;
+      const cursor = clientToLayout(event.clientX, event.clientY);
+      const targetIdx = nearestColumnIndex(activationMove.lifelineColumns, cursor.x);
+      const targetCol = activationMove.lifelineColumns[targetIdx];
+      if (!targetCol) return;
+      if (!activationMoveHorizontalGuide) {
+        activationMoveHorizontalGuide = svg.ownerDocument!.createElementNS(SVG_NS, "line");
+        activationMoveHorizontalGuide.setAttribute("class", "uml-activation-move-guide");
+        activationMoveHorizontalGuide.setAttribute("stroke", "var(--uml-accent)");
+        activationMoveHorizontalGuide.setAttribute("stroke-width", "2");
+        activationMoveHorizontalGuide.setAttribute("stroke-dasharray", "4 4");
+        activationMoveHorizontalGuide.setAttribute("pointer-events", "none");
+        contentGroup.appendChild(activationMoveHorizontalGuide);
+      }
+      const bbox = contentGroup.getBBox();
+      activationMoveHorizontalGuide.setAttribute("x1", String(targetCol.cx));
+      activationMoveHorizontalGuide.setAttribute("y1", String(bbox.y));
+      activationMoveHorizontalGuide.setAttribute("x2", String(targetCol.cx));
+      activationMoveHorizontalGuide.setAttribute("y2", String(bbox.y + bbox.height));
+      return;
+    }
+
+    // Vertical drag — translate the bar ephemerally; horizontal guide
+    // is cleared in case the user crossed back from a horizontal arc.
+    activationMoveHorizontalGuide?.remove();
+    activationMoveHorizontalGuide = null;
+    const snap = getSnap();
+    const cell = snap.enabled && snap.step > 0 ? snap.step : 1;
+    const cursor = clientToLayout(event.clientX, event.clientY);
+    const dy = cursor.y - activationMove.startLayoutY;
+    const deltaPx = Math.round(dy / cell) * cell;
+    if (groupEl instanceof SVGGraphicsElement) {
+      groupEl.setAttribute("transform", `translate(0, ${deltaPx})`);
+    }
+  }
+
+  function finishActivationMove(event: PointerEvent): void {
+    if (!activationMove) return;
+    const finished = activationMove;
+    activationMove = null;
+    svg.releasePointerCapture?.(event.pointerId);
+
+    const escaped = finished.activationId.replaceAll('"', '\\"');
+    const groupEl = contentGroup.querySelector(`g[data-activation-id="${escaped}"]`);
+    if (groupEl instanceof SVGGraphicsElement) groupEl.removeAttribute("transform");
+    activationMoveHorizontalGuide?.remove();
+    activationMoveHorizontalGuide = null;
+
+    if (!finished.hasMoved) return;
+
+    // Horizontal branch — reassign the activation to the lifeline whose
+    // column cx is closest to the pointer in layout coordinates. Skip
+    // when the drop lands on the same lifeline (no-op).
+    if (finished.direction === "horizontal") {
+      if (finished.lifelineColumns.length === 0) return;
+      const cursor = clientToLayout(event.clientX, event.clientY);
+      const targetIdx = nearestColumnIndex(finished.lifelineColumns, cursor.x);
+      const targetCol = finished.lifelineColumns[targetIdx];
+      if (!targetCol) return;
+      if (targetCol.id === finished.nodeId) return;
+      history.dispatch(
+        moveActivationToLifelineCommand(finished.activationId, targetCol.id, bus.getState()),
+      );
+      return;
+    }
+
+    const snap = getSnap();
+    const cell = snap.enabled && snap.step > 0 ? snap.step : 1;
+    const cursor = clientToLayout(event.clientX, event.clientY);
+    const dy = cursor.y - finished.startLayoutY;
+    const deltaPx = Math.round(dy / cell) * cell;
+    if (deltaPx === 0) return;
+
+    const diagram = bus.getState();
+    const node = diagram.nodes.find((n) => n.id === finished.nodeId);
+    const interval = node?.activations?.find((a) => a.id === finished.activationId);
+    if (!interval) return;
+
+    if (interval.fromEdgeId === undefined) {
+      // Standalone — translate the raw top position by deltaPx.
+      const nextTop = (interval.topPx ?? 0) + deltaPx;
+      history.dispatch(updateActivationCommand(finished.activationId, { topPx: nextTop }, diagram));
+    } else {
+      // Edge-anchored — shift both extras so the bar translates without
+      // changing height. Sign convention in the renderer: topExtraPx is
+      // subtracted from yTop; bottomExtraPx is added to yBottom. So a
+      // downward translation (deltaPx > 0) needs: topExtra -= deltaPx
+      // (top moves down), bottomExtra += deltaPx (bottom moves down).
+      history.dispatch(
+        updateActivationCommand(
+          finished.activationId,
+          {
+            topExtraPx: (interval.topExtraPx ?? 0) - deltaPx,
+            bottomExtraPx: (interval.bottomExtraPx ?? 0) + deltaPx,
+          },
+          diagram,
+        ),
+      );
+    }
   }
 
   function finishFragmentReorder(event: PointerEvent): void {
@@ -1178,6 +1417,50 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       }
     }
 
+    // Activation N / S resize handle — same priority as the fragment
+    // handle: must beat the activation-rect click branch below so a
+    // grab on the handle never resolves to a plain selection.
+    if (!group) {
+      const handleEl =
+        event.target instanceof Element
+          ? event.target.closest("[data-activation-resize-handle]")
+          : null;
+      if (handleEl) {
+        const sideAttr = handleEl.getAttribute("data-activation-resize-handle");
+        const activationEl = handleEl.closest("[data-activation-id]");
+        const activationId = activationEl?.getAttribute("data-activation-id");
+        if (activationId && (sideAttr === "n" || sideAttr === "s")) {
+          startActivationResize(event, activationId, sideAttr);
+          return;
+        }
+      }
+    }
+
+    // Activation rect — select + start vertical drag-to-move. Resize
+    // handles above already intercepted any pointerdown on the N/S
+    // grips, so reaching here means the user clicked the bar body. The
+    // gesture is threshold-gated: a pure click leaves only the
+    // selection mutation; movement past `DRAG_THRESHOLD_PX` translates
+    // the bar via `updateActivationCommand`.
+    if (!group) {
+      const activationEl =
+        event.target instanceof Element ? event.target.closest("[data-activation-id]") : null;
+      if (activationEl) {
+        const activationId = activationEl.getAttribute("data-activation-id");
+        const nodeId = activationEl.getAttribute("data-activation-node-id");
+        if (activationId) {
+          if (event.shiftKey) {
+            selection.toggle(activationId);
+          } else {
+            selection.set([activationId]);
+          }
+          if (nodeId) startActivationMove(event, activationId, nodeId);
+          event.stopPropagation();
+          return;
+        }
+      }
+    }
+
     // Sequence ornaments — fragments, notes, dividers — are not nodes
     // but still selectable. Click sets the selection to the ornament id.
     // Fragments additionally support drag-to-move: dragging a fragment
@@ -1506,6 +1789,31 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       paintFragmentResizeGuide(event);
       return;
     }
+    // Activation-resize gesture (sequence-only): paint a horizontal
+    // dashed guide at the proposed new top/bottom edge of the bar.
+    if (activationResize && activationResize.pointerId === event.pointerId) {
+      const dy = event.clientY - activationResize.startClientY;
+      if (!activationResize.hasMoved && Math.abs(dy) < DRAG_THRESHOLD_PX) return;
+      activationResize.hasMoved = true;
+      paintActivationResizeGuide(event);
+      return;
+    }
+    // Activation-move gesture (sequence-only): lazy direction lock —
+    // first move past `DRAG_THRESHOLD_PX` decides vertical translate vs
+    // horizontal lifeline reassignment. Vertical drags translate the
+    // bar group via CSS transform; horizontal drags paint a vertical
+    // dashed guide at the target lifeline cx.
+    if (activationMove && activationMove.pointerId === event.pointerId) {
+      if (activationMove.direction === null) {
+        const dx = event.clientX - activationMove.startClientX;
+        const dy = event.clientY - activationMove.startClientY;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        activationMove.direction = Math.abs(dx) > Math.abs(dy) ? "horizontal" : "vertical";
+      }
+      activationMove.hasMoved = true;
+      paintActivationMoveGuide(event);
+      return;
+    }
     if (!drag || drag.pointerId !== event.pointerId) return;
     const dx = event.clientX - drag.startClient.x;
     const dy = event.clientY - drag.startClient.y;
@@ -1615,6 +1923,14 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     }
     if (fragmentResize && fragmentResize.pointerId === event.pointerId) {
       finishFragmentResize(event);
+      return;
+    }
+    if (activationResize && activationResize.pointerId === event.pointerId) {
+      finishActivationResize(event);
+      return;
+    }
+    if (activationMove && activationMove.pointerId === event.pointerId) {
+      finishActivationMove(event);
       return;
     }
     if (!drag || drag.pointerId !== event.pointerId) return;
@@ -1824,6 +2140,7 @@ function paintSelection(contentGroup: SVGGraphicsElement, ids: ReadonlySet<strin
       contentGroup.querySelector(`g[data-fragment-id="${escaped}"]`) ??
       contentGroup.querySelector(`g[data-note-id="${escaped}"]`) ??
       contentGroup.querySelector(`g[data-divider-id="${escaped}"]`) ??
+      contentGroup.querySelector(`g[data-activation-id="${escaped}"]`) ??
       contentGroup.querySelector(`g[data-edge-id="${escaped}"]`);
     if (target) target.setAttribute("data-selected", "true");
   }

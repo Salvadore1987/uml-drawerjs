@@ -76,11 +76,15 @@ export function renderSequence(diagram: Diagram, aliases: Map<string, string>): 
     }
   }
 
-  // Activation events keyed by edge id.
+  // Activation events keyed by edge id. Standalone activations
+  // (no `fromEdgeId`) anchor by raw layout pixels and are not emitted
+  // as PlantUML — they survive round-trips via the .umljson export and
+  // `' @drawer:meta` comments (see `metadata.layoutOverrides`).
   const activateAt = new Map<string, string[]>(); // edgeId -> lifeline aliases
   const deactivateAt = new Map<string, string[]>();
   for (const node of diagram.nodes) {
     for (const interval of node.activations ?? []) {
+      if (interval.fromEdgeId === undefined) continue;
       push(activateAt, interval.fromEdgeId, lookupAlias(aliases, node.id));
       if (interval.toEdgeId) {
         push(deactivateAt, interval.toEdgeId, lookupAlias(aliases, node.id));

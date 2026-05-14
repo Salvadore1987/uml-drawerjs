@@ -173,12 +173,16 @@ export const diagramJsonSchema = {
     },
     activationInterval: {
       type: "object",
-      required: ["id", "fromEdgeId"],
+      required: ["id"],
       additionalProperties: false,
       properties: {
         id: { type: "string" },
         fromEdgeId: { type: "string" },
         toEdgeId: { type: "string" },
+        topPx: { type: "number" },
+        heightPx: { type: "number" },
+        topExtraPx: { type: "number" },
+        bottomExtraPx: { type: "number" },
       },
     },
     fragmentKind: {

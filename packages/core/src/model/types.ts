@@ -170,14 +170,37 @@ export interface EnumLiteral {
 
 /**
  * Sequence-only: an interval during which a lifeline is "active" (running an
- * execution specification). `fromEdgeId` is the message that begins the
- * activation; `toEdgeId` is the message that closes it (open-ended if absent
- * — closes at the bottom of the diagram).
+ * execution specification).
+ *
+ * Two anchoring modes:
+ *   1. Edge-anchored — `fromEdgeId` is the message that begins the
+ *      activation; `toEdgeId` is the message that closes it (open-ended if
+ *      absent — closes at the bottom of the diagram). Authored by the
+ *      parser via `++` / `activate X` shortcuts.
+ *   2. Standalone — both `fromEdgeId` and `toEdgeId` are absent; the
+ *      activation positions itself with raw layout-pixel coordinates
+ *      `topPx` (from the top of the timeline, below the lifeline head)
+ *      and `heightPx`. Used by the "Activation Bar" palette item so
+ *      authors can place an activation independent of any message.
+ *
+ * `topExtraPx` / `bottomExtraPx` are pixel offsets applied on top of the
+ * resolved geometry (positive grows; negative shrinks). The N / S resize
+ * handles mutate these in increments of the grid step so the bar edge
+ * always lands on a visible grid cell — same convention as fragments.
  */
 export interface ActivationInterval {
   id: string;
-  fromEdgeId: string;
+  fromEdgeId?: string;
   toEdgeId?: string;
+  /** Standalone activations only: top position in layout pixels, measured
+   *  from the start of the timeline (below the lifeline head). */
+  topPx?: number;
+  /** Standalone activations only: height in layout pixels. */
+  heightPx?: number;
+  /** Grow / shrink at the top (raw layout pixels). */
+  topExtraPx?: number;
+  /** Grow / shrink at the bottom (raw layout pixels). */
+  bottomExtraPx?: number;
 }
 
 /**

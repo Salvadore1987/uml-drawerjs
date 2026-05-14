@@ -90,6 +90,28 @@ export { importTextCommand } from "./importText.js";
 export type { ImportTextCommand, ImportTextPayload } from "./importText.js";
 
 export {
+  addActivationCommand,
+  removeActivationCommand,
+  updateActivationCommand,
+  resizeActivationCommand,
+  moveActivationToLifelineCommand,
+} from "./activations.js";
+export type {
+  AddActivationCommand,
+  AddActivationPayload,
+  RemoveActivationCommand,
+  RemoveActivationPayload,
+  UpdateActivationCommand,
+  UpdateActivationPayload,
+  ActivationPatch,
+  ResizeActivationCommand,
+  ResizeActivationPayload,
+  ActivationResizeSide,
+  MoveActivationToLifelineCommand,
+  MoveActivationToLifelinePayload,
+} from "./activations.js";
+
+export {
   addFragmentCommand,
   updateFragmentCommand,
   removeFragmentCommand,

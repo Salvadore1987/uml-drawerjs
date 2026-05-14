@@ -770,34 +770,98 @@ function renderActivations(
     const col = columns.get(node.id);
     if (!col) continue;
     for (const interval of node.activations ?? []) {
-      const fromRow = edgeYRow.get(interval.fromEdgeId);
-      if (fromRow === undefined) continue;
-      const toRow = interval.toEdgeId
-        ? (edgeYRow.get(interval.toEdgeId) ?? lastEdgeRow)
-        : lastEdgeRow;
-      const yTop = yToPx(fromRow);
-      const yBottom = yToPx(toRow) + ROW_HEIGHT / 2;
+      let yTop: number;
+      let yBottom: number;
+
+      if (interval.fromEdgeId === undefined) {
+        // Standalone activation — positioned by raw layout pixels
+        // relative to the start of the timeline (just below the
+        // lifeline head). Defaults give a visible bar even when the
+        // caller omitted the fields entirely.
+        const topPx = interval.topPx ?? 0;
+        const heightPx = interval.heightPx ?? ROW_HEIGHT * 3;
+        yTop = HEAD_HEIGHT + TOP_PADDING + topPx;
+        yBottom = yTop + heightPx;
+      } else {
+        const fromRow = edgeYRow.get(interval.fromEdgeId);
+        if (fromRow === undefined) continue;
+        const toRow = interval.toEdgeId
+          ? (edgeYRow.get(interval.toEdgeId) ?? lastEdgeRow)
+          : lastEdgeRow;
+        yTop = yToPx(fromRow);
+        yBottom = yToPx(toRow) + ROW_HEIGHT / 2;
+      }
+
+      // Visual extras (raw layout pixels). Positive `topExtraPx`
+      // extends upward; positive `bottomExtraPx` extends downward.
+      yTop -= interval.topExtraPx ?? 0;
+      yBottom += interval.bottomExtraPx ?? 0;
+
+      const x = col.cx - ACTIVATION_WIDTH / 2;
+      const height = Math.max(yBottom - yTop, ROW_HEIGHT);
+
+      const rect = v(
+        "rect",
+        {
+          x,
+          y: yTop,
+          width: ACTIVATION_WIDTH,
+          height,
+          fill: "var(--uml-sequence-activation-fill, var(--uml-surface-elevated, var(--uml-node-bg)))",
+          stroke:
+            "var(--uml-sequence-activation-stroke, var(--uml-text-primary, var(--uml-node-border)))",
+          "stroke-width": "var(--uml-sequence-activation-stroke-width, 1)",
+        },
+        undefined,
+        { classes: ["uml-sequence-activation"], style: "cursor: move" },
+      );
+
+      // N / S resize handles centred on the top / bottom edges. Hidden
+      // by CSS until the wrapping `[data-activation-id]` group is
+      // selected. See `resizeActivationCommand`.
+      const handleCx = col.cx;
+      const handleN = makeActivationResizeHandle(handleCx, yTop, "n");
+      const handleS = makeActivationResizeHandle(handleCx, yBottom, "s");
+
       out.push(
         v(
-          "rect",
+          "g",
           {
-            x: col.cx - ACTIVATION_WIDTH / 2,
-            y: yTop,
-            width: ACTIVATION_WIDTH,
-            height: Math.max(yBottom - yTop, ROW_HEIGHT),
-            fill: "var(--uml-sequence-activation-fill, var(--uml-surface-elevated, var(--uml-node-bg)))",
-            stroke:
-              "var(--uml-sequence-activation-stroke, var(--uml-text-primary, var(--uml-node-border)))",
-            "stroke-width": "var(--uml-sequence-activation-stroke-width, 1)",
             "data-activation-id": interval.id,
+            "data-activation-node-id": node.id,
           },
-          undefined,
-          { classes: ["uml-sequence-activation"] },
+          [rect, handleN, handleS],
+          { classes: ["uml-sequence-activation-group"] },
         ),
       );
     }
   }
   return out;
+}
+
+function makeActivationResizeHandle(cx: number, cy: number, side: "n" | "s"): VNode {
+  const HALF = 4;
+  return v(
+    "rect",
+    {
+      x: cx - HALF,
+      y: cy - HALF,
+      width: HALF * 2,
+      height: HALF * 2,
+      fill: "var(--uml-selection-handle, var(--uml-accent))",
+      stroke: "var(--uml-bg)",
+      "stroke-width": "1",
+      "data-activation-resize-handle": side,
+    },
+    undefined,
+    {
+      style: "cursor: ns-resize",
+      classes: [
+        "uml-sequence-activation-resize-handle",
+        `uml-sequence-activation-resize-handle--${side}`,
+      ],
+    },
+  );
 }
 
 // ---------- Fragments ----------

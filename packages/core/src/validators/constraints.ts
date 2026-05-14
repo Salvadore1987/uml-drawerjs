@@ -346,6 +346,9 @@ function enforceSequenceActivations(diagram: Diagram, errors: DiagramError[]): v
   const edgeIds = new Set(diagram.edges.map((e) => e.id));
   for (const node of diagram.nodes) {
     for (const interval of node.activations ?? []) {
+      // Standalone activations (no `fromEdgeId`) anchor by raw layout
+      // coordinates and don't need any message edge to exist; skip them.
+      if (interval.fromEdgeId === undefined) continue;
       const fromOk = edgeIds.has(interval.fromEdgeId);
       const toOk = interval.toEdgeId === undefined || edgeIds.has(interval.toEdgeId);
       if (!fromOk || !toOk) {
