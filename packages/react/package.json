@@ -1,6 +1,6 @@
 {
   "name": "@uml-drawer/react",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": false,
   "description": "React 18+ adapter for UML Drawer JS — design-agnostic <UmlEditor> root + Canvas / Palette / PropsPanel / TextEditor / Outline / HUD / CommandChannel / Statusbar primitives, all driven by --uml-* theming tokens.",
   "license": "MIT",
@@ -31,10 +31,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@uml-drawer/core": "workspace:*"
+    "@uml-drawer/core": "workspace:^"
   },
   "peerDependencies": {
-    "@uml-drawer/theme": "workspace:*",
+    "@uml-drawer/theme": "workspace:^",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0"
   },
@@ -42,7 +42,7 @@
     "@testing-library/react": "^16.0.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@uml-drawer/theme": "workspace:*",
+    "@uml-drawer/theme": "workspace:^",
     "happy-dom": "^15.11.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -50,8 +50,7 @@
     "vite-plugin-dts": "^4.3.0"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "keywords": [
     "uml",

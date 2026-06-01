@@ -125,7 +125,7 @@ importers:
         specifier: ^6.34.0
         version: 6.42.1
       '@uml-drawer/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       happy-dom:
         specifier: ^15.11.7
@@ -159,7 +159,7 @@ importers:
   packages/react:
     dependencies:
       '@uml-drawer/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
     devDependencies:
       '@testing-library/react':
@@ -172,7 +172,7 @@ importers:
         specifier: ^18.3.1
         version: 18.3.7(@types/react@18.3.28)
       '@uml-drawer/theme':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../theme
       happy-dom:
         specifier: ^15.11.7
