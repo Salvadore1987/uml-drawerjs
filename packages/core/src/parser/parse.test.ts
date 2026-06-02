@@ -181,6 +181,43 @@ describe("parsePlantUml — meta-comment decoding", () => {
     expect(ast.styles).toEqual({ a: { fill: "#fff" } });
   });
 
+  it("preserves unknown-key layoutOverrides verbatim (legacy UUID payload)", () => {
+    // Arrange — a payload written before the generator switched to alias keys.
+    const legacy = `@startuml\n!include <C4/C4_Context>\n' @drawer:meta {"layoutOverrides":{"abcd-1234-uuid":{"x":12,"y":12}}}\nPerson(customer, "Customer", "")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(legacy, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — unknown key is not in ctx.aliases, so it survives unchanged.
+    expect(errors).toEqual([]);
+    expect(ast.metadata.layoutOverrides?.["abcd-1234-uuid"]).toEqual({ x: 12, y: 12 });
+  });
+
+  it("remaps alias-keyed layoutOverrides to freshly-allocated AST ids", () => {
+    // Arrange — alias-keyed payload (current generator output shape).
+    const text = `@startuml\n!include <C4/C4_Context>\n' @drawer:meta {"layoutOverrides":{"customer":{"x":5,"y":6}}}\nPerson(customer, "Customer", "")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — the alias key is translated to the node's allocated id.
+    expect(errors).toEqual([]);
+    const node = ast.nodes.find((n) => n.alias === "customer");
+    expect(node).toBeDefined();
+    if (node) {
+      expect(ast.metadata.layoutOverrides?.[node.id]).toEqual({ x: 5, y: 6 });
+      expect(ast.metadata.layoutOverrides?.["customer"]).toBeUndefined();
+    }
+  });
+
   it("emits SYNTAX_META on malformed meta-comment payload but keeps the AST", () => {
     // Arrange — payload is not valid JSON
     const text = `@startuml\n' @drawer:meta {not valid}\nclass Foo\n@enduml\n`;

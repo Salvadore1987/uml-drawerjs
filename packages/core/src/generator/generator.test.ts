@@ -455,3 +455,57 @@ describe("generator format helpers", () => {
     expect(escapeStringLiteral("path\\to\\file")).toBe("path\\\\to\\\\file");
   });
 });
+
+describe("formatDiagramMeta + parser round-trip", () => {
+  it("preserves layoutOverrides across generate → parse despite fresh ids", () => {
+    // Arrange — parse a seed, then attach overrides keyed by the current
+    // (counter-allocated) node ids.
+    const seed = `@startuml
+!include <C4/C4_Context>
+Person(customer, "Customer", "")
+System(orderSystem, "Order Platform", "")
+Rel(customer, orderSystem, "Uses")
+@enduml`;
+    const first = parsePlantUml(seed, {
+      diagramType: "c4-context",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+    expect(first.errors).toEqual([]);
+
+    const overrides: Record<string, { x: number; y: number }> = {};
+    first.ast.nodes.forEach((node, i) => {
+      overrides[node.id] = { x: 10 * (i + 1), y: 20 * (i + 1) };
+    });
+    const withOverrides: Diagram = {
+      ...first.ast,
+      metadata: { ...first.ast.metadata, layoutOverrides: overrides },
+    };
+
+    // Act — generate (alias-keyed meta) then reparse with a *fresh* factory
+    // so the second parse allocates different ids for the same aliases.
+    const generated = generatePlantUml(withOverrides);
+    const second = parsePlantUml(generated, {
+      diagramType: "c4-context",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — wire payload is alias-keyed, and every node keeps its coord.
+    const metaLine = generated.split("\n").find((line) => line.includes("@drawer:meta"));
+    expect(metaLine).toBeDefined();
+    expect(metaLine).toContain('"customer"');
+    expect(metaLine).not.toContain('"id-');
+
+    expect(second.errors).toEqual([]);
+    const after = second.ast.metadata.layoutOverrides ?? {};
+    expect(Object.keys(after)).toHaveLength(Object.keys(overrides).length);
+    for (const node of second.ast.nodes) {
+      const before = first.ast.nodes.find((n) => n.alias === node.alias);
+      expect(before).toBeDefined();
+      if (before) {
+        expect(after[node.id]).toEqual(overrides[before.id]);
+      }
+    }
+  });
+});

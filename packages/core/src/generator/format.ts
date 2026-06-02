@@ -83,6 +83,14 @@ export function lookupAlias(index: Map<string, string>, id: string): string {
  * emit a single `' @drawer:meta {...}` line that the parser will decode
  * back into `metadata.layoutOverrides` / `styles`. Returns `null` when
  * there is nothing to encode.
+ *
+ * Keys in the on-the-wire payload are *aliases* (the PlantUML symbol the
+ * user writes — `customer`, `orderSystem`), not AST UUIDs. Aliases are
+ * stable across parses; UUIDs are not (the parser allocates a fresh one
+ * per `loadFromText`). The parser's `finalize` step reverses this
+ * translation by looking each key up in `ctx.aliases`. Anything that
+ * cannot be resolved to a node/group on either side is preserved verbatim
+ * so legacy UUID-keyed payloads continue to round-trip without loss.
  */
 export function formatDiagramMeta(diagram: Diagram): string | null {
   const layoutOverrides = diagram.metadata.layoutOverrides;
@@ -91,10 +99,29 @@ export function formatDiagramMeta(diagram: Diagram): string | null {
   const hasStyles = styles && Object.keys(styles).length > 0;
   if (!hasLayout && !hasStyles) return null;
 
+  const aliasIndex = buildAliasIndex(diagram);
   const payload: { layoutOverrides?: Record<string, LayoutCoordinate>; styles?: StyleMap } = {};
-  if (hasLayout) payload.layoutOverrides = sortRecord(layoutOverrides);
-  if (hasStyles) payload.styles = sortRecord(styles);
+  if (hasLayout) payload.layoutOverrides = sortRecord(remapToAliases(layoutOverrides, aliasIndex));
+  if (hasStyles) payload.styles = sortRecord(remapToAliases(styles, aliasIndex));
   return formatMetaComment(payload);
+}
+
+/**
+ * Rewrite a record's keys from AST id → PlantUML alias via the supplied
+ * index. Keys that are not in the index (already-aliased payloads,
+ * legacy data, or references to elements that vanished) pass through
+ * unchanged so the round-trip is conservative.
+ */
+function remapToAliases<T>(
+  record: Record<string, T>,
+  aliasIndex: Map<string, string>,
+): Record<string, T> {
+  const result: Record<string, T> = {};
+  for (const [id, value] of Object.entries(record)) {
+    const alias = aliasIndex.get(id);
+    result[alias ?? id] = value;
+  }
+  return result;
 }
 
 /** Sort a record by keys to keep generator output deterministic. */

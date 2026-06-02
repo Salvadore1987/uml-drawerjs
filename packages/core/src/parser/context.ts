@@ -202,7 +202,9 @@ export function freshId(ctx: ParseContext): string {
 /** Compose the final `Diagram` from parser state. */
 export function finalize(ctx: ParseContext): Diagram {
   const metadata: Diagram["metadata"] = { schemaVersion: "0.1.0" };
-  if (ctx.layoutOverrides) metadata.layoutOverrides = ctx.layoutOverrides;
+  if (ctx.layoutOverrides) {
+    metadata.layoutOverrides = remapAliasKeysToIds(ctx.layoutOverrides, ctx.aliases);
+  }
   if (ctx.opaque.length > 0) metadata.opaque = ctx.opaque;
   if (ctx.sequenceAutoNumber) metadata.sequenceAutoNumber = ctx.sequenceAutoNumber;
 
@@ -215,9 +217,28 @@ export function finalize(ctx: ParseContext): Diagram {
     metadata,
   };
   if (ctx.title) diagram.title = ctx.title;
-  if (ctx.styles) diagram.styles = ctx.styles;
+  if (ctx.styles) diagram.styles = remapAliasKeysToIds(ctx.styles, ctx.aliases);
   if (ctx.fragments.length > 0) diagram.fragments = ctx.fragments;
   if (ctx.notes.length > 0) diagram.notes = ctx.notes;
   if (ctx.dividers.length > 0) diagram.dividers = ctx.dividers;
   return diagram;
+}
+
+/**
+ * Rewrite a record's keys from PlantUML alias → AST id via `ctx.aliases`.
+ * Keys that are not in the alias map pass through verbatim — this keeps
+ * legacy UUID-keyed payloads (written before the generator started
+ * emitting alias keys) intact even though the renderer will not match
+ * them. The next `exportText()` rewrites them to aliases automatically.
+ */
+function remapAliasKeysToIds<T>(
+  record: Record<string, T>,
+  aliases: ReadonlyMap<string, string>,
+): Record<string, T> {
+  const result: Record<string, T> = {};
+  for (const [key, value] of Object.entries(record)) {
+    const id = aliases.get(key);
+    result[id ?? key] = value;
+  }
+  return result;
 }
