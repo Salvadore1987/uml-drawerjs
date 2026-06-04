@@ -305,7 +305,7 @@ describe("generatePlantUml — output shape", () => {
     expect(cls).not.toContain("!include");
   });
 
-  it("drops the empty third argument from Rel(...) when there's neither label nor tech", () => {
+  it('always emits Rel(from, to, "label") — even with empty label — so plantuml.com\'s bundled C4 stdlib resolves the macro', () => {
     // Arrange
     const text =
       `@startuml\n` +
@@ -322,10 +322,10 @@ describe("generatePlantUml — output shape", () => {
     // Act
     const generated = generatePlantUml(ast);
 
-    // Assert — clean two-arg form, no `Rel(p, s, "")` artefact. Original
-    // aliases `p` and `s` survive the round-trip.
-    expect(generated).toContain("Rel(p, s)\n");
-    expect(generated).not.toMatch(/Rel\([^()]+,\s*[^()]+,\s*""\)/);
+    // Assert — the empty third argument is kept so the upstream Rel macro's
+    // parameter count matches. Original aliases `p` and `s` survive too.
+    expect(generated).toContain('Rel(p, s, "")');
+    expect(generated).not.toMatch(/Rel\(p, s\)\s*$/m);
   });
 
   it("preserves the `[tech]` suffix on C4 Rel labels by promoting it to a 4th argument", () => {

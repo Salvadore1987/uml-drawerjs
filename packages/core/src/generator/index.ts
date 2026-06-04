@@ -47,6 +47,12 @@ export function generatePlantUml(diagram: Diagram): string {
 }
 
 function c4StdlibInclude(type: DiagramType): string | null {
+  // Stdlib short form. PlantUML's canonical server (plantuml.com) bundles
+  // the C4 stdlib and resolves this against it. URL-based includes were
+  // tried in 0.1.2 to support planttext.com, but PlantUML's INTERNET
+  // security profile rejected the github URL on plantuml.com itself, so
+  // we reverted. The parser strips any `!include` line on read, so this
+  // change is invisible on round-trip.
   switch (type) {
     case "c4-context":
       return "!include <C4/C4_Context>";

@@ -151,12 +151,11 @@ function formatC4Edge(edge: DiagramEdge, aliases: Map<string, string>): string {
     // this branch.
     return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}", "${escapeStringLiteral(technology)}")`;
   }
-  if (label === "") {
-    // Drop the empty third argument entirely — `Rel(a, b)` is valid in
-    // C4-PlantUML and avoids the "" label that some downstream linters
-    // (and our own LINT_C4_EMPTY_REL_LABEL) flag.
-    return `Rel(${from}, ${to})`;
-  }
+  // Always emit the third (label) argument — `Rel(from, to)` is a
+  // parameter-count mismatch against the upstream C4-PlantUML macro
+  // (`$label` has no default value), causing "Function not found Rel"
+  // on plantuml.com and any server using the stdlib's bundled C4 macros.
+  // The lint pass still flags empty labels as content-quality issues.
   return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}")`;
 }
 
