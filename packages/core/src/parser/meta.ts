@@ -7,9 +7,21 @@ import type { LayoutCoordinate, StyleMap } from "../model/types.js";
  * and per-element style overrides.
  */
 
+/**
+ * Sidecar carrier for C4 node fields that have no slot in the standard
+ * `Person` / `System` / `Container` / `Component` macros. Keyed by PlantUML
+ * alias (stable across parses, like the rest of the payload) so the parser
+ * can re-attach them in `finalize` after node ids are reallocated.
+ */
+export interface DrawerNodeExtras {
+  stereotype?: string;
+  technology?: string;
+}
+
 export interface DrawerMetaPayload {
   layoutOverrides?: Record<string, LayoutCoordinate>;
   styles?: StyleMap;
+  nodeExtras?: Record<string, DrawerNodeExtras>;
 }
 
 const PREFIX = "' @drawer:meta ";

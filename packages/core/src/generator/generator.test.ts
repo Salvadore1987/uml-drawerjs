@@ -509,3 +509,134 @@ Rel(customer, orderSystem, "Uses")
     }
   });
 });
+
+describe("C4 node extras (stereotype / technology) round-trip", () => {
+  // Parse a C4 source, mutate fields the macros can't express, then return
+  // the AST so each test can generate from a node carrying extras.
+  function c4AstWith(
+    mutate: (ast: Diagram) => void,
+    diagramType: DiagramType = "c4-context",
+  ): Diagram {
+    const source =
+      `@startuml\n` +
+      `Person(customer, "Customer")\n` +
+      `System(orderSystem, "Order Platform")\n` +
+      `@enduml\n`;
+    const { ast, errors } = parsePlantUml(source, {
+      diagramType,
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    expect(errors).toEqual([]);
+    mutate(ast);
+    return ast;
+  }
+
+  it("emits stereotype via nodeExtras sidecar without touching the macro line", () => {
+    // Arrange — system with a stereotype the System() macro has no slot for.
+    const ast = c4AstWith((d) => {
+      const node = d.nodes.find((n) => n.alias === "orderSystem");
+      if (node) node.stereotype = "domain";
+    });
+
+    // Act
+    const generated = generatePlantUml(ast);
+    const metaLine = generated.split("\n").find((line) => line.includes("@drawer:meta"));
+
+    // Assert — macro line unchanged; stereotype rides the sidecar.
+    expect(generated).toContain('System(orderSystem, "Order Platform")');
+    expect(metaLine).toBeDefined();
+    const payload = JSON.parse(metaLine!.replace("' @drawer:meta ", "")) as {
+      nodeExtras?: Record<string, { stereotype?: string; technology?: string }>;
+    };
+    expect(payload.nodeExtras?.orderSystem?.stereotype).toBe("domain");
+  });
+
+  it("emits Person/System technology via nodeExtras (no 4th macro argument)", () => {
+    // Arrange
+    const ast = c4AstWith((d) => {
+      const node = d.nodes.find((n) => n.alias === "customer");
+      if (node) node.technology = "Browser";
+    });
+
+    // Act
+    const generated = generatePlantUml(ast);
+    const metaLine = generated.split("\n").find((line) => line.includes("@drawer:meta"));
+
+    // Assert — Person line keeps its arity; technology rides the sidecar.
+    expect(generated).toContain('Person(customer, "Customer")');
+    expect(generated).not.toMatch(/Person\(customer,[^\n]*"Browser"/);
+    const payload = JSON.parse(metaLine!.replace("' @drawer:meta ", "")) as {
+      nodeExtras?: Record<string, { technology?: string }>;
+    };
+    expect(payload.nodeExtras?.customer?.technology).toBe("Browser");
+  });
+
+  it("does NOT duplicate Container technology into nodeExtras", () => {
+    // Arrange — container technology is already a macro argument.
+    const source =
+      `@startuml\n` + `Container(api, "API", "Java", "Handles intake")\n` + `@enduml\n`;
+    const { ast, errors } = parsePlantUml(source, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    expect(errors).toEqual([]);
+    expect(ast.nodes[0]?.technology).toBe("Java");
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert — technology stays in the macro; no nodeExtras sidecar emitted.
+    expect(generated).toContain('Container(api, "API", "Java", "Handles intake")');
+    expect(generated).not.toContain("nodeExtras");
+  });
+
+  it("restores stereotype + technology through parse(generate(ast)) with fresh ids", () => {
+    // Arrange
+    const ast = c4AstWith((d) => {
+      const person = d.nodes.find((n) => n.alias === "customer");
+      if (person) person.technology = "Browser";
+      const system = d.nodes.find((n) => n.alias === "orderSystem");
+      if (system) {
+        system.stereotype = "domain";
+        system.technology = "Spring";
+      }
+    });
+
+    // Act — regenerate, then reparse with a fresh factory (new ids).
+    const generated = generatePlantUml(ast);
+    const reparsed = parsePlantUml(generated, {
+      diagramType: "c4-context",
+      diagramId: "d2",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — fields survive the round-trip, matched by alias.
+    expect(reparsed.errors).toEqual([]);
+    const person = reparsed.ast.nodes.find((n) => n.alias === "customer");
+    const system = reparsed.ast.nodes.find((n) => n.alias === "orderSystem");
+    expect(person?.technology).toBe("Browser");
+    expect(system?.stereotype).toBe("domain");
+    expect(system?.technology).toBe("Spring");
+  });
+
+  it("does not emit nodeExtras for non-C4 diagrams (class stereotype uses <<...>>)", () => {
+    // Arrange — a class with a stereotype, which the class generator already
+    // expresses via `<<...>>` rather than the sidecar.
+    const source = `@startuml\nclass Foo\n@enduml\n`;
+    const { ast } = parsePlantUml(source, {
+      diagramType: "class",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    const node = ast.nodes.find((n) => n.label === "Foo");
+    if (node) node.stereotype = "service";
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert — no sidecar for class diagrams.
+    expect(generated).not.toContain("nodeExtras");
+  });
+});

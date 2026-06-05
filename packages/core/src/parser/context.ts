@@ -1,4 +1,5 @@
 import { uuidv7 } from "../model/ids.js";
+import type { DrawerNodeExtras } from "./meta.js";
 import type {
   CombinedFragment,
   Diagram,
@@ -83,6 +84,12 @@ export interface ParseContext {
   groups: DiagramGroup[];
   styles: StyleMap | null;
   layoutOverrides: Record<string, LayoutCoordinate> | null;
+  /**
+   * Sidecar C4 node fields (`stereotype` / `technology`) decoded from the
+   * `nodeExtras` block of a `' @drawer:meta` comment. Keyed by alias; applied
+   * to the matching node in `finalize` once ids are resolved.
+   */
+  nodeExtras: Record<string, DrawerNodeExtras> | null;
   opaque: string[];
   errors: DiagramError[];
   /** Whether we have seen `@startuml` / `@enduml` markers. */
@@ -159,6 +166,7 @@ export function createParseContext(options: ParseOptions): ParseContext {
     groups: [],
     styles: null,
     layoutOverrides: null,
+    nodeExtras: null,
     opaque: [],
     errors: [],
     sawStart: false,
@@ -201,6 +209,8 @@ export function freshId(ctx: ParseContext): string {
 
 /** Compose the final `Diagram` from parser state. */
 export function finalize(ctx: ParseContext): Diagram {
+  applyNodeExtras(ctx);
+
   const metadata: Diagram["metadata"] = { schemaVersion: "0.1.0" };
   if (ctx.layoutOverrides) {
     metadata.layoutOverrides = remapAliasKeysToIds(ctx.layoutOverrides, ctx.aliases);
@@ -222,6 +232,29 @@ export function finalize(ctx: ParseContext): Diagram {
   if (ctx.notes.length > 0) diagram.notes = ctx.notes;
   if (ctx.dividers.length > 0) diagram.dividers = ctx.dividers;
   return diagram;
+}
+
+/**
+ * Re-attach sidecar `stereotype` / `technology` fields decoded from the
+ * `nodeExtras` meta block onto their nodes. Keyed by alias, so this runs
+ * after all nodes and aliases are resolved. Unknown aliases are skipped
+ * silently (same as `layoutOverrides`), and a macro-parsed `technology`
+ * always wins over the sidecar value.
+ */
+function applyNodeExtras(ctx: ParseContext): void {
+  if (!ctx.nodeExtras) return;
+  for (const [alias, extras] of Object.entries(ctx.nodeExtras)) {
+    const id = ctx.aliases.get(alias);
+    if (!id) continue;
+    const node = ctx.nodes.find((n) => n.id === id);
+    if (!node) continue;
+    if (typeof extras.stereotype === "string") {
+      node.stereotype = extras.stereotype;
+    }
+    if (typeof extras.technology === "string" && node.technology === undefined) {
+      node.technology = extras.technology;
+    }
+  }
 }
 
 /**
