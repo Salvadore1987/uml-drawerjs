@@ -5,7 +5,7 @@ import type {
   LayoutCoordinate,
   StyleMap,
 } from "../model/types.js";
-import { formatMetaComment } from "../parser/meta.js";
+import { formatMetaComment, type DrawerNodeExtras } from "../parser/meta.js";
 
 /**
  * Shared formatting helpers used by every per-type renderer. Keeps escape
@@ -95,15 +95,70 @@ export function lookupAlias(index: Map<string, string>, id: string): string {
 export function formatDiagramMeta(diagram: Diagram): string | null {
   const layoutOverrides = diagram.metadata.layoutOverrides;
   const styles = diagram.styles;
+  const aliasIndex = buildAliasIndex(diagram);
+  const nodeExtras = collectC4NodeExtras(diagram, aliasIndex);
   const hasLayout = layoutOverrides && Object.keys(layoutOverrides).length > 0;
   const hasStyles = styles && Object.keys(styles).length > 0;
-  if (!hasLayout && !hasStyles) return null;
+  const hasExtras = nodeExtras !== null;
+  if (!hasLayout && !hasStyles && !hasExtras) return null;
 
-  const aliasIndex = buildAliasIndex(diagram);
-  const payload: { layoutOverrides?: Record<string, LayoutCoordinate>; styles?: StyleMap } = {};
+  const payload: {
+    layoutOverrides?: Record<string, LayoutCoordinate>;
+    styles?: StyleMap;
+    nodeExtras?: Record<string, DrawerNodeExtras>;
+  } = {};
   if (hasLayout) payload.layoutOverrides = sortRecord(remapToAliases(layoutOverrides, aliasIndex));
   if (hasStyles) payload.styles = sortRecord(remapToAliases(styles, aliasIndex));
+  if (hasExtras) payload.nodeExtras = nodeExtras;
   return formatMetaComment(payload);
+}
+
+/** C4 node kinds whose macros (`Person`, `System`, and their `_Ext` forms)
+ * carry neither a stereotype nor a technology slot, so both fields would be
+ * lost on round-trip without the sidecar. */
+const PERSON_SYSTEM_KINDS = new Set<DiagramNode["kind"]>([
+  "person",
+  "person-external",
+  "system",
+  "system-external",
+]);
+
+/**
+ * Collect C4 node fields the standard macros cannot express, so they can
+ * ride the `nodeExtras` sidecar instead of being silently dropped:
+ *
+ * - `stereotype` — no C4 macro has a slot for it, so it always travels here.
+ * - `technology` — only for the Person/System family; Container/Component
+ *   macros already carry technology as a positional argument, so emitting it
+ *   here too would duplicate it.
+ *
+ * Keys are aliases (matching `layoutOverrides`/`styles`) so the round-trip
+ * survives id reallocation. Returns `null` for non-C4 diagrams and when
+ * nothing needs sidecar storage.
+ */
+function collectC4NodeExtras(
+  diagram: Diagram,
+  aliasIndex: Map<string, string>,
+): Record<string, DrawerNodeExtras> | null {
+  if (
+    diagram.type !== "c4-context" &&
+    diagram.type !== "c4-container" &&
+    diagram.type !== "c4-component"
+  ) {
+    return null;
+  }
+  const result: Record<string, DrawerNodeExtras> = {};
+  for (const node of diagram.nodes) {
+    const extras: DrawerNodeExtras = {};
+    if (node.stereotype) extras.stereotype = node.stereotype;
+    if (PERSON_SYSTEM_KINDS.has(node.kind) && node.technology) {
+      extras.technology = node.technology;
+    }
+    if (Object.keys(extras).length > 0) {
+      result[lookupAlias(aliasIndex, node.id)] = extras;
+    }
+  }
+  return Object.keys(result).length > 0 ? sortRecord(result) : null;
 }
 
 /**

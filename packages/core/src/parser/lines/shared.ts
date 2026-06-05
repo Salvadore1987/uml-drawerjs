@@ -75,4 +75,8 @@ function handleMetaComment(ctx: ParseContext, line: SourceLine): void {
   if (result.payload.styles) {
     ctx.styles = { ...(ctx.styles ?? {}), ...result.payload.styles };
   }
+  const extras = result.payload.nodeExtras;
+  if (extras && typeof extras === "object" && !Array.isArray(extras)) {
+    ctx.nodeExtras = { ...(ctx.nodeExtras ?? {}), ...extras };
+  }
 }
