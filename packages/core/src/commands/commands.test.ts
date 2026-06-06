@@ -149,6 +149,31 @@ describe("moveNodeCommand", () => {
     expect(post.metadata.layoutOverrides?.[a.id]).toEqual({ x: 100, y: 200 });
     expect(JSON.stringify(cmd.invert(post))).toBe(before);
   });
+
+  it("preserves a manually-resized width/height when only x/y are updated", () => {
+    // Arrange — node has a previous override with explicit size from a resize
+    const a = makeNode("A");
+    const initial: Diagram = {
+      ...createEmptyDiagram("class"),
+      nodes: [a],
+      metadata: {
+        schemaVersion: "0.1.0",
+        layoutOverrides: { [a.id]: { x: 10, y: 20, width: 320, height: 200 } },
+      },
+    };
+
+    // Act — move to new coordinates without touching size
+    const cmd = moveNodeCommand(a.id, { x: 100, y: 200 }, initial);
+    const post = cmd.apply(initial);
+
+    // Assert — width/height carry over so the node doesn't resize back to auto
+    expect(post.metadata.layoutOverrides?.[a.id]).toEqual({
+      x: 100,
+      y: 200,
+      width: 320,
+      height: 200,
+    });
+  });
 });
 
 describe("updateNodeCommand", () => {
