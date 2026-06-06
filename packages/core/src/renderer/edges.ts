@@ -24,6 +24,10 @@ export function renderEdge(args: RenderEdgeArgs): VNode {
   const { from, to } = portSnap(source, target);
 
   const children: VNode[] = [];
+  // Wide transparent hit-line under the visible stroke so a click within
+  // ~10px of the edge still resolves to it. The visible line is 1.5px
+  // wide and would otherwise be near-unclickable.
+  children.push(renderHitArea(from, to));
   children.push(renderPath(edge, from, to));
   const hasLabel = Boolean(edge.label && edge.label.trim() !== "");
   const hasTech = Boolean(edge.technology && edge.technology.trim() !== "");
@@ -124,6 +128,20 @@ function renderPath(edge: DiagramEdge, from: Point, to: Point): VNode {
     "marker-end": markerForKind(edge.kind, "end"),
     "marker-start": markerForKind(edge.kind, "start"),
     fill: "none",
+  });
+}
+
+function renderHitArea(from: Point, to: Point): VNode {
+  return v("line", {
+    x1: from.x,
+    y1: from.y,
+    x2: to.x,
+    y2: to.y,
+    stroke: "transparent",
+    "stroke-width": 12,
+    "stroke-linecap": "butt",
+    fill: "none",
+    "pointer-events": "stroke",
   });
 }
 
