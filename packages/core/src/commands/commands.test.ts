@@ -16,6 +16,7 @@ import {
 import { moveGroupCommand } from "./moveGroup.js";
 import { resizeGroupCommand } from "./resizeGroup.js";
 import { importTextCommand } from "./importText.js";
+import { moveEdgeLabelCommand } from "./moveEdgeLabel.js";
 import { moveNodeCommand } from "./moveNode.js";
 import { removeEdgeCommand } from "./removeEdge.js";
 import { removeNodeCommand } from "./removeNode.js";
@@ -245,6 +246,56 @@ describe("addEdgeCommand / removeEdgeCommand / updateEdgeCommand", () => {
     expectRoundTrip(initial, (d) =>
       updateEdgeCommand(edge.id, { kind: "inheritance", label: "extends" }, d),
     );
+  });
+});
+
+describe("moveEdgeLabelCommand", () => {
+  it("writes a new offset on apply and inverts back to absent override", () => {
+    // Arrange — edge with no label override
+    const a = makeNode("A");
+    const b = makeNode("B");
+    const edge = makeEdge(a.id, b.id);
+    const initial: Diagram = { ...createEmptyDiagram("class"), nodes: [a, b], edges: [edge] };
+
+    // Act + Assert — round-trip back to no edgeLayoutOverrides field
+    expectRoundTrip(initial, (d) =>
+      moveEdgeLabelCommand(edge.id, { labelOffsetX: 40, labelOffsetY: -24 }, d),
+    );
+
+    const cmd = moveEdgeLabelCommand(edge.id, { labelOffsetX: 40, labelOffsetY: -24 }, initial);
+    expect(cmd.kind).toBe("MoveEdgeLabel");
+    expect(cmd.apply(initial).metadata.edgeLayoutOverrides?.[edge.id]).toEqual({
+      labelOffsetX: 40,
+      labelOffsetY: -24,
+    });
+  });
+
+  it("inverts back to a previous offset when the edge already had one", () => {
+    // Arrange
+    const a = makeNode("A");
+    const b = makeNode("B");
+    const edge = makeEdge(a.id, b.id);
+    const initial: Diagram = {
+      ...createEmptyDiagram("class"),
+      nodes: [a, b],
+      edges: [edge],
+      metadata: {
+        schemaVersion: "0.1.0",
+        edgeLayoutOverrides: { [edge.id]: { labelOffsetX: 10, labelOffsetY: 0 } },
+      },
+    };
+
+    // Act
+    const before = JSON.stringify(initial);
+    const cmd = moveEdgeLabelCommand(edge.id, { labelOffsetX: 100, labelOffsetY: 200 }, initial);
+    const post = cmd.apply(initial);
+
+    // Assert
+    expect(post.metadata.edgeLayoutOverrides?.[edge.id]).toEqual({
+      labelOffsetX: 100,
+      labelOffsetY: 200,
+    });
+    expect(JSON.stringify(cmd.invert(post))).toBe(before);
   });
 });
 

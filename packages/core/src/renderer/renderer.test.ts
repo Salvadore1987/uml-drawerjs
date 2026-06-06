@@ -84,6 +84,54 @@ describe("renderDiagram — vnode tree shape", () => {
     expect((tech?.attrs as Record<string, unknown> | undefined)?.["font-style"]).toBe("italic");
   });
 
+  it("applies edgeLayoutOverrides offset to the label `<g>` transform", () => {
+    // Arrange — same diagram twice, once without and once with an
+    // edge-label override; the delta between the two label transforms
+    // must equal the override.
+    const baseDiagram: Diagram = {
+      ...createEmptyDiagram("c4-context"),
+      nodes: [
+        { id: "a", kind: "person", label: "Customer" },
+        { id: "b", kind: "system", label: "Banking" },
+      ],
+      edges: [{ id: "e", source: "a", target: "b", kind: "uses", label: "Uses" }],
+      metadata: {
+        schemaVersion: "0.1.0",
+        layoutOverrides: {
+          a: { x: 0, y: 0, width: 100, height: 100 },
+          b: { x: 400, y: 0, width: 100, height: 100 },
+        },
+      },
+    };
+    const withOverride: Diagram = {
+      ...baseDiagram,
+      metadata: {
+        ...baseDiagram.metadata,
+        edgeLayoutOverrides: { e: { labelOffsetX: 36, labelOffsetY: -24 } },
+      },
+    };
+
+    // Act
+    const baseLabel = findLabelAttrs(renderDiagram(baseDiagram).root);
+    const movedLabel = findLabelAttrs(renderDiagram(withOverride).root);
+
+    // Assert — same auto midpoint in both renders; the overridden one is
+    // shifted by exactly the offset, and exposes data attributes for the
+    // interactions handler to read on pointerdown.
+    expect(baseLabel).toBeDefined();
+    expect(movedLabel).toBeDefined();
+    expect(movedLabel?.["data-label-offset-x"]).toBe(36);
+    expect(movedLabel?.["data-label-offset-y"]).toBe(-24);
+    const basePos = parseTranslate(baseLabel?.transform as string | undefined);
+    const movedPos = parseTranslate(movedLabel?.transform as string | undefined);
+    expect(basePos).not.toBeNull();
+    expect(movedPos).not.toBeNull();
+    if (basePos && movedPos) {
+      expect(movedPos.x - basePos.x).toBe(36);
+      expect(movedPos.y - basePos.y).toBe(-24);
+    }
+  });
+
   it("renders ER cardinality labels for both endpoints", () => {
     // Arrange
     const diagram: Diagram = {
@@ -280,6 +328,21 @@ describe("summarizeForA11y", () => {
     expect(summary).toContain("Shape implements Renderable");
   });
 });
+
+function findLabelAttrs(root: {
+  tag: string;
+  children?: readonly { tag: string }[];
+}): Record<string, string | number | boolean | undefined> | undefined {
+  const node = flattenNodes(root).find((n) => (n.classes ?? []).includes("uml-edge-label"));
+  return node?.attrs;
+}
+
+function parseTranslate(value: string | undefined): { x: number; y: number } | null {
+  if (!value) return null;
+  const match = value.match(/translate\(([-\d.]+), ([-\d.]+)\)/);
+  if (!match) return null;
+  return { x: Number(match[1]), y: Number(match[2]) };
+}
 
 function flattenNodes(node: { tag: string; children?: readonly { tag: string }[] }): {
   tag: string;

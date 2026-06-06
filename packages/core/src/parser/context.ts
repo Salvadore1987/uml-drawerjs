@@ -8,6 +8,7 @@ import type {
   DiagramGroup,
   DiagramNode,
   DiagramType,
+  EdgeLayoutOverride,
   LayoutCoordinate,
   NodeKind,
   SequenceDivider,
@@ -84,6 +85,12 @@ export interface ParseContext {
   groups: DiagramGroup[];
   styles: StyleMap | null;
   layoutOverrides: Record<string, LayoutCoordinate> | null;
+  /**
+   * Edge label offsets decoded from `@drawer:meta`, keyed in their raw
+   * `"sourceAlias->targetAlias"` form (with optional `":N"` for duplicates).
+   * Translated to current edge ids in `finalize` once edges are built.
+   */
+  edgeLayoutOverrides: Record<string, EdgeLayoutOverride> | null;
   /**
    * Sidecar C4 node fields (`stereotype` / `technology`) decoded from the
    * `nodeExtras` block of a `' @drawer:meta` comment. Keyed by alias; applied
@@ -166,6 +173,7 @@ export function createParseContext(options: ParseOptions): ParseContext {
     groups: [],
     styles: null,
     layoutOverrides: null,
+    edgeLayoutOverrides: null,
     nodeExtras: null,
     opaque: [],
     errors: [],
@@ -214,6 +222,13 @@ export function finalize(ctx: ParseContext): Diagram {
   const metadata: Diagram["metadata"] = { schemaVersion: "0.1.0" };
   if (ctx.layoutOverrides) {
     metadata.layoutOverrides = remapAliasKeysToIds(ctx.layoutOverrides, ctx.aliases);
+  }
+  if (ctx.edgeLayoutOverrides) {
+    metadata.edgeLayoutOverrides = remapEdgeAliasKeysToIds(
+      ctx.edgeLayoutOverrides,
+      ctx.aliases,
+      ctx.edges,
+    );
   }
   if (ctx.opaque.length > 0) metadata.opaque = ctx.opaque;
   if (ctx.sequenceAutoNumber) metadata.sequenceAutoNumber = ctx.sequenceAutoNumber;
@@ -274,4 +289,74 @@ function remapAliasKeysToIds<T>(
     result[id ?? key] = value;
   }
   return result;
+}
+
+/**
+ * Translate edge meta keys (`"sourceAlias->targetAlias"` or
+ * `"sourceAlias->targetAlias:N"`) to current edge ids. Aliases are stable
+ * across parses; edge ids are reallocated, so this re-binding happens once
+ * all edges have been built. Unknown / unmatched keys pass through verbatim
+ * to keep the round-trip conservative.
+ */
+function remapEdgeAliasKeysToIds<T>(
+  record: Record<string, T>,
+  aliases: ReadonlyMap<string, string>,
+  edges: readonly DiagramEdge[],
+): Record<string, T> {
+  const usedOccurrence = new Map<string, number>();
+  const result: Record<string, T> = {};
+  for (const [key, value] of Object.entries(record)) {
+    const parsed = parseEdgeAliasKey(key);
+    if (!parsed) {
+      result[key] = value;
+      continue;
+    }
+    const sourceId = aliases.get(parsed.sourceAlias);
+    const targetId = aliases.get(parsed.targetAlias);
+    if (!sourceId || !targetId) {
+      result[key] = value;
+      continue;
+    }
+    const pairKey = `${sourceId}->${targetId}`;
+    const wantedOccurrence = parsed.occurrence ?? 0;
+    let seen = 0;
+    let matchedId: string | null = null;
+    for (const edge of edges) {
+      if (edge.source !== sourceId || edge.target !== targetId) continue;
+      if (seen === wantedOccurrence) {
+        matchedId = edge.id;
+        break;
+      }
+      seen += 1;
+    }
+    if (!matchedId) {
+      result[key] = value;
+      continue;
+    }
+    usedOccurrence.set(pairKey, wantedOccurrence);
+    result[matchedId] = value;
+  }
+  return result;
+}
+
+function parseEdgeAliasKey(
+  key: string,
+): { sourceAlias: string; targetAlias: string; occurrence?: number } | null {
+  const arrowIdx = key.indexOf("->");
+  if (arrowIdx <= 0) return null;
+  const sourceAlias = key.slice(0, arrowIdx);
+  const rest = key.slice(arrowIdx + 2);
+  if (rest.length === 0) return null;
+  const colonIdx = rest.indexOf(":");
+  if (colonIdx === -1) {
+    return { sourceAlias, targetAlias: rest };
+  }
+  const occurrenceText = rest.slice(colonIdx + 1);
+  const occurrence = Number.parseInt(occurrenceText, 10);
+  if (!Number.isFinite(occurrence) || occurrence < 0) return null;
+  return {
+    sourceAlias,
+    targetAlias: rest.slice(0, colonIdx),
+    occurrence,
+  };
 }

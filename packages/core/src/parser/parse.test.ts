@@ -218,6 +218,58 @@ describe("parsePlantUml — meta-comment decoding", () => {
     }
   });
 
+  it("remaps alias-keyed edgeLayoutOverrides to the current edge id", () => {
+    // Arrange — `customer->myapp` keys the override; aliases survive
+    // parses but edge ids are reallocated, so the parser must rewrite
+    // the key to the freshly-built edge.id.
+    const text = `@startuml\n!include <C4/C4_Context>\n' @drawer:meta {"edgeLayoutOverrides":{"customer->myapp":{"labelOffsetX":40,"labelOffsetY":-20}}}\nPerson(customer, "Customer", "")\nSystem(myapp, "App", "")\nRel(customer, myapp, "Uses")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.edges).toHaveLength(1);
+    const edgeId = ast.edges[0]?.id;
+    expect(edgeId).toBeDefined();
+    if (edgeId) {
+      expect(ast.metadata.edgeLayoutOverrides?.[edgeId]).toEqual({
+        labelOffsetX: 40,
+        labelOffsetY: -20,
+      });
+      expect(ast.metadata.edgeLayoutOverrides?.["customer->myapp"]).toBeUndefined();
+    }
+  });
+
+  it("disambiguates duplicate-endpoint edges using the `:N` suffix", () => {
+    // Arrange — two Rel lines between the same source/target pair.
+    const text = `@startuml\n!include <C4/C4_Context>\n' @drawer:meta {"edgeLayoutOverrides":{"customer->myapp":{"labelOffsetX":1,"labelOffsetY":1},"customer->myapp:1":{"labelOffsetX":2,"labelOffsetY":2}}}\nPerson(customer, "Customer", "")\nSystem(myapp, "App", "")\nRel(customer, myapp, "Reads")\nRel(customer, myapp, "Writes")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — first occurrence gets the no-suffix override, second gets `:1`.
+    expect(errors).toEqual([]);
+    expect(ast.edges).toHaveLength(2);
+    const [first, second] = ast.edges;
+    expect(first && ast.metadata.edgeLayoutOverrides?.[first.id]).toEqual({
+      labelOffsetX: 1,
+      labelOffsetY: 1,
+    });
+    expect(second && ast.metadata.edgeLayoutOverrides?.[second.id]).toEqual({
+      labelOffsetX: 2,
+      labelOffsetY: 2,
+    });
+  });
+
   it("emits SYNTAX_META on malformed meta-comment payload but keeps the AST", () => {
     // Arrange — payload is not valid JSON
     const text = `@startuml\n' @drawer:meta {not valid}\nclass Foo\n@enduml\n`;

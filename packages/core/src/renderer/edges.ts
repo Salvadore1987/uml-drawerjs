@@ -1,4 +1,4 @@
-import type { DiagramEdge, EdgeEndpoint, EdgeKind } from "../model/types.js";
+import type { DiagramEdge, EdgeEndpoint, EdgeKind, EdgeLayoutOverride } from "../model/types.js";
 import { v } from "./types.js";
 import type { NodeGeometry, VNode } from "./types.js";
 
@@ -17,10 +17,12 @@ export interface RenderEdgeArgs {
   readonly edge: DiagramEdge;
   readonly source: NodeGeometry;
   readonly target: NodeGeometry;
+  /** Optional persisted label offset from `metadata.edgeLayoutOverrides`. */
+  readonly labelOverride?: EdgeLayoutOverride;
 }
 
 export function renderEdge(args: RenderEdgeArgs): VNode {
-  const { edge, source, target } = args;
+  const { edge, source, target, labelOverride } = args;
   const { from, to } = portSnap(source, target);
 
   const children: VNode[] = [];
@@ -32,7 +34,7 @@ export function renderEdge(args: RenderEdgeArgs): VNode {
   const hasLabel = Boolean(edge.label && edge.label.trim() !== "");
   const hasTech = Boolean(edge.technology && edge.technology.trim() !== "");
   if (hasLabel || hasTech) {
-    children.push(renderLabel(edge.label ?? "", edge.technology, from, to));
+    children.push(renderLabel(edge.label ?? "", edge.technology, from, to, labelOverride));
   }
   // Class diagrams: per-end role + multiplicity from `edge.ends`. ER fall-back
   // remains via `edge.cardinality`. Both can coexist without overlap because
@@ -176,9 +178,19 @@ function markerForKind(kind: EdgeKind, side: "start" | "end"): string | undefine
   return undefined;
 }
 
-function renderLabel(label: string, technology: string | undefined, from: Point, to: Point): VNode {
-  const mx = (from.x + to.x) / 2;
-  const my = (from.y + to.y) / 2;
+function renderLabel(
+  label: string,
+  technology: string | undefined,
+  from: Point,
+  to: Point,
+  override?: EdgeLayoutOverride,
+): VNode {
+  const autoMx = (from.x + to.x) / 2;
+  const autoMy = (from.y + to.y) / 2;
+  const offsetX = override?.labelOffsetX ?? 0;
+  const offsetY = override?.labelOffsetY ?? 0;
+  const mx = autoMx + offsetX;
+  const my = autoMy + offsetY;
   const techText = technology && technology.trim() !== "" ? `[${technology}]` : undefined;
   // Width sizes to the longer of the two lines so neither overflows the pill.
   const widest = Math.max(label.length, techText?.length ?? 0);
@@ -237,7 +249,19 @@ function renderLabel(label: string, technology: string | undefined, from: Point,
       ),
     );
   }
-  return v("g", { transform: `translate(${mx}, ${my})` }, children, {
+  // Emit `data-label-offset-*` only when an override is actually applied,
+  // so existing snapshot fixtures (which exercise the auto-routed code
+  // path exclusively) stay untouched. The interactions handler reads
+  // these attributes on pointerdown, falling back to 0 when absent.
+  const attrs: Record<string, string | number> =
+    override !== undefined
+      ? {
+          transform: `translate(${mx}, ${my})`,
+          "data-label-offset-x": offsetX,
+          "data-label-offset-y": offsetY,
+        }
+      : { transform: `translate(${mx}, ${my})` };
+  return v("g", attrs, children, {
     classes: ["uml-edge-label"],
   });
 }

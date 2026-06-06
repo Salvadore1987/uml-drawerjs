@@ -1,4 +1,4 @@
-import type { LayoutCoordinate, StyleMap } from "../model/types.js";
+import type { EdgeLayoutOverride, LayoutCoordinate, StyleMap } from "../model/types.js";
 
 /**
  * Decoder + encoder for `' @drawer:meta {...}` annotations. These comments
@@ -20,6 +20,13 @@ export interface DrawerNodeExtras {
 
 export interface DrawerMetaPayload {
   layoutOverrides?: Record<string, LayoutCoordinate>;
+  /**
+   * Per-edge label offsets, keyed by `"sourceAlias->targetAlias"` (with a
+   * trailing `":N"` to disambiguate when multiple edges share the same
+   * endpoint pair). The parser rewrites these keys to current edge ids
+   * in `finalize`.
+   */
+  edgeLayoutOverrides?: Record<string, EdgeLayoutOverride>;
   styles?: StyleMap;
   nodeExtras?: Record<string, DrawerNodeExtras>;
 }

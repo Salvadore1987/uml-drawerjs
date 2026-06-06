@@ -531,6 +531,61 @@ Rel(customer, orderSystem, "Uses")
       }
     }
   });
+
+  it("preserves edgeLayoutOverrides across generate → parse despite fresh edge ids", () => {
+    // Arrange — seed an AST with one Rel, attach an edge-label override
+    // keyed by the current edge id, then re-parse with a fresh factory to
+    // simulate a real reload (edge id is reallocated).
+    const seed = `@startuml
+!include <C4/C4_Context>
+Person(customer, "Customer", "")
+System(orderSystem, "Order Platform", "")
+Rel(customer, orderSystem, "Uses")
+@enduml`;
+    const first = parsePlantUml(seed, {
+      diagramType: "c4-context",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+    expect(first.errors).toEqual([]);
+    const originalEdgeId = first.ast.edges[0]?.id;
+    expect(originalEdgeId).toBeDefined();
+    if (!originalEdgeId) return;
+
+    const withOverride: Diagram = {
+      ...first.ast,
+      metadata: {
+        ...first.ast.metadata,
+        edgeLayoutOverrides: {
+          [originalEdgeId]: { labelOffsetX: 36, labelOffsetY: -24 },
+        },
+      },
+    };
+
+    // Act
+    const generated = generatePlantUml(withOverride);
+    const second = parsePlantUml(generated, {
+      diagramType: "c4-context",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — alias-pair encoding is on the wire, and the reparsed edge
+    // sees the override remapped to its new id.
+    const metaLine = generated.split("\n").find((line) => line.includes("@drawer:meta"));
+    expect(metaLine).toBeDefined();
+    expect(metaLine).toContain('"customer->orderSystem"');
+
+    expect(second.errors).toEqual([]);
+    const reparsedEdgeId = second.ast.edges[0]?.id;
+    expect(reparsedEdgeId).toBeDefined();
+    if (reparsedEdgeId) {
+      expect(second.ast.metadata.edgeLayoutOverrides?.[reparsedEdgeId]).toEqual({
+        labelOffsetX: 36,
+        labelOffsetY: -24,
+      });
+    }
+  });
 });
 
 describe("C4 node extras (stereotype / technology) round-trip", () => {

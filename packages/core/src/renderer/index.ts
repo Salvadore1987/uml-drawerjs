@@ -79,7 +79,12 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
     const source = geometry.get(edge.source);
     const target = geometry.get(edge.target);
     if (!source || !target) continue;
-    edgeVNodes.push(renderEdge({ edge, source, target }));
+    const labelOverride = diagram.metadata.edgeLayoutOverrides?.[edge.id];
+    edgeVNodes.push(
+      labelOverride
+        ? renderEdge({ edge, source, target, labelOverride })
+        : renderEdge({ edge, source, target }),
+    );
   }
 
   const groupBoxes = computeGroupBoxes({ diagram, nodeGeometry: geometry });

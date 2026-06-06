@@ -31,6 +31,7 @@ import {
   addNodeToGroupCommand,
   moveActivationToLifelineCommand,
   moveEdgeCommand,
+  moveEdgeLabelCommand,
   moveGroupCommand,
   moveNodeCommand,
   moveSequenceFragmentCommand,
@@ -241,6 +242,23 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     lifelineColumns: ReadonlyArray<{ id: string; cx: number }>;
   } | null = null;
   let activationMoveHorizontalGuide: SVGLineElement | null = null;
+  /**
+   * Edge label drag (any non-sequence diagram type). Pointerdown on a
+   * `<g.uml-edge-label>` captures the current offset + the segment's
+   * auto midpoint; pointermove translates the label directly; pointerup
+   * snaps the absolute label position to the grid, derives a new offset
+   * relative to the auto midpoint and dispatches `moveEdgeLabelCommand`.
+   */
+  let edgeLabelDrag: {
+    edgeId: string;
+    pointerId: number;
+    startClient: { x: number; y: number };
+    startLayout: { x: number; y: number };
+    labelGroup: SVGGraphicsElement;
+    startOffset: { x: number; y: number };
+    autoMid: { x: number; y: number };
+    hasMoved: boolean;
+  } | null = null;
 
   // Subscribe to selection so the SVG reflects the current ids.
   let unsubscribeSelection: (() => void) | null = selection.subscribe((ids) => {
@@ -460,6 +478,85 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     const toIndex = Math.max(0, Math.min(fromIndex + moved, diagram.edges.length - 1));
     if (toIndex === fromIndex) return;
     history.dispatch(moveEdgeCommand(finished.edgeId, toIndex, diagram));
+  }
+
+  /**
+   * Edge label drag-to-move. Pointerdown on a `<g.uml-edge-label>`
+   * captures the segment's auto midpoint (read from the parent edge
+   * `<g>` `data-source-x/y` + `data-target-x/y`) and the label's current
+   * offset; pointermove translates the label via `transform` directly
+   * (no AST writes); pointerup snaps the absolute label position to the
+   * grid and dispatches `moveEdgeLabelCommand` so the offset persists
+   * and is reversible through history.
+   */
+  function startEdgeLabelDrag(
+    event: PointerEvent,
+    edgeId: string,
+    labelGroup: SVGGraphicsElement,
+    edgeGroup: SVGGraphicsElement,
+  ): void {
+    const sx = Number(edgeGroup.getAttribute("data-source-x") ?? 0);
+    const sy = Number(edgeGroup.getAttribute("data-source-y") ?? 0);
+    const tx = Number(edgeGroup.getAttribute("data-target-x") ?? 0);
+    const ty = Number(edgeGroup.getAttribute("data-target-y") ?? 0);
+    const autoMid = { x: (sx + tx) / 2, y: (sy + ty) / 2 };
+    const startOffsetX = Number(labelGroup.getAttribute("data-label-offset-x") ?? 0);
+    const startOffsetY = Number(labelGroup.getAttribute("data-label-offset-y") ?? 0);
+    if (event.shiftKey) {
+      selection.toggle(edgeId);
+    } else {
+      selection.set([edgeId]);
+    }
+    edgeLabelDrag = {
+      edgeId,
+      pointerId: event.pointerId,
+      startClient: { x: event.clientX, y: event.clientY },
+      startLayout: clientToLayout(event.clientX, event.clientY),
+      labelGroup,
+      startOffset: { x: startOffsetX, y: startOffsetY },
+      autoMid,
+      hasMoved: false,
+    };
+    svg.setPointerCapture?.(event.pointerId);
+    event.stopPropagation();
+  }
+
+  function paintEdgeLabelDrag(event: PointerEvent): void {
+    if (!edgeLabelDrag) return;
+    const cursor = clientToLayout(event.clientX, event.clientY);
+    const rawDx = cursor.x - edgeLabelDrag.startLayout.x;
+    const rawDy = cursor.y - edgeLabelDrag.startLayout.y;
+    const offsetX = edgeLabelDrag.startOffset.x + rawDx;
+    const offsetY = edgeLabelDrag.startOffset.y + rawDy;
+    const mx = edgeLabelDrag.autoMid.x + offsetX;
+    const my = edgeLabelDrag.autoMid.y + offsetY;
+    edgeLabelDrag.labelGroup.setAttribute("transform", `translate(${mx}, ${my})`);
+  }
+
+  function finishEdgeLabelDrag(event: PointerEvent): void {
+    if (!edgeLabelDrag) return;
+    const finished = edgeLabelDrag;
+    edgeLabelDrag = null;
+    svg.releasePointerCapture?.(event.pointerId);
+    if (!finished.hasMoved) return;
+    const cursor = clientToLayout(event.clientX, event.clientY);
+    const rawDx = cursor.x - finished.startLayout.x;
+    const rawDy = cursor.y - finished.startLayout.y;
+    // Snap the final absolute label position to the grid (not the
+    // delta), so the label always rests on a grid intersection
+    // regardless of where the auto midpoint falls. Alt holds free-form
+    // mode for fine adjustment, matching the node-move gesture.
+    const snap = getSnap();
+    const useSnap = snap.enabled && !event.altKey;
+    const absX = finished.autoMid.x + finished.startOffset.x + rawDx;
+    const absY = finished.autoMid.y + finished.startOffset.y + rawDy;
+    const snappedX = useSnap ? snapValue(absX, snap) : absX;
+    const snappedY = useSnap ? snapValue(absY, snap) : absY;
+    const labelOffsetX = snappedX - finished.autoMid.x;
+    const labelOffsetY = snappedY - finished.autoMid.y;
+    history.dispatch(
+      moveEdgeLabelCommand(finished.edgeId, { labelOffsetX, labelOffsetY }, bus.getState()),
+    );
   }
 
   /**
@@ -1383,6 +1480,28 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
     }
     const group = findNodeAt(event.target);
 
+    // Edge label drag — pointerdown on a `<g.uml-edge-label>` pill starts
+    // a label-move gesture. Runs ahead of every other branch (only when
+    // the click did not resolve to a node) so a label sitting visually
+    // over a boundary, edge body, or empty canvas still wins. Sequence
+    // diagrams have their own drag-to-reorder gesture on edge bodies —
+    // for now we keep label-move disabled there to avoid gesture overlap.
+    if (!group) {
+      const labelEl =
+        event.target instanceof Element ? event.target.closest("g.uml-edge-label") : null;
+      if (labelEl instanceof SVGGraphicsElement) {
+        const edgeGroup = labelEl.closest("[data-edge-id]");
+        const edgeId = edgeGroup?.getAttribute("data-edge-id") ?? null;
+        if (edgeGroup instanceof SVGGraphicsElement && edgeId) {
+          const diagram = bus.getState();
+          if (diagram.type !== "sequence") {
+            startEdgeLabelDrag(event, edgeId, labelEl, edgeGroup);
+            return;
+          }
+        }
+      }
+    }
+
     // Boundary-group hit takes priority only when no node was matched —
     // the renderer puts groups under nodes in z-order, so most pointerdown
     // events on a node still fall into the node branch above.
@@ -1756,6 +1875,18 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
   }
 
   function onPointerMove(event: PointerEvent): void {
+    // Edge-label drag (non-sequence): translate the label `<g>`
+    // ephemerally via `transform`. Threshold-gated so a pure click
+    // leaves only the selection mutation; the AST write happens once
+    // on pointerup.
+    if (edgeLabelDrag && edgeLabelDrag.pointerId === event.pointerId) {
+      const dx = event.clientX - edgeLabelDrag.startClient.x;
+      const dy = event.clientY - edgeLabelDrag.startClient.y;
+      if (!edgeLabelDrag.hasMoved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+      edgeLabelDrag.hasMoved = true;
+      paintEdgeLabelDrag(event);
+      return;
+    }
     // Edge-reorder gesture (sequence-only): paint a horizontal guide
     // at the proposed insertion row, OR — for self-calls — a vertical
     // guide at the target lifeline when the user drags horizontally.
@@ -1918,6 +2049,10 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
   }
 
   function onPointerUp(event: PointerEvent): void {
+    if (edgeLabelDrag && edgeLabelDrag.pointerId === event.pointerId) {
+      finishEdgeLabelDrag(event);
+      return;
+    }
     if (edgeReorder && edgeReorder.pointerId === event.pointerId) {
       finishEdgeReorder(event);
       return;
