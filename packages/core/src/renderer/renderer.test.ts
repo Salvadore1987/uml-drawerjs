@@ -58,6 +58,32 @@ describe("renderDiagram — vnode tree shape", () => {
     expect(edgeMatches.map((n) => n.attrs?.["data-edge-id"])).toEqual(["e"]);
   });
 
+  it("renders a C4 Rel technology as a second italic [bracketed] label line", () => {
+    // Arrange
+    const diagram: Diagram = {
+      ...createEmptyDiagram("c4-context"),
+      nodes: [
+        { id: "a", kind: "person", label: "Customer" },
+        { id: "b", kind: "system", label: "Banking" },
+      ],
+      edges: [
+        { id: "e", source: "a", target: "b", kind: "uses", label: "Uses", technology: "HTTPS" },
+      ],
+    };
+
+    // Act
+    const rendered = renderDiagram(diagram);
+    const flat = flattenNodes(rendered.root);
+
+    // Assert — both the action-name line and the technology line are present;
+    // the technology line is italic and wrapped in brackets.
+    const action = flat.find((n) => (n.classes ?? []).includes("uml-edge-label-text"));
+    const tech = flat.find((n) => (n.classes ?? []).includes("uml-edge-label-tech"));
+    expect(action?.text).toBe("Uses");
+    expect(tech?.text).toBe("[HTTPS]");
+    expect((tech?.attrs as Record<string, unknown> | undefined)?.["font-style"]).toBe("italic");
+  });
+
   it("renders ER cardinality labels for both endpoints", () => {
     // Arrange
     const diagram: Diagram = {

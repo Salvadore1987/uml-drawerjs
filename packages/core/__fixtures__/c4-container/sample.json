@@ -45,28 +45,32 @@
       "source": "id-1",
       "target": "id-3",
       "kind": "uses",
-      "label": "Uses [HTTPS]"
+      "label": "Uses",
+      "technology": "HTTPS"
     },
     {
       "id": "id-7",
       "source": "id-3",
       "target": "id-4",
       "kind": "uses",
-      "label": "Calls [JSON/HTTPS]"
+      "label": "Calls",
+      "technology": "JSON/HTTPS"
     },
     {
       "id": "id-8",
       "source": "id-4",
       "target": "id-5",
       "kind": "uses",
-      "label": "Reads/writes [JDBC]"
+      "label": "Reads/writes",
+      "technology": "JDBC"
     },
     {
       "id": "id-9",
       "source": "id-4",
       "target": "id-2",
       "kind": "uses",
-      "label": "Sends e-mails [SMTP]"
+      "label": "Sends e-mails",
+      "technology": "SMTP"
     }
   ],
   "groups": [],

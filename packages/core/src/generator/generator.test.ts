@@ -328,7 +328,7 @@ describe("generatePlantUml — output shape", () => {
     expect(generated).not.toMatch(/Rel\(p, s\)\s*$/m);
   });
 
-  it("preserves the `[tech]` suffix on C4 Rel labels by promoting it to a 4th argument", () => {
+  it("round-trips the C4 Rel technology argument through the dedicated field", () => {
     // Arrange
     const text =
       `@startuml\n` +
@@ -341,14 +341,37 @@ describe("generatePlantUml — output shape", () => {
       diagramId: "d",
       idFactory: makeCounterFactory(),
     });
-    // Sanity-check the parser still encodes tech as `[HTTPS]` in the label.
-    expect(ast.edges[0]?.label).toBe("Uses [HTTPS]");
+    // The parser splits action name and technology into separate fields.
+    expect(ast.edges[0]?.label).toBe("Uses");
+    expect(ast.edges[0]?.technology).toBe("HTTPS");
 
     // Act
     const generated = generatePlantUml(ast);
 
-    // Assert — the suffix is decoded back into the 4-arg form. The
-    // original aliases `p` and `s` round-trip through the parser.
+    // Assert — the technology field re-emits the 4-arg form. The original
+    // aliases `p` and `s` round-trip through the parser.
+    expect(generated).toContain('Rel(p, s, "Uses", "HTTPS")');
+  });
+
+  it("decodes the legacy `[tech]` label suffix into a 4-arg Rel (back-compat)", () => {
+    // Arrange — an AST authored before the `technology` field existed, where
+    // technology still rides as a `[HTTPS]` suffix on the label.
+    const ast: Diagram = {
+      id: "d",
+      type: "c4-context",
+      nodes: [
+        { id: "p", kind: "person", label: "Person", alias: "p" },
+        { id: "s", kind: "system", label: "System", alias: "s" },
+      ],
+      edges: [{ id: "e1", source: "p", target: "s", kind: "uses", label: "Uses [HTTPS]" }],
+      groups: [],
+      metadata: { schemaVersion: "1.0.0", layoutOverrides: {} },
+    };
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert
     expect(generated).toContain('Rel(p, s, "Uses", "HTTPS")');
   });
 

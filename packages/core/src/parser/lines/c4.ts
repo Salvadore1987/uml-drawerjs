@@ -273,12 +273,13 @@ function consumeRel(ctx: ParseContext, line: SourceLine, match: RegExpExecArray)
     target: targetId,
     kind: "uses",
   };
-  // Technology rides as a `[tech]` suffix on the label until we expose a
-  // dedicated field on `DiagramEdge`. Tracked in ADR-0003.
-  if (tech !== undefined && tech !== "") {
-    edge.label = label === "" ? `[${tech}]` : `${label} [${tech}]`;
-  } else if (label !== "") {
+  // `label` is the action name (verb phrase); `tech` the relationship
+  // technology — each maps to its own field on `DiagramEdge`.
+  if (label !== "") {
     edge.label = label;
+  }
+  if (tech !== undefined && tech !== "") {
+    edge.technology = tech;
   }
   ctx.edges.push(edge);
 }

@@ -71,14 +71,16 @@
       "source": "id-7",
       "target": "id-2",
       "kind": "uses",
-      "label": "Submits credentials [JSON/HTTPS]"
+      "label": "Submits credentials",
+      "technology": "JSON/HTTPS"
     },
     {
       "id": "id-11",
       "source": "id-7",
       "target": "id-3",
       "kind": "uses",
-      "label": "Requests accounts [JSON/HTTPS]"
+      "label": "Requests accounts",
+      "technology": "JSON/HTTPS"
     },
     {
       "id": "id-12",
@@ -113,14 +115,16 @@
       "source": "id-3",
       "target": "id-9",
       "kind": "uses",
-      "label": "Charges via [HTTPS]"
+      "label": "Charges via",
+      "technology": "HTTPS"
     },
     {
       "id": "id-17",
       "source": "id-5",
       "target": "id-8",
       "kind": "uses",
-      "label": "Reads/writes [JDBC]"
+      "label": "Reads/writes",
+      "technology": "JDBC"
     }
   ],
   "groups": [

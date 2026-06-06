@@ -26,6 +26,14 @@ const DATABASE_CAP_HEIGHT = 14;
 const QUEUE_END_INSET = 10;
 const PERSON_ICON_HEIGHT = 18;
 
+// Description text wrapping. SVG `<text>` does not wrap, so the description
+// is broken into lines that fit the node's content width and each line is
+// emitted as its own `<text>` row (the same idiom sequence notes use). The
+// node then grows in height to fit every line.
+const DESC_PAD_X = 10; // horizontal inset inside the node frame
+const DESC_CHAR_WIDTH = 6; // avg glyph width estimate for font-size-sm italic
+const DESC_MAX_LINES = 5; // safety cap so a long description can't grow forever
+
 const C4_KINDS = new Set<NodeKind>([
   "person",
   "person-external",
@@ -56,7 +64,7 @@ export function computeNodeGeometry(args: RenderNodeArgs): NodeGeometry {
     : node.kind === "entity"
       ? entityRowHeights(node)
       : 0;
-  const c4Padding = c4ExtraHeight(node);
+  const c4Padding = c4ExtraHeight(node, width);
   const finalHeight = Math.max(height, HEADER_HEIGHT + rowHeights + c4Padding);
   return { id: node.id, x, y, width, height: finalHeight };
 }
@@ -91,7 +99,7 @@ function entityRowHeights(node: DiagramNode): number {
   return attrCount > 0 ? attrCount * ATTRIBUTE_ROW_HEIGHT : EMPTY_COMPARTMENT_HEIGHT;
 }
 
-function c4ExtraHeight(node: DiagramNode): number {
+function c4ExtraHeight(node: DiagramNode, width: number): number {
   if (!C4_KINDS.has(node.kind)) return 0;
   let extra = 0;
   if (node.kind === "database") extra += DATABASE_CAP_HEIGHT;
@@ -100,7 +108,10 @@ function c4ExtraHeight(node: DiagramNode): number {
   // "[Software System]" / "[Person]" — we render it on a dedicated row
   // for every C4 kind, regardless of whether `technology` is set.
   extra += TYPE_TAG_ROW_HEIGHT;
-  if (node.description) extra += DESCRIPTION_ROW_HEIGHT;
+  // Description wraps onto as many rows as needed to fit the node width.
+  if (node.description) {
+    extra += descriptionLines(node.description, width).length * DESCRIPTION_ROW_HEIGHT;
+  }
   return extra;
 }
 
@@ -552,22 +563,29 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
   }
 
   if (node.description && C4_KINDS.has(node.kind)) {
-    rows.push(
-      v(
-        "text",
-        {
-          x: geom.width / 2,
-          y,
-          "text-anchor": "middle",
-          "font-family": "var(--uml-font-sans)",
-          "font-size": "var(--uml-font-size-sm)",
-          "font-style": "italic",
-          fill: "var(--uml-text-muted)",
-        },
-        undefined,
-        { text: truncate(node.description, 64), classes: ["uml-node-description"] },
-      ),
-    );
+    // Wrap the description across the node width — one `<text>` per line so
+    // long copy stays inside the frame instead of overflowing or being
+    // hard-truncated. `descriptionLines` is the same source of truth the
+    // geometry uses, so the box height always matches the rendered rows.
+    const lines = descriptionLines(node.description, geom.width);
+    lines.forEach((line, index) => {
+      rows.push(
+        v(
+          "text",
+          {
+            x: geom.width / 2,
+            y: y + index * DESCRIPTION_ROW_HEIGHT,
+            "text-anchor": "middle",
+            "font-family": "var(--uml-font-sans)",
+            "font-size": "var(--uml-font-size-sm)",
+            "font-style": "italic",
+            fill: "var(--uml-text-muted)",
+          },
+          undefined,
+          { text: line, classes: ["uml-node-description"] },
+        ),
+      );
+    });
   }
 
   return rows;
@@ -613,9 +631,62 @@ function formatTypeTag(node: DiagramNode): string {
   return `[${prefix}]`;
 }
 
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 1).trimEnd()}…`;
+/**
+ * Greedy word-wrap into lines no wider than `maxCharsPerLine`. A single
+ * word longer than the budget is hard-split so it can never overflow the
+ * frame. When the wrapped text exceeds `maxLines`, the last kept line is
+ * truncated with an ellipsis so the node can't grow without bound.
+ */
+function wrapText(text: string, maxCharsPerLine: number, maxLines: number): string[] {
+  const budget = Math.max(1, Math.floor(maxCharsPerLine));
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  const pushWord = (word: string): void => {
+    let remainder = word;
+    // Hard-split words that are wider than a full line.
+    while (remainder.length > budget) {
+      if (current) {
+        lines.push(current);
+        current = "";
+      }
+      lines.push(remainder.slice(0, budget));
+      remainder = remainder.slice(budget);
+    }
+    if (!remainder) return;
+    if (!current) {
+      current = remainder;
+    } else if (current.length + 1 + remainder.length <= budget) {
+      current = `${current} ${remainder}`;
+    } else {
+      lines.push(current);
+      current = remainder;
+    }
+  };
+
+  for (const word of words) pushWord(word);
+  if (current) lines.push(current);
+  if (lines.length === 0) return [""];
+
+  if (lines.length > maxLines) {
+    const kept = lines.slice(0, maxLines);
+    const last = kept[maxLines - 1] ?? "";
+    kept[maxLines - 1] =
+      last.length >= budget ? `${last.slice(0, Math.max(0, budget - 1)).trimEnd()}…` : `${last}…`;
+    return kept;
+  }
+  return lines;
+}
+
+/**
+ * Wrap a node description to the node's content width. Shared by the
+ * geometry pass (to grow the box) and the render pass (to draw rows) so the
+ * two never disagree on line count.
+ */
+function descriptionLines(text: string, width: number): string[] {
+  const budget = Math.max(1, Math.floor((width - DESC_PAD_X * 2) / DESC_CHAR_WIDTH));
+  return wrapText(text, budget, DESC_MAX_LINES);
 }
 
 function renderAttributeRows(

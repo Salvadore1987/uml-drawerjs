@@ -515,4 +515,8 @@ uml-drawerjs/
 
 *— 2026-05-12: Sequence diagram brought to full UML SD — distinct `lifeline-boundary` / `-control` / `-entity` / `-collections` kinds + `database` / `queue` / `actor` reuse; combined fragments (`alt` / `opt` / `loop` / `par` / `break` / `critical` / `ref`) with operands / guards; activations as intervals; notes (`left` / `right` / `over`); divider bands; autonumber; self-messages; create / destroy; props-panel editors for fragments / notes / dividers; new commands `MoveSequenceFragmentCommand`, `ResizeSequenceFragmentCommand`, `SequenceOrnamentCommand`; five new `CONSTRAINT_SEQUENCE_*` validators; ADR-0010 (commit `d6c4f0b`).*
 
+*— 2026-06-06: Node `description` now word-wraps to the node width instead of being hard-truncated to 64 chars — C4 elements grow in height to fit every wrapped line (`wrapText` / `descriptionLines` in `packages/core/src/renderer/nodes.ts`; geometry and render share one line-count source of truth). Versions bumped: `@uml-drawer/core` 0.1.6, `@uml-drawer/{react,theme,codemirror-plantuml}` 0.1.1.*
+
+*— 2026-06-06: C4 relationships (`Rel`) get a dedicated `DiagramEdge.technology` field (was a `[tech]` suffix on `label`, per ADR-0003). Parser/generator round-trip action name + technology as separate args; `<PropsPanel>` exposes **Action** + **Technology** inputs for C4 edges (`kind` `uses` / `depends-on`); the renderer draws technology as a second italic `[tech]` line under the action name. Legacy `[tech]`-in-label ASTs still decode for back-compat.*
+
 *The MVP is feature-complete pending the Phase-14b browser-test layer.*

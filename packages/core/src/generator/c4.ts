@@ -144,7 +144,16 @@ function formatContainerLike(
 function formatC4Edge(edge: DiagramEdge, aliases: Map<string, string>): string {
   const from = lookupAlias(aliases, edge.source);
   const to = lookupAlias(aliases, edge.target);
-  const { label, technology } = splitTechSuffix(edge.label ?? "");
+  // Prefer the dedicated `technology` field. Fall back to the legacy `[tech]`
+  // suffix encoding only for ASTs created before the field existed.
+  const hasTechField = edge.technology !== undefined && edge.technology !== "";
+  const legacy = splitTechSuffix(edge.label ?? "");
+  const technology = hasTechField
+    ? edge.technology!
+    : edge.technology !== undefined
+      ? null // explicit empty technology → no 4th arg
+      : legacy.technology;
+  const label = edge.technology !== undefined ? (edge.label ?? "") : legacy.label;
   if (technology !== null) {
     // C4-PlantUML's Rel macro requires the third (label) argument when a
     // fourth (technology) is present, so we keep the empty string only in
