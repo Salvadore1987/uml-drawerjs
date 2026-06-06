@@ -32,7 +32,17 @@ export function moveNodeCommand(
     kind: "MoveNode",
     payload,
     apply(input: Diagram): Diagram {
-      return setLayoutOverride(input, payload.nodeId, { ...payload.to });
+      // Preserve any manually-resized width/height from the existing override:
+      // a move must update x/y only, never reset the user's chosen size.
+      const existing = input.metadata.layoutOverrides?.[payload.nodeId];
+      const next: LayoutCoordinate = { ...payload.to };
+      if (payload.to.width === undefined && existing?.width !== undefined) {
+        next.width = existing.width;
+      }
+      if (payload.to.height === undefined && existing?.height !== undefined) {
+        next.height = existing.height;
+      }
+      return setLayoutOverride(input, payload.nodeId, next);
     },
     invert(input: Diagram): Diagram {
       return setLayoutOverride(

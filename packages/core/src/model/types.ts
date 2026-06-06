@@ -385,6 +385,12 @@ export interface DiagramEdge {
   kind: EdgeKind;
   label?: string;
   /**
+   * C4 relationships: the technology / protocol carried by the relationship —
+   * the 4th `Rel(from, to, "label", "technology")` argument, e.g. "HTTPS/JSON".
+   * The `label` field carries the action name (verb phrase) alongside it.
+   */
+  technology?: string;
+  /**
    * ER + legacy class diagrams: flat per-end multiplicity strings. Class
    * diagrams now prefer `ends` (richer per-end shape with role + navigability).
    */

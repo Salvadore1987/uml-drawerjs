@@ -24,9 +24,15 @@ export function renderEdge(args: RenderEdgeArgs): VNode {
   const { from, to } = portSnap(source, target);
 
   const children: VNode[] = [];
+  // Wide transparent hit-line under the visible stroke so a click within
+  // ~10px of the edge still resolves to it. The visible line is 1.5px
+  // wide and would otherwise be near-unclickable.
+  children.push(renderHitArea(from, to));
   children.push(renderPath(edge, from, to));
-  if (edge.label && edge.label.trim() !== "") {
-    children.push(renderLabel(edge.label, from, to));
+  const hasLabel = Boolean(edge.label && edge.label.trim() !== "");
+  const hasTech = Boolean(edge.technology && edge.technology.trim() !== "");
+  if (hasLabel || hasTech) {
+    children.push(renderLabel(edge.label ?? "", edge.technology, from, to));
   }
   // Class diagrams: per-end role + multiplicity from `edge.ends`. ER fall-back
   // remains via `edge.cardinality`. Both can coexist without overlap because
@@ -125,6 +131,20 @@ function renderPath(edge: DiagramEdge, from: Point, to: Point): VNode {
   });
 }
 
+function renderHitArea(from: Point, to: Point): VNode {
+  return v("line", {
+    x1: from.x,
+    y1: from.y,
+    x2: to.x,
+    y2: to.y,
+    stroke: "transparent",
+    "stroke-width": 12,
+    "stroke-linecap": "butt",
+    fill: "none",
+    "pointer-events": "stroke",
+  });
+}
+
 function markerForKind(kind: EdgeKind, side: "start" | "end"): string | undefined {
   if (side === "end") {
     switch (kind) {
@@ -156,43 +176,70 @@ function markerForKind(kind: EdgeKind, side: "start" | "end"): string | undefine
   return undefined;
 }
 
-function renderLabel(label: string, from: Point, to: Point): VNode {
+function renderLabel(label: string, technology: string | undefined, from: Point, to: Point): VNode {
   const mx = (from.x + to.x) / 2;
   const my = (from.y + to.y) / 2;
-  return v(
-    "g",
-    { transform: `translate(${mx}, ${my})` },
-    [
-      v(
-        "rect",
-        {
-          x: -label.length * 3.5 - 6,
-          y: -10,
-          width: label.length * 7 + 12,
-          height: 18,
-          rx: 4,
-          ry: 4,
-          fill: "var(--uml-edge-label-bg)",
-        },
-        undefined,
-        { classes: ["uml-edge-label-bg"] },
-      ),
+  const techText = technology && technology.trim() !== "" ? `[${technology}]` : undefined;
+  // Width sizes to the longer of the two lines so neither overflows the pill.
+  const widest = Math.max(label.length, techText?.length ?? 0);
+  // Single-line layout keeps the exact historical geometry; the two-line
+  // (with-technology) layout grows the pill and stacks the rows.
+  const pillHeight = techText ? 32 : 18;
+  const pillY = techText ? -pillHeight / 2 : -10;
+  const children: VNode[] = [
+    v(
+      "rect",
+      {
+        x: -widest * 3.5 - 6,
+        y: pillY,
+        width: widest * 7 + 12,
+        height: pillHeight,
+        rx: 4,
+        ry: 4,
+        fill: "var(--uml-edge-label-bg)",
+      },
+      undefined,
+      { classes: ["uml-edge-label-bg"] },
+    ),
+  ];
+  // Action name on top (or vertically centred when no technology is present).
+  children.push(
+    v(
+      "text",
+      {
+        x: 0,
+        y: techText ? -2 : 4,
+        "text-anchor": "middle",
+        "font-family": "var(--uml-font-sans)",
+        "font-size": "var(--uml-font-size-sm)",
+        fill: "var(--uml-edge-label-text)",
+      },
+      undefined,
+      { text: label, classes: ["uml-edge-label-text"] },
+    ),
+  );
+  // Technology line below, smaller italic, in muted brackets — c4model notation.
+  if (techText) {
+    children.push(
       v(
         "text",
         {
           x: 0,
-          y: 4,
+          y: 12,
           "text-anchor": "middle",
           "font-family": "var(--uml-font-sans)",
           "font-size": "var(--uml-font-size-sm)",
-          fill: "var(--uml-edge-label-text)",
+          "font-style": "italic",
+          fill: "var(--uml-edge-label-tech, var(--uml-edge-label-text))",
         },
         undefined,
-        { text: label, classes: ["uml-edge-label-text"] },
+        { text: techText, classes: ["uml-edge-label-tech"] },
       ),
-    ],
-    { classes: ["uml-edge-label"] },
-  );
+    );
+  }
+  return v("g", { transform: `translate(${mx}, ${my})` }, children, {
+    classes: ["uml-edge-label"],
+  });
 }
 
 function endpointText(end: EdgeEndpoint | undefined): string | undefined {
@@ -267,5 +314,6 @@ export function renderArrowMarkerDefs(): VNode {
 
 function ariaLabelFor(edge: DiagramEdge): string {
   const labelPart = edge.label ? ` labelled '${edge.label}'` : "";
-  return `${edge.kind} edge${labelPart}`;
+  const techPart = edge.technology ? ` over ${edge.technology}` : "";
+  return `${edge.kind} edge${labelPart}${techPart}`;
 }

@@ -1484,22 +1484,27 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       }
     }
 
-    // Sequence message edges — drag-to-reorder. The user grabs an arrow
-    // and drags it vertically; on release the edge is moved to the new
-    // chronological slot in `diagram.edges`. Other diagram types route
-    // edge clicks through the React layer's selection wiring; here we
-    // only intercept sequence so we don't disturb existing UX.
+    // Edge selection. Sequence diagrams drag-to-reorder a message; other
+    // diagram types set the selection to the clicked edge so the React
+    // layer (PropsPanel) can surface its action / technology fields.
     if (!group) {
       const edgeEl =
         event.target instanceof Element ? event.target.closest("[data-edge-id]") : null;
       if (edgeEl) {
         const diagram = bus.getState();
-        if (diagram.type === "sequence") {
-          const edgeId = edgeEl.getAttribute("data-edge-id");
-          if (edgeId) {
+        const edgeId = edgeEl.getAttribute("data-edge-id");
+        if (edgeId) {
+          if (diagram.type === "sequence") {
             startEdgeReorder(event, edgeId);
             return;
           }
+          if (event.shiftKey) {
+            selection.toggle(edgeId);
+          } else {
+            selection.set([edgeId]);
+          }
+          event.stopPropagation();
+          return;
         }
       }
     }

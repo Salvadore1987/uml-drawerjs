@@ -263,6 +263,41 @@ describe("renderer/nodes — C4 per-kind visual language", () => {
     expect((descRow?.attrs as Record<string, unknown> | undefined)?.["font-style"]).toBe("italic");
   });
 
+  it("long description wraps onto multiple rows and grows the node height", () => {
+    // Arrange — one node with a long description, one identical node without,
+    // so we can compare the resulting heights.
+    const longText =
+      "A customer of the bank with personal and business accounts who manages everything online";
+    const withDesc = diagramWith({
+      type: "c4-component",
+      nodes: [{ id: "c", kind: "component", label: "AuthService", description: longText }],
+      metadata: { schemaVersion: "1.0.0", layoutOverrides: { c: { x: 0, y: 0 } } },
+    });
+    const withoutDesc = diagramWith({
+      type: "c4-component",
+      nodes: [{ id: "c", kind: "component", label: "AuthService" }],
+      metadata: { schemaVersion: "1.0.0", layoutOverrides: { c: { x: 0, y: 0 } } },
+    });
+
+    // Act
+    const rendered = renderDiagram(withDesc, { coordinates: { c: { x: 0, y: 0 } } });
+    const renderedBare = renderDiagram(withoutDesc, { coordinates: { c: { x: 0, y: 0 } } });
+    const node = findNodeVNode(rendered.root, "c");
+    const descRows = (node.children ?? []).filter(
+      (c) => c.tag === "text" && (c.classes ?? []).includes("uml-node-description"),
+    );
+
+    // Assert — the description spans more than one row, none of the rows is
+    // empty, and the node grew taller than the description-less twin.
+    expect(descRows.length).toBeGreaterThan(1);
+    for (const row of descRows) {
+      expect((row.text ?? "").length).toBeGreaterThan(0);
+    }
+    const tall = rendered.nodeGeometry.get("c")!;
+    const short = renderedBare.nodeGeometry.get("c")!;
+    expect(tall.height).toBeGreaterThan(short.height);
+  });
+
   it("C4 fills resolve through `--uml-c4-*` tokens with neutral fallbacks", () => {
     // Arrange
     const diagram = diagramWith({

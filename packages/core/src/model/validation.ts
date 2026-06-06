@@ -239,6 +239,7 @@ const edgeSchema = z
     target: z.string(),
     kind: edgeKindSchema,
     label: z.string().optional(),
+    technology: z.string().optional(),
     cardinality: z
       .object({
         source: z.string().optional(),

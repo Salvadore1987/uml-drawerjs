@@ -28,6 +28,7 @@ import { DividerEditor } from "./DividerEditor.js";
 
 const CLASS_LIKE_KINDS = new Set(["class", "interface", "abstract-class", "enum"]);
 const ER_EDGE_KINDS = new Set<EdgeKind>(["one-to-one", "one-to-many", "many-to-many"]);
+const C4_EDGE_KINDS = new Set<EdgeKind>(["uses", "depends-on"]);
 const CARDINALITY_OPTIONS = ["1", "0..1", "0..*", "1..*"] as const;
 
 const SEQUENCE_NODE_KINDS = new Set<NodeKind>([
@@ -94,6 +95,7 @@ interface FormState {
   technology: string;
   description: string;
   edgeLabel: string;
+  edgeTechnology: string;
   edgeKind: string;
   groupAlias: string;
   groupLabel: string;
@@ -106,6 +108,7 @@ const EMPTY_FORM: FormState = {
   technology: "",
   description: "",
   edgeLabel: "",
+  edgeTechnology: "",
   edgeKind: "",
   groupAlias: "",
   groupLabel: "",
@@ -174,6 +177,7 @@ export function PropsPanel({
       setForm({
         ...EMPTY_FORM,
         edgeLabel: selectedEdge.label ?? "",
+        edgeTechnology: selectedEdge.technology ?? "",
         edgeKind: selectedEdge.kind,
       });
     } else if (selectedGroup) {
@@ -308,7 +312,7 @@ export function PropsPanel({
       aria-label={`Properties for edge ${edge.id}`}
     >
       <label className="uml-field">
-        <span>Label</span>
+        <span>{C4_EDGE_KINDS.has(edge.kind) ? "Action" : "Label"}</span>
         <input
           type="text"
           value={form.edgeLabel}
@@ -320,6 +324,21 @@ export function PropsPanel({
           }}
         />
       </label>
+      {C4_EDGE_KINDS.has(edge.kind) && (
+        <label className="uml-field">
+          <span>Technology</span>
+          <input
+            type="text"
+            value={form.edgeTechnology}
+            onChange={(e): void => setForm((prev) => ({ ...prev, edgeTechnology: e.target.value }))}
+            onBlur={(): void => {
+              if (form.edgeTechnology !== (edge.technology ?? "")) {
+                commitEdge({ technology: form.edgeTechnology });
+              }
+            }}
+          />
+        </label>
+      )}
       {SEQUENCE_EDGE_KINDS.has(edge.kind) ? (
         <label className="uml-field">
           <span>Kind</span>
