@@ -409,6 +409,13 @@ export interface DiagramEdge {
    */
   technology?: string;
   /**
+   * C4 relationships: raw C4-PlantUML `$tags` values, split on the `+`
+   * separator (`$tags="async+critical"` → ["async", "critical"]). The
+   * "async" tag renders the edge dashed (see `hasAsyncTag`). Empty array
+   * is treated as absent, mirroring the `generics` convention.
+   */
+  tags?: string[];
+  /**
    * ER + legacy class diagrams: flat per-end multiplicity strings. Class
    * diagrams now prefer `ends` (richer per-end shape with role + navigability).
    */

@@ -276,6 +276,7 @@ export const diagramJsonSchema = {
         kind: { $ref: "#/$defs/edgeKind" },
         label: { type: "string" },
         technology: { type: "string" },
+        tags: { type: "array", items: { type: "string" } },
         cardinality: {
           type: "object",
           additionalProperties: false,

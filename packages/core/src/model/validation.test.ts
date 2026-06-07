@@ -85,6 +85,39 @@ describe("parseDiagram (round-trip)", () => {
       expect(result.diagram).toEqual(original);
     }
   });
+
+  it("accepts a C4 edge carrying tags (async interaction marker)", () => {
+    // Arrange
+    const node1Id = uuidv7();
+    const node2Id = uuidv7();
+    const original: Diagram = {
+      ...createEmptyDiagram("c4-context"),
+      nodes: [
+        { id: node1Id, kind: "person", label: "Customer" },
+        { id: node2Id, kind: "system", label: "Banking" },
+      ],
+      edges: [
+        {
+          id: uuidv7(),
+          source: node1Id,
+          target: node2Id,
+          kind: "uses",
+          label: "Uses",
+          technology: "Kafka",
+          tags: ["async", "critical"],
+        },
+      ],
+    };
+
+    // Act
+    const result = parseDiagram(JSON.parse(JSON.stringify(original)) as unknown);
+
+    // Assert
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.diagram.edges[0]?.tags).toEqual(["async", "critical"]);
+    }
+  });
 });
 
 describe("parseDiagram (rejection cases)", () => {

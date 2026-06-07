@@ -439,4 +439,118 @@ describe("parsePlantUml — C4 macro coverage", () => {
       description: "Order events",
     });
   });
+
+  it("Rel with $tags='async' (after label + tech) lands on edge.tags", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", "HTTPS", $tags="async")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.edges[0]).toMatchObject({
+      kind: "uses",
+      label: "Uses",
+      technology: "HTTPS",
+      tags: ["async"],
+    });
+  });
+
+  it("Rel with $tags but no technology argument still parses", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", $tags="async")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — tags captured, no technology field.
+    expect(errors).toEqual([]);
+    expect(ast.edges[0]?.tags).toEqual(["async"]);
+    expect(ast.edges[0]?.technology).toBeUndefined();
+  });
+
+  it("splits multi-tag $tags on the '+' separator", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", $tags="async+critical")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.edges[0]?.tags).toEqual(["async", "critical"]);
+  });
+
+  it("consumes AddRelTag('async', ...) without polluting opaque", () => {
+    // Arrange — the style declaration the generator emits for async edges.
+    const text =
+      `@startuml\n` +
+      `AddRelTag("async", $lineStyle = DashedLine())\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", $tags="async")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — declaration dropped (generator re-emits it), AST intact.
+    expect(errors).toEqual([]);
+    expect(ast.metadata.opaque ?? []).toEqual([]);
+    expect(ast.edges[0]?.tags).toEqual(["async"]);
+  });
+
+  it("keeps Rel lines with unsupported named args (e.g. $link) opaque", () => {
+    // Arrange — narrow-grammar philosophy: unknown named args fall through.
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", $link="https://example.com")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — no edge produced; the original line round-trips via opaque.
+    expect(errors).toEqual([]);
+    expect(ast.edges).toHaveLength(0);
+    expect(ast.metadata.opaque).toEqual([`Rel(p, s, "Uses", $link="https://example.com")`]);
+  });
 });

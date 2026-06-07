@@ -353,6 +353,84 @@ describe("generatePlantUml — output shape", () => {
     expect(generated).toContain('Rel(p, s, "Uses", "HTTPS")');
   });
 
+  it("emits $tags plus a single AddRelTag('async') header before the first Rel", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", "HTTPS", $tags="async")\n` +
+      `@enduml\n`;
+    const { ast } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert — tags re-emit on the Rel; the dashed line-style declaration
+    // appears exactly once, ahead of the Rel lines (C4-PlantUML scoping).
+    expect(generated).toContain('Rel(p, s, "Uses", "HTTPS", $tags="async")');
+    const declarations = generated.match(/AddRelTag\("async", \$lineStyle = DashedLine\(\)\)/g);
+    expect(declarations).toHaveLength(1);
+    expect(generated.indexOf('AddRelTag("async"')).toBeLessThan(generated.indexOf("Rel(p, s"));
+  });
+
+  it("treats tags: [] as absent — no $tags argument, no AddRelTag header", () => {
+    // Arrange — commands clear tags with [] (applyPatch skips undefined).
+    const ast: Diagram = {
+      id: "d",
+      type: "c4-context",
+      nodes: [
+        { id: "p", kind: "person", label: "Person", alias: "p" },
+        { id: "s", kind: "system", label: "System", alias: "s" },
+      ],
+      edges: [{ id: "e1", source: "p", target: "s", kind: "uses", label: "Uses", tags: [] }],
+      groups: [],
+      metadata: { schemaVersion: "1.0.0", layoutOverrides: {} },
+    };
+
+    // Act
+    const generated = generatePlantUml(ast);
+
+    // Assert
+    expect(generated).toContain('Rel(p, s, "Uses")');
+    expect(generated).not.toContain("$tags");
+    expect(generated).not.toContain("AddRelTag");
+  });
+
+  it("async Rel text is a generator fixed point (parse → generate → parse → generate)", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `AddRelTag("async", $lineStyle = DashedLine())\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", "HTTPS", $tags="async+critical")\n` +
+      `@enduml\n`;
+    const first = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Act
+    const generatedOnce = generatePlantUml(first.ast);
+    const second = parsePlantUml(generatedOnce, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    const generatedTwice = generatePlantUml(second.ast);
+
+    // Assert — no duplicate AddRelTag, tags preserved verbatim.
+    expect(second.errors).toEqual([]);
+    expect(second.ast.edges[0]?.tags).toEqual(["async", "critical"]);
+    expect(generatedTwice).toBe(generatedOnce);
+  });
+
   it("decodes the legacy `[tech]` label suffix into a 4-arg Rel (back-compat)", () => {
     // Arrange — an AST authored before the `technology` field existed, where
     // technology still rides as a `[HTTPS]` suffix on the label.

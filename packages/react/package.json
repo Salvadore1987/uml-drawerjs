@@ -1,6 +1,6 @@
 {
   "name": "@uml-drawer/react",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "private": false,
   "description": "React 18+ adapter for UML Drawer JS — design-agnostic <UmlEditor> root + Canvas / Palette / PropsPanel / TextEditor / Outline / HUD / CommandChannel / Statusbar primitives, all driven by --uml-* theming tokens.",
   "license": "MIT",

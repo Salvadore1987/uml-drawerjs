@@ -1,3 +1,4 @@
+import { hasAsyncTag } from "../model/query.js";
 import type { Diagram, DiagramEdge, DiagramNode, DiagramType } from "../model/types.js";
 import { escapeStringLiteral, lookupAlias, nodeAlias } from "./format.js";
 
@@ -18,6 +19,14 @@ export function renderC4(diagram: Diagram, aliases: Map<string, string>): string
   // per c4model.com; the other tiers use System_Boundary as the canonical
   // wrapper macro.
   const boundaryMacro = diagram.type === "c4-component" ? "Container_Boundary" : "System_Boundary";
+
+  // Async edges need the dashed line-style declared BEFORE the Rel lines so
+  // real PlantUML renderers apply it. The parser consumes incoming
+  // `AddRelTag("async", ...)` lines, so the opaque check only guards
+  // documents serialized before that behavior existed.
+  if (diagram.edges.some(hasAsyncTag) && !opaqueDeclaresAsyncRelTag(diagram)) {
+    lines.push('AddRelTag("async", $lineStyle = DashedLine())');
+  }
 
   for (const group of diagram.groups) {
     if (group.kind !== "boundary") continue;
@@ -141,9 +150,27 @@ function formatContainerLike(
   return `${macro}(${alias}, "${label}")`;
 }
 
+/**
+ * Defensive duplicate guard for the `AddRelTag("async", ...)` header — only
+ * relevant for ASTs serialized before the parser learned to consume the
+ * declaration (it would sit in `metadata.opaque` and be re-emitted there).
+ */
+function opaqueDeclaresAsyncRelTag(diagram: Diagram): boolean {
+  return (
+    diagram.metadata.opaque?.some((line) => /^AddRelTag\(\s*"async"/u.test(line.trim())) ?? false
+  );
+}
+
 function formatC4Edge(edge: DiagramEdge, aliases: Map<string, string>): string {
   const from = lookupAlias(aliases, edge.source);
   const to = lookupAlias(aliases, edge.target);
+  // Non-empty `tags` round-trip as the `$tags="a+b"` named argument; the
+  // empty array means "absent" (commands clear tags with `[]`, never
+  // `undefined`, because applyPatch skips undefined patch values).
+  const tagsSuffix =
+    edge.tags && edge.tags.length > 0
+      ? `, $tags="${escapeStringLiteral(edge.tags.join("+"))}"`
+      : "";
   // Prefer the dedicated `technology` field. Fall back to the legacy `[tech]`
   // suffix encoding only for ASTs created before the field existed.
   const hasTechField = edge.technology !== undefined && edge.technology !== "";
@@ -158,14 +185,14 @@ function formatC4Edge(edge: DiagramEdge, aliases: Map<string, string>): string {
     // C4-PlantUML's Rel macro requires the third (label) argument when a
     // fourth (technology) is present, so we keep the empty string only in
     // this branch.
-    return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}", "${escapeStringLiteral(technology)}")`;
+    return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}", "${escapeStringLiteral(technology)}"${tagsSuffix})`;
   }
   // Always emit the third (label) argument — `Rel(from, to)` is a
   // parameter-count mismatch against the upstream C4-PlantUML macro
   // (`$label` has no default value), causing "Function not found Rel"
   // on plantuml.com and any server using the stdlib's bundled C4 macros.
   // The lint pass still flags empty labels as content-quality issues.
-  return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}")`;
+  return `Rel(${from}, ${to}, "${escapeStringLiteral(label)}"${tagsSuffix})`;
 }
 
 /**

@@ -151,7 +151,14 @@ const NODE_MACROS: NodeMacroSpec[] = [
 const BOUNDARY =
   /^(?:System_Boundary|Enterprise_Boundary|Container_Boundary|Boundary)\(\s*(\w+)\s*,\s*"([^"]*)"\s*\)\s*\{?$/u;
 const REL =
-  /^Rel(?:_[UDLR])?\(\s*(\w+)\s*,\s*(\w+)(?:\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?)?\s*\)$/u;
+  /^Rel(?:_[UDLR])?\(\s*(\w+)\s*,\s*(\w+)(?:\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?)?(?:\s*,\s*\$tags\s*=\s*"([^"]*)")?\s*\)$/u;
+// AddRelTag("async", ...) declares the dashed line-style for the async tag.
+// The parser consumes it without producing AST — the generator re-emits the
+// canonical declaration before the first Rel whenever an async edge exists,
+// so leaving the line opaque would duplicate it (and re-emit it after the
+// Rel lines, where C4-PlantUML no longer applies it). Other tag names keep
+// falling through to the opaque bucket.
+const ADD_REL_TAG_ASYNC = /^AddRelTag\(\s*"async"\s*(?:,.*)?\)$/u;
 
 export function handleC4Line(ctx: ParseContext, line: SourceLine): boolean {
   const text = line.text.trim();
@@ -173,6 +180,12 @@ export function handleC4Line(ctx: ParseContext, line: SourceLine): boolean {
   const relMatch = REL.exec(text);
   if (relMatch) {
     consumeRel(ctx, line, relMatch);
+    return true;
+  }
+
+  // Style declaration for the async tag — consumed (no AST); see the
+  // comment on ADD_REL_TAG_ASYNC for why it must not stay opaque.
+  if (ADD_REL_TAG_ASYNC.test(text)) {
     return true;
   }
 
@@ -280,6 +293,17 @@ function consumeRel(ctx: ParseContext, line: SourceLine, match: RegExpExecArray)
   }
   if (tech !== undefined && tech !== "") {
     edge.technology = tech;
+  }
+  // Optional `$tags="a+b"` named argument — `+` is C4-PlantUML's multi-tag
+  // separator. The raw values round-trip on the edge; "async" drives the
+  // dashed rendering.
+  const rawTags = match[5];
+  if (rawTags !== undefined && rawTags !== "") {
+    const tags = rawTags
+      .split("+")
+      .map((tag) => tag.trim())
+      .filter((tag) => tag !== "");
+    if (tags.length > 0) edge.tags = tags;
   }
   ctx.edges.push(edge);
 }

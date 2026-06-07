@@ -84,6 +84,42 @@ describe("renderDiagram — vnode tree shape", () => {
     expect((tech?.attrs as Record<string, unknown> | undefined)?.["font-style"]).toBe("italic");
   });
 
+  it("renders a C4 edge with the async tag as a dashed line with the async class", () => {
+    // Arrange — same edge twice: plain (solid) and async-tagged (dashed).
+    const baseDiagram: Diagram = {
+      ...createEmptyDiagram("c4-context"),
+      nodes: [
+        { id: "a", kind: "person", label: "Customer" },
+        { id: "b", kind: "system", label: "Banking" },
+      ],
+      edges: [{ id: "e", source: "a", target: "b", kind: "uses", label: "Uses" }],
+    };
+    const asyncDiagram: Diagram = {
+      ...baseDiagram,
+      edges: [{ id: "e", source: "a", target: "b", kind: "uses", label: "Uses", tags: ["async"] }],
+    };
+
+    // Act
+    const baseFlat = flattenNodes(renderDiagram(baseDiagram).root);
+    const asyncFlat = flattenNodes(renderDiagram(asyncDiagram).root);
+
+    // Assert — async edge: dashed stroke + class/data markers; the filled
+    // arrowhead stays (only the line style changes). Each render carries a
+    // single edge, so the one non-transparent <line> is its visible stroke.
+    const asyncGroup = asyncFlat.find((n) => n.attrs?.["data-edge-id"] === "e");
+    expect(asyncGroup?.classes).toContain("uml-edge-async");
+    expect(asyncGroup?.attrs?.["data-edge-async"]).toBe("true");
+    const asyncLine = asyncFlat.find((n) => n.tag === "line" && n.attrs?.stroke !== "transparent");
+    expect(asyncLine?.attrs?.["stroke-dasharray"]).toBe("6 4");
+    expect(asyncLine?.attrs?.["marker-end"]).toBe("url(#uml-arrow-arrow)");
+
+    // Solid baseline: no dash, no async markers.
+    const baseGroup = baseFlat.find((n) => n.attrs?.["data-edge-id"] === "e");
+    expect(baseGroup?.classes).not.toContain("uml-edge-async");
+    const baseLine = baseFlat.find((n) => n.tag === "line" && n.attrs?.stroke !== "transparent");
+    expect(baseLine?.attrs?.["stroke-dasharray"]).toBeUndefined();
+  });
+
   it("applies edgeLayoutOverrides offset to the label `<g>` transform", () => {
     // Arrange — same diagram twice, once without and once with an
     // edge-label override; the delta between the two label transforms

@@ -1,3 +1,4 @@
+import { hasAsyncTag } from "../model/query.js";
 import type { DiagramEdge, EdgeEndpoint, EdgeKind, EdgeLayoutOverride } from "../model/types.js";
 import { v } from "./types.js";
 import type { NodeGeometry, VNode } from "./types.js";
@@ -52,22 +53,25 @@ export function renderEdge(args: RenderEdgeArgs): VNode {
     children.push(renderCardinality(edge.cardinality.target, from, to, "target"));
   }
 
-  return v(
-    "g",
-    {
-      "data-edge-id": edge.id,
-      "data-edge-kind": edge.kind,
-      "data-source-x": Math.round(from.x),
-      "data-source-y": Math.round(from.y),
-      "data-target-x": Math.round(to.x),
-      "data-target-y": Math.round(to.y),
-    },
-    children,
-    {
-      classes: ["uml-edge", `uml-edge-${edge.kind}`],
-      aria: { role: "graphics-symbol", "aria-label": ariaLabelFor(edge) },
-    },
-  );
+  // The async tag is exposed both as a class (styling hooks) and a data
+  // attribute (e2e / interaction queries); the dash itself is applied on
+  // the stroke in `renderPath`.
+  const async = hasAsyncTag(edge);
+  const attrs: Record<string, string | number> = {
+    "data-edge-id": edge.id,
+    "data-edge-kind": edge.kind,
+    "data-source-x": Math.round(from.x),
+    "data-source-y": Math.round(from.y),
+    "data-target-x": Math.round(to.x),
+    "data-target-y": Math.round(to.y),
+  };
+  if (async) attrs["data-edge-async"] = "true";
+  return v("g", attrs, children, {
+    classes: async
+      ? ["uml-edge", `uml-edge-${edge.kind}`, "uml-edge-async"]
+      : ["uml-edge", `uml-edge-${edge.kind}`],
+    aria: { role: "graphics-symbol", "aria-label": ariaLabelFor(edge) },
+  });
 }
 
 interface Point {
@@ -126,7 +130,9 @@ function renderPath(edge: DiagramEdge, from: Point, to: Point): VNode {
     y2: to.y,
     stroke: "var(--uml-edge-stroke)",
     "stroke-width": "var(--uml-edge-stroke-width)",
-    "stroke-dasharray": DASH_BY_KIND[edge.kind],
+    // C4 async interactions render dashed regardless of kind; otherwise the
+    // per-kind UML conventions (realization / dependency / return) apply.
+    "stroke-dasharray": hasAsyncTag(edge) ? "6 4" : DASH_BY_KIND[edge.kind],
     "marker-end": markerForKind(edge.kind, "end"),
     "marker-start": markerForKind(edge.kind, "start"),
     fill: "none",

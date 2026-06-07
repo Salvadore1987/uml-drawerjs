@@ -6,6 +6,7 @@ import {
   updateGroupCommand,
   updateNodeCommand,
 } from "@uml-drawer/core/commands";
+import { ASYNC_EDGE_TAG, hasAsyncTag } from "@uml-drawer/core/model";
 import type {
   CombinedFragment,
   DiagramEdge,
@@ -337,6 +338,25 @@ export function PropsPanel({
               }
             }}
           />
+        </label>
+      )}
+      {C4_EDGE_KINDS.has(edge.kind) && (
+        <label className="uml-field">
+          <span>Interaction</span>
+          <select
+            value={hasAsyncTag(edge) ? "async" : "sync"}
+            onChange={(e): void => {
+              // Preserve any other C4 tags; clearing must patch `tags: []`
+              // (never undefined — applyPatch skips undefined values).
+              const others = (edge.tags ?? []).filter((tag) => tag !== ASYNC_EDGE_TAG);
+              commitEdge({
+                tags: e.target.value === "async" ? [...others, ASYNC_EDGE_TAG] : others,
+              });
+            }}
+          >
+            <option value="sync">Sync (solid)</option>
+            <option value="async">Async (dashed)</option>
+          </select>
         </label>
       )}
       {SEQUENCE_EDGE_KINDS.has(edge.kind) ? (
