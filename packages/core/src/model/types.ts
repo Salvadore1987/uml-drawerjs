@@ -318,10 +318,28 @@ export interface LayoutCoordinate {
   height?: number;
 }
 
+/**
+ * Per-edge layout customisation. `labelOffsetX`/`labelOffsetY` shift the
+ * edge label away from its auto-routed midpoint (`(from+to)/2`), in layout
+ * pixels. Stored as a delta — not absolute coordinates — so the label
+ * tracks the line when the source/target nodes are moved.
+ */
+export interface EdgeLayoutOverride {
+  labelOffsetX: number;
+  labelOffsetY: number;
+}
+
 /** Per-AST metadata — versioning + persisted layout overrides. */
 export interface DiagramMetadata {
   schemaVersion: string;
   layoutOverrides?: Record<string, LayoutCoordinate>;
+  /**
+   * Per-edge layout overrides, keyed by edge id. The renderer reads
+   * `labelOffsetX`/`labelOffsetY` and shifts the label pill from the
+   * auto-routed segment midpoint. Round-trips through `@drawer:meta`
+   * under alias-derived keys (`"sourceAlias->targetAlias"`).
+   */
+  edgeLayoutOverrides?: Record<string, EdgeLayoutOverride>;
   /**
    * PlantUML constructs we don't yet model (preprocessor, !include, raw
    * skinparam blocks). Stored verbatim so generator round-trips them.
@@ -390,6 +408,13 @@ export interface DiagramEdge {
    * The `label` field carries the action name (verb phrase) alongside it.
    */
   technology?: string;
+  /**
+   * C4 relationships: raw C4-PlantUML `$tags` values, split on the `+`
+   * separator (`$tags="async+critical"` → ["async", "critical"]). The
+   * "async" tag renders the edge dashed (see `hasAsyncTag`). Empty array
+   * is treated as absent, mirroring the `generics` convention.
+   */
+  tags?: string[];
   /**
    * ER + legacy class diagrams: flat per-end multiplicity strings. Class
    * diagrams now prefer `ends` (richer per-end shape with role + navigability).

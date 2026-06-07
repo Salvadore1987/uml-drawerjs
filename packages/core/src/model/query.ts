@@ -34,6 +34,19 @@ export function getIncomingEdges(diagram: Diagram, nodeId: string): DiagramEdge[
 }
 
 /**
+ * The C4-PlantUML relationship tag that marks an interaction as
+ * asynchronous. Edges carrying it render with a dashed stroke; the
+ * generator emits `$tags="async"` plus an `AddRelTag("async", ...)`
+ * header so external PlantUML renderers draw the same dash.
+ */
+export const ASYNC_EDGE_TAG = "async";
+
+/** True when the edge carries the C4 "async" tag (dashed interaction). */
+export function hasAsyncTag(edge: DiagramEdge): boolean {
+  return edge.tags?.includes(ASYNC_EDGE_TAG) ?? false;
+}
+
+/**
  * Returns every group that directly contains the given element id.
  * Walks groups via `children`, no transitive ancestry.
  */

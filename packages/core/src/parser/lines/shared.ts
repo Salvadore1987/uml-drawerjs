@@ -72,6 +72,12 @@ function handleMetaComment(ctx: ParseContext, line: SourceLine): void {
       ...result.payload.layoutOverrides,
     };
   }
+  if (result.payload.edgeLayoutOverrides) {
+    ctx.edgeLayoutOverrides = {
+      ...(ctx.edgeLayoutOverrides ?? {}),
+      ...result.payload.edgeLayoutOverrides,
+    };
+  }
   if (result.payload.styles) {
     ctx.styles = { ...(ctx.styles ?? {}), ...result.payload.styles };
   }

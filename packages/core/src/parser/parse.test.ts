@@ -218,6 +218,58 @@ describe("parsePlantUml — meta-comment decoding", () => {
     }
   });
 
+  it("remaps alias-keyed edgeLayoutOverrides to the current edge id", () => {
+    // Arrange — `customer->myapp` keys the override; aliases survive
+    // parses but edge ids are reallocated, so the parser must rewrite
+    // the key to the freshly-built edge.id.
+    const text = `@startuml\n!include <C4/C4_Context>\n' @drawer:meta {"edgeLayoutOverrides":{"customer->myapp":{"labelOffsetX":40,"labelOffsetY":-20}}}\nPerson(customer, "Customer", "")\nSystem(myapp, "App", "")\nRel(customer, myapp, "Uses")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.edges).toHaveLength(1);
+    const edgeId = ast.edges[0]?.id;
+    expect(edgeId).toBeDefined();
+    if (edgeId) {
+      expect(ast.metadata.edgeLayoutOverrides?.[edgeId]).toEqual({
+        labelOffsetX: 40,
+        labelOffsetY: -20,
+      });
+      expect(ast.metadata.edgeLayoutOverrides?.["customer->myapp"]).toBeUndefined();
+    }
+  });
+
+  it("disambiguates duplicate-endpoint edges using the `:N` suffix", () => {
+    // Arrange — two Rel lines between the same source/target pair.
+    const text = `@startuml\n!include <C4/C4_Context>\n' @drawer:meta {"edgeLayoutOverrides":{"customer->myapp":{"labelOffsetX":1,"labelOffsetY":1},"customer->myapp:1":{"labelOffsetX":2,"labelOffsetY":2}}}\nPerson(customer, "Customer", "")\nSystem(myapp, "App", "")\nRel(customer, myapp, "Reads")\nRel(customer, myapp, "Writes")\n@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — first occurrence gets the no-suffix override, second gets `:1`.
+    expect(errors).toEqual([]);
+    expect(ast.edges).toHaveLength(2);
+    const [first, second] = ast.edges;
+    expect(first && ast.metadata.edgeLayoutOverrides?.[first.id]).toEqual({
+      labelOffsetX: 1,
+      labelOffsetY: 1,
+    });
+    expect(second && ast.metadata.edgeLayoutOverrides?.[second.id]).toEqual({
+      labelOffsetX: 2,
+      labelOffsetY: 2,
+    });
+  });
+
   it("emits SYNTAX_META on malformed meta-comment payload but keeps the AST", () => {
     // Arrange — payload is not valid JSON
     const text = `@startuml\n' @drawer:meta {not valid}\nclass Foo\n@enduml\n`;
@@ -386,5 +438,119 @@ describe("parsePlantUml — C4 macro coverage", () => {
       technology: "Kafka",
       description: "Order events",
     });
+  });
+
+  it("Rel with $tags='async' (after label + tech) lands on edge.tags", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", "HTTPS", $tags="async")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.edges[0]).toMatchObject({
+      kind: "uses",
+      label: "Uses",
+      technology: "HTTPS",
+      tags: ["async"],
+    });
+  });
+
+  it("Rel with $tags but no technology argument still parses", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", $tags="async")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — tags captured, no technology field.
+    expect(errors).toEqual([]);
+    expect(ast.edges[0]?.tags).toEqual(["async"]);
+    expect(ast.edges[0]?.technology).toBeUndefined();
+  });
+
+  it("splits multi-tag $tags on the '+' separator", () => {
+    // Arrange
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", $tags="async+critical")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert
+    expect(errors).toEqual([]);
+    expect(ast.edges[0]?.tags).toEqual(["async", "critical"]);
+  });
+
+  it("consumes AddRelTag('async', ...) without polluting opaque", () => {
+    // Arrange — the style declaration the generator emits for async edges.
+    const text =
+      `@startuml\n` +
+      `AddRelTag("async", $lineStyle = DashedLine())\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", $tags="async")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — declaration dropped (generator re-emits it), AST intact.
+    expect(errors).toEqual([]);
+    expect(ast.metadata.opaque ?? []).toEqual([]);
+    expect(ast.edges[0]?.tags).toEqual(["async"]);
+  });
+
+  it("keeps Rel lines with unsupported named args (e.g. $link) opaque", () => {
+    // Arrange — narrow-grammar philosophy: unknown named args fall through.
+    const text =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", $link="https://example.com")\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeDeterministicIdFactory(),
+    });
+
+    // Assert — no edge produced; the original line round-trips via opaque.
+    expect(errors).toEqual([]);
+    expect(ast.edges).toHaveLength(0);
+    expect(ast.metadata.opaque).toEqual([`Rel(p, s, "Uses", $link="https://example.com")`]);
   });
 });

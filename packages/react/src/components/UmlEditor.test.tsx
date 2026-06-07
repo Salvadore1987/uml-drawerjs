@@ -1,6 +1,6 @@
 import { addNodeCommand } from "@uml-drawer/core/commands";
 import type { EditorChangeEvent } from "@uml-drawer/core/editor";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -204,6 +204,54 @@ describe("Component composition", () => {
 
     // Assert
     expect(captured!.getState().nodes.length).toBe(before + 1);
+  });
+
+  it("PropsPanel Interaction select toggles the async tag on a C4 edge", async () => {
+    // Arrange — a C4 diagram with one (sync) Rel; select its edge.
+    const initial =
+      `@startuml\n` +
+      `Person(p, "Person")\n` +
+      `System(s, "System")\n` +
+      `Rel(p, s, "Uses", "HTTPS")\n` +
+      `@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="c4-context" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().edges).toHaveLength(1);
+    });
+    const edgeId = captured!.getState().edges[0]!.id;
+    act(() => {
+      captured!.selection.set([edgeId]);
+    });
+
+    // The C4 edge form shows exactly one select — the Interaction control.
+    const select = (await screen.findByRole("combobox")) as HTMLSelectElement;
+    expect(select.value).toBe("sync");
+
+    // Act — switch to async.
+    act(() => {
+      fireEvent.change(select, { target: { value: "async" } });
+    });
+
+    // Assert — text gains the $tags argument plus the AddRelTag header.
+    expect(captured!.exportText()).toContain('$tags="async"');
+    expect(captured!.exportText()).toContain('AddRelTag("async", $lineStyle = DashedLine())');
+
+    // Act — switch back to sync.
+    act(() => {
+      fireEvent.change(screen.getByRole("combobox"), { target: { value: "sync" } });
+    });
+
+    // Assert — both the tag and the header are gone again.
+    expect(captured!.exportText()).not.toContain("$tags");
+    expect(captured!.exportText()).not.toContain("AddRelTag");
   });
 });
 

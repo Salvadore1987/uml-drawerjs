@@ -17,6 +17,8 @@ export {
   getOutgoingEdges,
   getIncomingEdges,
   getParentGroups,
+  ASYNC_EDGE_TAG,
+  hasAsyncTag,
 } from "./query.js";
 export { SCHEMA_VERSION, diagramJsonSchema } from "./schema.js";
 export {

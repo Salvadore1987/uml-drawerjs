@@ -2,6 +2,7 @@ import type {
   Diagram,
   DiagramGroup,
   DiagramNode,
+  EdgeLayoutOverride,
   LayoutCoordinate,
   StyleMap,
 } from "../model/types.js";
@@ -94,20 +95,28 @@ export function lookupAlias(index: Map<string, string>, id: string): string {
  */
 export function formatDiagramMeta(diagram: Diagram): string | null {
   const layoutOverrides = diagram.metadata.layoutOverrides;
+  const edgeLayoutOverrides = diagram.metadata.edgeLayoutOverrides;
   const styles = diagram.styles;
   const aliasIndex = buildAliasIndex(diagram);
   const nodeExtras = collectC4NodeExtras(diagram, aliasIndex);
   const hasLayout = layoutOverrides && Object.keys(layoutOverrides).length > 0;
+  const hasEdgeLayout = edgeLayoutOverrides && Object.keys(edgeLayoutOverrides).length > 0;
   const hasStyles = styles && Object.keys(styles).length > 0;
   const hasExtras = nodeExtras !== null;
-  if (!hasLayout && !hasStyles && !hasExtras) return null;
+  if (!hasLayout && !hasEdgeLayout && !hasStyles && !hasExtras) return null;
 
   const payload: {
     layoutOverrides?: Record<string, LayoutCoordinate>;
+    edgeLayoutOverrides?: Record<string, EdgeLayoutOverride>;
     styles?: StyleMap;
     nodeExtras?: Record<string, DrawerNodeExtras>;
   } = {};
   if (hasLayout) payload.layoutOverrides = sortRecord(remapToAliases(layoutOverrides, aliasIndex));
+  if (hasEdgeLayout) {
+    payload.edgeLayoutOverrides = sortRecord(
+      remapEdgesToAliases(edgeLayoutOverrides, diagram, aliasIndex),
+    );
+  }
   if (hasStyles) payload.styles = sortRecord(remapToAliases(styles, aliasIndex));
   if (hasExtras) payload.nodeExtras = nodeExtras;
   return formatMetaComment(payload);
@@ -175,6 +184,55 @@ function remapToAliases<T>(
   for (const [id, value] of Object.entries(record)) {
     const alias = aliasIndex.get(id);
     result[alias ?? id] = value;
+  }
+  return result;
+}
+
+/**
+ * Translate `edgeLayoutOverrides` (keyed by edge id) into alias-pair keys
+ * (`"sourceAlias->targetAlias"`, with a trailing `":N"` when multiple edges
+ * share the same endpoint pair). Aliases stay stable across parses, so this
+ * keeps the override pinned to the right edge even after id reallocation.
+ * Overrides whose edge has vanished pass through verbatim so the data
+ * survives a generate → parse round-trip without surprise loss.
+ */
+function remapEdgesToAliases(
+  record: Record<string, EdgeLayoutOverride>,
+  diagram: Diagram,
+  aliasIndex: Map<string, string>,
+): Record<string, EdgeLayoutOverride> {
+  const edgesById = new Map(diagram.edges.map((edge) => [edge.id, edge] as const));
+  // Track each endpoint pair's index so we can emit `:N` suffixes only for
+  // duplicates; the bare `A->B` form stays the common case.
+  const pairCounts = new Map<string, number>();
+  const occurrenceForEdgeId = new Map<string, number>();
+  for (const edge of diagram.edges) {
+    const pairKey = `${edge.source}->${edge.target}`;
+    const next = pairCounts.get(pairKey) ?? 0;
+    occurrenceForEdgeId.set(edge.id, next);
+    pairCounts.set(pairKey, next + 1);
+  }
+  const result: Record<string, EdgeLayoutOverride> = {};
+  for (const [edgeId, value] of Object.entries(record)) {
+    const edge = edgesById.get(edgeId);
+    if (!edge) {
+      result[edgeId] = value;
+      continue;
+    }
+    const sourceAlias = aliasIndex.get(edge.source);
+    const targetAlias = aliasIndex.get(edge.target);
+    if (!sourceAlias || !targetAlias) {
+      result[edgeId] = value;
+      continue;
+    }
+    const pairKey = `${edge.source}->${edge.target}`;
+    const totalForPair = pairCounts.get(pairKey) ?? 1;
+    const occurrence = occurrenceForEdgeId.get(edgeId) ?? 0;
+    const key =
+      totalForPair > 1
+        ? `${sourceAlias}->${targetAlias}:${occurrence}`
+        : `${sourceAlias}->${targetAlias}`;
+    result[key] = value;
   }
   return result;
 }

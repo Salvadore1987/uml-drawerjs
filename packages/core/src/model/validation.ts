@@ -240,6 +240,7 @@ const edgeSchema = z
     kind: edgeKindSchema,
     label: z.string().optional(),
     technology: z.string().optional(),
+    tags: z.array(z.string()).optional(),
     cardinality: z
       .object({
         source: z.string().optional(),

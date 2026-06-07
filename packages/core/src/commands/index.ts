@@ -53,6 +53,9 @@ export type { UpdateEdgeCommand, UpdateEdgePayload, EdgePatch } from "./updateEd
 export { moveEdgeCommand } from "./moveEdge.js";
 export type { MoveEdgeCommand, MoveEdgePayload } from "./moveEdge.js";
 
+export { moveEdgeLabelCommand } from "./moveEdgeLabel.js";
+export type { MoveEdgeLabelCommand, MoveEdgeLabelPayload } from "./moveEdgeLabel.js";
+
 export { moveSequenceFragmentCommand } from "./moveSequenceFragment.js";
 export type {
   MoveSequenceFragmentCommand,
