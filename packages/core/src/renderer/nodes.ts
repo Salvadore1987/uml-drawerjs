@@ -34,6 +34,16 @@ const DESC_PAD_X = 10; // horizontal inset inside the node frame
 const DESC_CHAR_WIDTH = 6; // avg glyph width estimate for font-size-sm italic
 const DESC_MAX_LINES = 5; // safety cap so a long description can't grow forever
 
+// Average glyph-width estimates (px) used to grow compartment nodes
+// (class / interface / abstract-class / enum / entity) so their name and
+// member rows never spill past the frame — the same estimation idiom as
+// DESC_CHAR_WIDTH, padded generously because real glyph widths vary by font.
+const NAME_CHAR_WIDTH = 8.5; // font-size-base (14px), bold sans header label
+const ROW_CHAR_WIDTH = 7.2; // font-size-sm (12px) mono attribute / operation rows
+const STEREOTYPE_CHAR_WIDTH = 6.5; // font-size-sm (12px) sans stereotype line
+const COMPARTMENT_PAD_X = 24; // total horizontal padding (left + right) inside the frame
+const STEREOTYPE_ROW_HEIGHT = 16; // extra header height when a stereotype row is shown
+
 const C4_KINDS = new Set<NodeKind>([
   "person",
   "person-external",
@@ -59,14 +69,20 @@ const C4_KINDS = new Set<NodeKind>([
  * only one literals compartment.
  */
 export function computeNodeGeometry(args: RenderNodeArgs): NodeGeometry {
-  const { node, x, y, width, height } = args;
+  const { node, x, y, height } = args;
   const rowHeights = isClassLike(node.kind)
     ? classRowHeights(node)
     : node.kind === "entity"
       ? entityRowHeights(node)
       : 0;
+  // Compartment nodes (class / interface / abstract-class / enum / entity)
+  // grow to fit their widest text line so the name and member rows never
+  // spill past the frame; their header also grows to fit a stereotype row.
+  // C4 nodes keep the caller's width (they wrap descriptions instead).
+  const width = Math.max(args.width, compartmentContentWidth(node));
+  const headerH = isCompartmentNode(node.kind) ? compartmentHeaderHeight(node) : HEADER_HEIGHT;
   const c4Padding = c4ExtraHeight(node, width);
-  const finalHeight = Math.max(height, HEADER_HEIGHT + rowHeights + c4Padding);
+  const finalHeight = Math.max(height, headerH + rowHeights + c4Padding);
   return { id: node.id, x, y, width, height: finalHeight };
 }
 
@@ -120,10 +136,13 @@ export function renderNode(args: RenderNodeArgs): VNode {
   const geometry = computeNodeGeometry(args);
   const { node } = args;
   const children: VNode[] = [];
+  // Header band / dividers / member rows all anchor to this height so a
+  // stereotyped node's taller header pushes the body down in lockstep.
+  const headerH = compartmentHeaderHeight(node);
 
   children.push(renderFrame(node, geometry));
   if (isCompartmentNode(node.kind)) {
-    children.push(renderClassHeaderBand(geometry));
+    children.push(renderClassHeaderBand(geometry, headerH));
   }
   children.push(...renderHeaderRows(node, geometry));
   if (isClassLike(node.kind)) {
@@ -131,7 +150,7 @@ export function renderNode(args: RenderNodeArgs): VNode {
     const attrCount = node.attributes?.length ?? 0;
     const opCount = node.operations?.length ?? 0;
     if (literalCount > 0) {
-      children.push(...renderEnumLiteralRows(node.enumLiterals ?? [], geometry));
+      children.push(...renderEnumLiteralRows(node.enumLiterals ?? [], geometry, headerH));
     }
     if (attrCount > 0) {
       children.push(
@@ -140,6 +159,7 @@ export function renderNode(args: RenderNodeArgs): VNode {
           geometry,
           node.kind,
           literalCount * ATTRIBUTE_ROW_HEIGHT,
+          headerH,
         ),
       );
     }
@@ -147,16 +167,23 @@ export function renderNode(args: RenderNodeArgs): VNode {
       const opOffset =
         literalCount * ATTRIBUTE_ROW_HEIGHT +
         (attrCount > 0 ? attrCount * ATTRIBUTE_ROW_HEIGHT : EMPTY_COMPARTMENT_HEIGHT);
-      children.push(...renderOperationRows(node.operations ?? [], geometry, opOffset));
+      children.push(...renderOperationRows(node.operations ?? [], geometry, opOffset, headerH));
     }
     children.push(
-      ...renderClassCompartmentDividers(geometry, node.kind, literalCount, attrCount, opCount),
+      ...renderClassCompartmentDividers(
+        geometry,
+        node.kind,
+        literalCount,
+        attrCount,
+        opCount,
+        headerH,
+      ),
     );
   } else if (node.kind === "entity") {
     // Entity: single attributes compartment under the header. UML/IE
     // notation — PK underlined, FK with `+ ` prefix, NN (required) bold.
-    children.push(compartmentDivider(geometry, HEADER_HEIGHT));
-    children.push(...renderEntityAttributeRows(node.attributes ?? [], geometry));
+    children.push(compartmentDivider(geometry, headerH));
+    children.push(...renderEntityAttributeRows(node.attributes ?? [], geometry, headerH));
   }
 
   // Port handles — four small circles at edge midpoints. Hidden by
@@ -710,13 +737,14 @@ function renderAttributeRows(
   _geom: NodeGeometry,
   kind: NodeKind,
   baseOffset: number,
+  headerHeight: number,
 ): VNode[] {
   return attributes.map((attribute, index) =>
     v(
       "text",
       {
         x: 12,
-        y: HEADER_HEIGHT + baseOffset + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        y: headerHeight + baseOffset + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
@@ -737,13 +765,14 @@ function renderOperationRows(
   operations: readonly Operation[],
   _geom: NodeGeometry,
   baseOffset: number,
+  headerHeight: number,
 ): VNode[] {
   return operations.map((operation, index) =>
     v(
       "text",
       {
         x: 12,
-        y: HEADER_HEIGHT + baseOffset + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        y: headerHeight + baseOffset + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
@@ -771,7 +800,11 @@ function renderOperationRows(
  * Uses `<tspan>` children so the styling can be applied selectively to the
  * name segment without leaking into the type segment.
  */
-function renderEntityAttributeRows(attributes: readonly Attribute[], _geom: NodeGeometry): VNode[] {
+function renderEntityAttributeRows(
+  attributes: readonly Attribute[],
+  _geom: NodeGeometry,
+  headerHeight: number,
+): VNode[] {
   return attributes.map((attribute, index) => {
     const tspans: VNode[] = [];
 
@@ -804,7 +837,7 @@ function renderEntityAttributeRows(attributes: readonly Attribute[], _geom: Node
       "text",
       {
         x: 12,
-        y: HEADER_HEIGHT + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        y: headerHeight + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
@@ -818,13 +851,14 @@ function renderEntityAttributeRows(attributes: readonly Attribute[], _geom: Node
 function renderEnumLiteralRows(
   literals: readonly { id: string; name: string }[],
   _geom: NodeGeometry,
+  headerHeight: number,
 ): VNode[] {
   return literals.map((literal, index) =>
     v(
       "text",
       {
         x: 12,
-        y: HEADER_HEIGHT + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        y: headerHeight + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
@@ -853,10 +887,11 @@ function renderClassCompartmentDividers(
   literalCount: number,
   attrCount: number,
   opCount: number,
+  headerHeight: number,
 ): VNode[] {
   const lines: VNode[] = [];
   // Header divider — always present, just below the stereotype + name band.
-  lines.push(compartmentDivider(geom, HEADER_HEIGHT));
+  lines.push(compartmentDivider(geom, headerHeight));
 
   if (kind === "enum") {
     return lines;
@@ -866,7 +901,7 @@ function renderClassCompartmentDividers(
   // and operations (bottom). The literal-count branch is dead for these
   // kinds (literals only exist on enums), but we keep the offset general so
   // the math reads symmetrically.
-  const offset = HEADER_HEIGHT + literalCount * ATTRIBUTE_ROW_HEIGHT;
+  const offset = headerHeight + literalCount * ATTRIBUTE_ROW_HEIGHT;
   if (literalCount > 0) {
     lines.push(compartmentDivider(geom, offset));
   }
@@ -877,12 +912,12 @@ function renderClassCompartmentDividers(
   return lines;
 }
 
-function renderClassHeaderBand(geom: NodeGeometry): VNode {
+function renderClassHeaderBand(geom: NodeGeometry, headerHeight: number): VNode {
   return v("rect", {
     x: 0,
     y: 0,
     width: geom.width,
-    height: HEADER_HEIGHT,
+    height: headerHeight,
     fill: "var(--uml-class-header-bg, var(--uml-bg-elevated))",
     stroke: "none",
   });
@@ -909,6 +944,68 @@ function syntheticStereotype(kind: NodeKind): string | undefined {
 function appendGenerics(label: string, generics: string[] | undefined): string {
   if (!generics || generics.length === 0) return label;
   return `${label}<${generics.join(", ")}>`;
+}
+
+/**
+ * Header height for a node. Compartment nodes that show a stereotype line
+ * (interface / abstract-class / enum always do; a class with an explicit
+ * stereotype too) need a taller header so the name sits below the
+ * stereotype yet still above the first compartment divider. Everything
+ * else keeps the base `HEADER_HEIGHT`.
+ */
+export function compartmentHeaderHeight(node: DiagramNode): number {
+  if (!isCompartmentNode(node.kind)) return HEADER_HEIGHT;
+  const stereotype = node.stereotype ?? syntheticStereotype(node.kind);
+  return stereotype ? HEADER_HEIGHT + STEREOTYPE_ROW_HEIGHT : HEADER_HEIGHT;
+}
+
+/**
+ * Estimated minimum width (px) a compartment node needs so its widest text
+ * line — the (possibly generic) name, the stereotype, or any member row —
+ * fits inside the frame. Returns `0` for non-compartment kinds so callers
+ * can uniformly `Math.max(defaultWidth, compartmentContentWidth(node))`.
+ *
+ * Widths are estimated from average glyph widths (same approach as
+ * `descriptionLines`); the generous `COMPARTMENT_PAD_X` buffer absorbs the
+ * inaccuracy so text never touches the border.
+ */
+export function compartmentContentWidth(node: DiagramNode): number {
+  if (!isCompartmentNode(node.kind)) return 0;
+  let widest = 0;
+  const consider = (text: string, charWidth: number): void => {
+    widest = Math.max(widest, text.length * charWidth);
+  };
+
+  consider(appendGenerics(node.label, node.generics), NAME_CHAR_WIDTH);
+  const stereotype = node.stereotype ?? syntheticStereotype(node.kind);
+  if (stereotype) consider(`«${stereotype}»`, STEREOTYPE_CHAR_WIDTH);
+
+  if (node.kind === "enum") {
+    for (const literal of node.enumLiterals ?? []) consider(literal.name, ROW_CHAR_WIDTH);
+  } else if (node.kind === "entity") {
+    for (const attribute of node.attributes ?? [])
+      consider(entityRowText(attribute), ROW_CHAR_WIDTH);
+  } else {
+    for (const attribute of node.attributes ?? [])
+      consider(formatAttribute(attribute, node.kind), ROW_CHAR_WIDTH);
+    for (const operation of node.operations ?? [])
+      consider(formatOperation(operation), ROW_CHAR_WIDTH);
+  }
+
+  return widest === 0 ? 0 : Math.ceil(widest + COMPARTMENT_PAD_X);
+}
+
+/**
+ * Plain-text rendering of an entity attribute row, mirroring the segments
+ * `renderEntityAttributeRows` lays out (FK prefix + name + type + default).
+ * Used only for width estimation, so styling markers are ignored.
+ */
+function entityRowText(attribute: Attribute): string {
+  const fk = attribute.foreignKey === true && attribute.primaryKey !== true ? "+ " : "";
+  const type = attribute.type ? `: ${attribute.type}` : "";
+  const def =
+    attribute.default !== undefined && attribute.default !== "" ? ` = ${attribute.default}` : "";
+  return `${fk}${attribute.name}${type}${def}`;
 }
 
 function formatAttribute(attribute: Attribute, _kind: NodeKind): string {

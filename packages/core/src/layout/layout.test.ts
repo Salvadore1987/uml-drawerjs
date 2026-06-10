@@ -90,6 +90,24 @@ describe("layoutGrid — fallback", () => {
       d: { x: stepX, y: stepY },
     });
   });
+
+  it("widens the grid cell to fit a long class name so neighbours don't overlap", () => {
+    // Arrange — a name far wider than the 200px default.
+    const diagram = classDiagramWith({
+      nodes: [
+        { id: "a", kind: "class", label: "Order" },
+        { id: "b", kind: "class", label: "OrderProcessingServiceFactoryRegistry" },
+      ],
+    });
+
+    // Act
+    const result = layoutGrid(diagram);
+
+    // Assert — the uniform cell grew, so column 2 starts past the default
+    // step (200 + 80). Both names now have room inside their box.
+    const defaultStepX = LAYOUT_DEFAULTS.nodeWidth + 80;
+    expect(result.coordinates["b"]?.x ?? 0).toBeGreaterThan(defaultStepX);
+  });
 });
 
 describe("layoutSequence — custom algorithm", () => {
@@ -168,6 +186,27 @@ describe("runElkLayout — adapter", () => {
     expect(result.coordinates["s"]).toBeDefined();
     expect(result.coordinates["p"]).toBeDefined();
     expect(result.coordinates["s"]?.x).toBeGreaterThanOrEqual(result.coordinates["b"]!.x);
+  });
+
+  it("hands ELK a wider node footprint for a long-named class", async () => {
+    // Arrange — capture the width ELK receives for the class node.
+    let capturedWidth: number | undefined;
+    const probingElk = class ProbingElk implements ElkLike {
+      async layout(graph: ElkNodeLike): Promise<ElkNodeLike> {
+        capturedWidth = graph.children?.[0]?.width;
+        return graph;
+      }
+    } as unknown as ElkConstructorLike;
+    const diagram = classDiagramWith({
+      nodes: [{ id: "a", kind: "class", label: "OrderProcessingServiceFactoryRegistry" }],
+    });
+
+    // Act
+    await runElkLayout(diagram, { elkLoader: () => Promise.resolve(probingElk) });
+
+    // Assert — ELK reserved more than the 200px default so neighbours are
+    // spaced around the real footprint.
+    expect(capturedWidth ?? 0).toBeGreaterThan(LAYOUT_DEFAULTS.nodeWidth);
   });
 
   it("propagates the supplied algorithm option to ELK", async () => {
