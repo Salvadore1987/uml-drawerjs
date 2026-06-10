@@ -17,15 +17,22 @@ import { applyGenerics, handleClassMember } from "./classMembers.js";
  * `./classMembers.ts` while `ctx.openClassStack` is non-empty.
  */
 
+// Accepts three name forms, mirroring the ER `entity` grammar:
+//   class Account                       → label = alias = "Account"
+//   class "New Class" as n_abc          → label "New Class", alias "n_abc"
+//   class Account as acc                → label "Account", alias "acc"
+// The quoted `"label" as alias` form is what lets class names that aren't
+// bare `\w+` identifiers (spaces, punctuation) round-trip instead of
+// collapsing to a generated alias.
 const NODE_DECL =
-  /^(?:(abstract)\s+)?(class|interface|enum|abstract)\s+(\w+)(?:\s*<\s*([^<>]+(?:<[^<>]*>[^<>]*)*)\s*>)?(?:\s*<<\s*([\w-]+)\s*>>)?(\s*\{)?$/u;
+  /^(?:(abstract)\s+)?(class|interface|enum|abstract)\s+(?:"([^"]+)"\s+as\s+(\w+)|(\w+))(?:\s+as\s+(\w+))?(?:\s*<\s*([^<>]+(?:<[^<>]*>[^<>]*)*)\s*>)?(?:\s*<<\s*([\w-]+)\s*>>)?(\s*\{)?$/u;
 
 /**
  * UML package container. Authors write `package "com.bank" {` or
  * `package com.bank {`; both forms are accepted. Nested packages are
  * supported via the same `openGroupStack` machinery used for C4 boundaries.
  */
-const PACKAGE_DECL = /^package\s+(?:"([^"]+)"|(\S+))(?:\s*<<[\w-]+>>)?\s*\{$/u;
+const PACKAGE_DECL = /^package\s+(?:"([^"]+)"|(\S+))(?:\s+as\s+(\w+))?(?:\s*<<[\w-]+>>)?\s*\{$/u;
 
 const EDGE_LINE =
   /^(\w+)\s+("(?:[^"\\]|\\.)*"\s+)?(\.\.\|>|--\|>|\.\.>|\*--|o--|<\|--|<\|\.\.|<--|-->|<-\.|\.->|--|\.\.) ?\s*("(?:[^"\\]|\\.)*"\s+)?(\w+)(?:\s*:\s*(.+))?$/u;
@@ -102,17 +109,25 @@ export function handleClassLine(ctx: ParseContext, line: SourceLine): boolean {
 function consumePackage(ctx: ParseContext, match: RegExpExecArray): void {
   const quoted = match[1];
   const bare = match[2];
+  const explicitAlias = match[3];
   const label = quoted ?? bare;
   if (!label) return;
-  const id = freshId(ctx);
+  // Prefer the explicit `as alias`; otherwise reuse a bare identifier label
+  // as the alias. Registering the alias via `resolveAlias` is what lets
+  // `finalize` remap an alias-keyed `layoutOverrides` entry back onto this
+  // group's fresh id — without it a resized package loses its size/position
+  // on every re-parse.
+  const alias = explicitAlias ?? (bare && /^[A-Za-z0-9_.]+$/u.test(bare) ? bare : undefined);
+  const id = alias ? resolveAlias(ctx, alias, "create") : freshId(ctx);
+  if (id === null) return;
   const group: DiagramGroup = {
     id,
     kind: "package",
     label,
     children: [],
   };
-  if (bare && /^[A-Za-z0-9_.]+$/u.test(bare)) {
-    group.alias = bare;
+  if (alias) {
+    group.alias = alias;
   }
   ctx.groups.push(group);
 
@@ -129,11 +144,20 @@ function consumePackage(ctx: ParseContext, match: RegExpExecArray): void {
 function consumeNodeDecl(ctx: ParseContext, match: RegExpExecArray): void {
   const abstractMod = match[1];
   const keyword = match[2];
-  const ident = match[3];
-  const generics = match[4];
-  const stereotype = match[5];
-  const openBrace = match[6];
-  if (!keyword || !ident) return;
+  const quotedLabel = match[3];
+  const quotedAlias = match[4];
+  const bareIdent = match[5];
+  const trailingAlias = match[6];
+  const generics = match[7];
+  const stereotype = match[8];
+  const openBrace = match[9];
+  if (!keyword) return;
+
+  // `"label" as alias` and `bare as alias` carry an explicit alias; the
+  // plain `bare` form uses the identifier as both label and alias.
+  const alias = quotedAlias ?? trailingAlias ?? bareIdent;
+  const label = quotedLabel ?? bareIdent;
+  if (!alias || !label) return;
 
   const kind: NodeKind =
     keyword === "interface"
@@ -144,9 +168,12 @@ function consumeNodeDecl(ctx: ParseContext, match: RegExpExecArray): void {
           ? "abstract-class"
           : "class";
 
-  const id = resolveAlias(ctx, ident, "create");
+  const id = resolveAlias(ctx, alias, "create");
   if (id === null) return;
-  const node: DiagramNode = { id, kind, label: ident };
+  const node: DiagramNode = { id, kind, label };
+  // Persist the explicit alias so the generator can re-emit the same
+  // `"label" as alias` token (keeps the alias stable across round-trips).
+  if (quotedAlias !== undefined || trailingAlias !== undefined) node.alias = alias;
   if (stereotype) node.stereotype = stereotype;
   applyGenerics(node, generics);
   ctx.nodes.push(node);

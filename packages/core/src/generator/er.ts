@@ -1,5 +1,5 @@
-import type { Attribute, Diagram, DiagramEdge, EdgeKind } from "../model/types.js";
-import { lookupAlias, nodeAlias } from "./format.js";
+import type { Attribute, Diagram, DiagramEdge, DiagramNode, EdgeKind } from "../model/types.js";
+import { escapeStringLiteral, lookupAlias, nodeAlias } from "./format.js";
 
 /**
  * Render an Entity-Relationship diagram body. When entities have attributes
@@ -12,7 +12,7 @@ import { lookupAlias, nodeAlias } from "./format.js";
 export function renderEr(diagram: Diagram, aliases: Map<string, string>): string[] {
   const lines: string[] = [];
   for (const node of diagram.nodes) {
-    const head = `entity ${nodeAlias(aliases, node)}`;
+    const head = `entity ${formatErNameToken(node, aliases)}`;
     const attrs = node.attributes ?? [];
     if (attrs.length === 0) {
       lines.push(head);
@@ -26,6 +26,17 @@ export function renderEr(diagram: Diagram, aliases: Map<string, string>): string
     lines.push(formatErEdge(edge, aliases));
   }
   return lines;
+}
+
+/**
+ * Entity name token: bare `alias` when it equals the label, otherwise the
+ * `"label" as alias` form (the ER parser already accepts it) so entity names
+ * with spaces / punctuation round-trip instead of collapsing to the alias.
+ */
+function formatErNameToken(node: DiagramNode, aliases: Map<string, string>): string {
+  const alias = nodeAlias(aliases, node);
+  if (alias === node.label) return alias;
+  return `"${escapeStringLiteral(node.label)}" as ${alias}`;
 }
 
 const FORWARD_ARROWS: Partial<Record<EdgeKind, string>> = {

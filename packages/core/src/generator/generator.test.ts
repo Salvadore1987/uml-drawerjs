@@ -575,9 +575,45 @@ describe("generatePlantUml — output shape", () => {
     expect(second.errors).toEqual([]);
     expect(second.ast.groups).toHaveLength(1);
     expect(second.ast.groups[0]?.label).toBe("com.bank");
-    expect(generated).toContain('package "com.bank" {');
+    expect(generated).toMatch(/package "com\.bank" as \w+ \{/u);
     expect(generated).toContain("  class Account");
     expect(generated).toContain("  class Transaction");
+  });
+
+  it("round-trips a resized package's layout override (size survives re-parse)", () => {
+    // Arrange — a package with an explicit {x,y,width,height} override (as a
+    // user resize produces) plus one contained class.
+    const groupId = "0198gggg-1111-7000-8000-gggggggggggg";
+    const nodeId = "0198nnnn-2222-7000-8000-nnnnnnnnnnnn";
+    const diagram = createEmptyDiagram("class");
+    diagram.nodes.push({ id: nodeId, kind: "class", label: "Account" });
+    diagram.groups.push({ id: groupId, kind: "package", label: "com.bank", children: [nodeId] });
+    diagram.metadata.layoutOverrides = {
+      [groupId]: { x: 50, y: 60, width: 400, height: 300 },
+      [nodeId]: { x: 80, y: 120 },
+    };
+
+    // Act
+    const generated = generatePlantUml(diagram);
+    const { ast } = parsePlantUml(generated, {
+      diagramType: "class",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — the package is emitted with a stable alias and its size maps
+    // back onto the re-parsed group id (not orphaned → no default-size revert).
+    expect(generated).toMatch(/package "com\.bank" as \w+ \{/u);
+    const group = ast.groups[0];
+    expect(group?.label).toBe("com.bank");
+    expect(ast.metadata.layoutOverrides?.[group!.id]).toEqual({
+      x: 50,
+      y: 60,
+      width: 400,
+      height: 300,
+    });
+    // Round-trip is stable.
+    expect(generatePlantUml(ast)).toBe(generated);
   });
 });
 
@@ -833,5 +869,54 @@ describe("C4 node extras (stereotype / technology) round-trip", () => {
 
     // Assert — no sidecar for class diagrams.
     expect(generated).not.toContain("nodeExtras");
+  });
+
+  it('round-trips a class label that isn\'t a bare identifier via `"label" as alias`', () => {
+    // Arrange — a freshly added class carries a spaced placeholder label and
+    // no alias (the palette dispatches addNodeCommand with `New Class`).
+    const diagram = createEmptyDiagram("class");
+    diagram.nodes.push({
+      id: "0198abcd-1234-7000-8000-aaaaaaaaaaaa",
+      kind: "class",
+      label: "New Class",
+    });
+
+    // Act — generate, then re-parse, then generate again.
+    const generated = generatePlantUml(diagram);
+    const { ast } = parsePlantUml(generated, {
+      diagramType: "class",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    const regenerated = generatePlantUml(ast);
+
+    // Assert — the label survives as a quoted name (not a GUID), and the
+    // round-trip is stable.
+    expect(generated).toContain('class "New Class" as ');
+    expect(generated).not.toMatch(/class n_[0-9a-f_]+\s*$/mu);
+    expect(ast.nodes[0]?.label).toBe("New Class");
+    expect(regenerated).toBe(generated);
+  });
+
+  it('round-trips an entity label that isn\'t a bare identifier via `"label" as alias`', () => {
+    // Arrange
+    const diagram = createEmptyDiagram("er");
+    diagram.nodes.push({
+      id: "0198abcd-1234-7000-8000-bbbbbbbbbbbb",
+      kind: "entity",
+      label: "Customer Order",
+    });
+
+    // Act
+    const generated = generatePlantUml(diagram);
+    const { ast } = parsePlantUml(generated, {
+      diagramType: "er",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert
+    expect(generated).toContain('entity "Customer Order" as ');
+    expect(ast.nodes[0]?.label).toBe("Customer Order");
   });
 });

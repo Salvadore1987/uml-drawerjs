@@ -10,7 +10,7 @@ import type {
   OperationParameter,
   Visibility,
 } from "../model/types.js";
-import { lookupAlias, nodeAlias } from "./format.js";
+import { escapeStringLiteral, lookupAlias, nodeAlias } from "./format.js";
 
 /**
  * Render a class-diagram body. Node declarations are emitted in `ast.nodes`
@@ -38,7 +38,12 @@ export function renderClass(diagram: Diagram, aliases: Map<string, string>): str
   const nodesById = new Map<string, DiagramNode>(diagram.nodes.map((n) => [n.id, n]));
 
   for (const group of packageGroups) {
-    lines.push(`package "${group.label}" {`);
+    // Emit a stable alias (`package "Label" as alias {`) so the alias-keyed
+    // `@drawer:meta` layout override round-trips back onto the group — without
+    // it a resized package reverts to its auto-fit / default size on re-parse.
+    lines.push(
+      `package "${escapeStringLiteral(group.label)}" as ${lookupAlias(aliases, group.id)} {`,
+    );
     for (const childId of group.children) {
       const child = nodesById.get(childId);
       if (!child) continue;
@@ -69,23 +74,38 @@ function formatClassDeclaration(node: DiagramNode, aliases: Map<string, string>)
 }
 
 function formatClassHead(node: DiagramNode, aliases: Map<string, string>): string {
-  const alias = nodeAlias(aliases, node);
+  // `class Foo` ties the visual name to the alias; when the label can't be
+  // used as the alias verbatim (spaces / punctuation / a duplicate, so the
+  // alias index fell back to a generated token), emit the `"label" as alias`
+  // form so the real label round-trips instead of showing the alias/GUID.
+  const name = formatNameToken(node, aliases);
   const generics = formatGenerics(node.generics);
   const stereotype = node.stereotype ? ` <<${node.stereotype}>>` : "";
   switch (node.kind) {
     case "class":
-      return `class ${alias}${generics}${stereotype}`;
+      return `class ${name}${generics}${stereotype}`;
     case "interface":
-      return `interface ${alias}${generics}${stereotype}`;
+      return `interface ${name}${generics}${stereotype}`;
     case "abstract-class":
-      return `abstract class ${alias}${generics}${stereotype}`;
+      return `abstract class ${name}${generics}${stereotype}`;
     case "enum":
-      return `enum ${alias}${stereotype}`;
+      return `enum ${name}${stereotype}`;
     default:
       // Class diagrams shouldn't see other kinds; emit `class` as a safe
       // fallback so the generator never throws on malformed AST.
-      return `class ${alias}${stereotype}`;
+      return `class ${name}${stereotype}`;
   }
+}
+
+/**
+ * Name token for a class-like declaration: a bare `alias` when the alias is
+ * exactly the label, otherwise the `"label" as alias` form so labels that
+ * aren't valid PlantUML identifiers survive the round-trip.
+ */
+function formatNameToken(node: DiagramNode, aliases: Map<string, string>): string {
+  const alias = nodeAlias(aliases, node);
+  if (alias === node.label) return alias;
+  return `"${escapeStringLiteral(node.label)}" as ${alias}`;
 }
 
 function formatGenerics(generics: string[] | undefined): string {
