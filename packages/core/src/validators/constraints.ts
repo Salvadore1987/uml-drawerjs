@@ -184,6 +184,7 @@ const C4_NODE_KINDS = new Set<NodeKind>([
   "component",
   "component-external",
   "database",
+  "database-external",
   "queue",
 ]);
 
@@ -204,6 +205,7 @@ const C4_CONTEXT_NODE_KINDS = new Set<NodeKind>([
   "system",
   "system-external",
   "database",
+  "database-external",
   "queue",
 ]);
 
@@ -223,6 +225,7 @@ const C4_CONTAINER_NODE_KINDS = new Set<NodeKind>([
   "container",
   "container-external",
   "database",
+  "database-external",
   "queue",
 ]);
 const CLASS_NODE_KINDS = new Set<NodeKind>(["class", "interface", "abstract-class", "enum"]);

@@ -32,6 +32,7 @@ export type NodeKind =
   | "component"
   | "component-external"
   | "database"
+  | "database-external"
   | "queue"
   // Class
   | "class"

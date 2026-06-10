@@ -44,6 +44,7 @@ const nodeKindSchema = z.enum([
   "component",
   "component-external",
   "database",
+  "database-external",
   "queue",
   "class",
   "interface",

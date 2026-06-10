@@ -184,6 +184,45 @@ describe("generatePlantUml — output shape", () => {
     expect(ctnOut).toContain('ContainerDb(d, "Postgres", "PostgreSQL")');
   });
 
+  it("emits SystemDb_Ext / ContainerDb_Ext / ComponentDb_Ext for kind 'database-external' by tier", () => {
+    // Arrange — the same external-database kind must round-trip to the
+    // tier-correct macro: SystemDb_Ext on Context, ContainerDb_Ext on
+    // Container, ComponentDb_Ext on Component.
+    const ctxText = `@startuml\nSystemDb_Ext(d, "Legacy")\n@enduml\n`;
+    const ctxParsed = parsePlantUml(ctxText, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    const ctnText = `@startuml\nContainerDb_Ext(d, "Legacy", "Oracle")\n@enduml\n`;
+    const ctnParsed = parsePlantUml(ctnText, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    const cmpText = `@startuml\nComponentDb_Ext(d, "Legacy", "Oracle")\n@enduml\n`;
+    const cmpParsed = parsePlantUml(cmpText, {
+      diagramType: "c4-component",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — all three parse to the single `database-external` kind.
+    expect(ctxParsed.ast.nodes[0]?.kind).toBe("database-external");
+    expect(ctnParsed.ast.nodes[0]?.kind).toBe("database-external");
+    expect(cmpParsed.ast.nodes[0]?.kind).toBe("database-external");
+
+    // Act
+    const ctxOut = generatePlantUml(ctxParsed.ast);
+    const ctnOut = generatePlantUml(ctnParsed.ast);
+    const cmpOut = generatePlantUml(cmpParsed.ast);
+
+    // Assert — each tier regenerates its own external-database macro.
+    expect(ctxOut).toContain('SystemDb_Ext(d, "Legacy")');
+    expect(ctnOut).toContain('ContainerDb_Ext(d, "Legacy", "Oracle")');
+    expect(cmpOut).toContain('ComponentDb_Ext(d, "Legacy", "Oracle")');
+  });
+
   it("emits Container_Ext for kind 'container-external' (round-trip)", () => {
     // Arrange
     const text = `@startuml\nContainer_Ext(pay, "Payments", "REST", "Third-party")\n@enduml\n`;

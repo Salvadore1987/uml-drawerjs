@@ -39,7 +39,7 @@ const NODE_MACROS: NodeMacroSpec[] = [
   // (alias, "label", "description"?) — no tech on Context tier.
   {
     pattern: /^SystemDb_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?\s*\)$/u,
-    kind: "database",
+    kind: "database-external",
     shape: "personLike",
   },
   {
@@ -72,7 +72,7 @@ const NODE_MACROS: NodeMacroSpec[] = [
   {
     pattern:
       /^ContainerDb_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
-    kind: "database",
+    kind: "database-external",
     shape: "containerLike",
   },
   {
@@ -112,7 +112,7 @@ const NODE_MACROS: NodeMacroSpec[] = [
   {
     pattern:
       /^ComponentDb_Ext\(\s*(\w+)\s*,\s*"([^"]*)"(?:\s*,\s*"([^"]*)")?(?:\s*,\s*"([^"]*)")?\s*\)$/u,
-    kind: "database",
+    kind: "database-external",
     shape: "containerLike",
   },
   {

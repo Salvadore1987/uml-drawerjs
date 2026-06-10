@@ -105,6 +105,35 @@ describe("renderer/nodes — C4 per-kind visual language", () => {
     expect(childTags).toEqual(["ellipse", "path"]);
   });
 
+  it("database-external renders a dashed cylinder with the external fill", () => {
+    // Arrange
+    const diagram = diagramWith({
+      type: "c4-container",
+      nodes: [{ id: "db", kind: "database-external", label: "Legacy", technology: "Oracle" }],
+      metadata: { schemaVersion: "1.0.0", layoutOverrides: { db: { x: 0, y: 0 } } },
+    });
+
+    // Act
+    const rendered = renderDiagram(diagram, { coordinates: { db: { x: 0, y: 0 } } });
+    const node = findNodeVNode(rendered.root, "db");
+    const frame = node.children?.find(
+      (c) =>
+        c.tag === "g" &&
+        (c.attrs as Record<string, unknown> | undefined)?.["data-uml-frame"] ===
+          "database-external",
+    );
+
+    // Assert — still a cylinder (path + ellipse), but dashed and grey.
+    expect(frame, "database-external frame group should be emitted").toBeTruthy();
+    const childTags = (frame?.children ?? []).map((c) => c.tag).sort();
+    expect(childTags).toEqual(["ellipse", "path"]);
+    for (const child of frame?.children ?? []) {
+      const attrs = child.attrs as Record<string, unknown> | undefined;
+      expect(attrs?.["stroke-dasharray"]).toBe("6 4");
+      expect(attrs?.["fill"]).toBe("var(--uml-c4-external-bg, var(--uml-node-bg))");
+    }
+  });
+
   it("container with technology renders a [Container: Tech] type-tag row", () => {
     // Arrange
     const diagram = diagramWith({

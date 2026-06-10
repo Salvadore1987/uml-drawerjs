@@ -44,6 +44,7 @@ const C4_KINDS = new Set<NodeKind>([
   "component",
   "component-external",
   "database",
+  "database-external",
   "queue",
 ]);
 
@@ -102,7 +103,7 @@ function entityRowHeights(node: DiagramNode): number {
 function c4ExtraHeight(node: DiagramNode, width: number): number {
   if (!C4_KINDS.has(node.kind)) return 0;
   let extra = 0;
-  if (node.kind === "database") extra += DATABASE_CAP_HEIGHT;
+  if (node.kind === "database" || node.kind === "database-external") extra += DATABASE_CAP_HEIGHT;
   if (node.kind === "person" || node.kind === "person-external") extra += PERSON_ICON_HEIGHT;
   // c4model.com requires every element to carry a type tag like
   // "[Software System]" / "[Person]" — we render it on a dedicated row
@@ -212,6 +213,8 @@ function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
       return renderC4Rect(geom, "external", { dashed: true });
     case "database":
       return renderDatabaseFrame(geom);
+    case "database-external":
+      return renderDatabaseFrame(geom, { external: true });
     case "queue":
       return renderQueueFrame(geom);
     case "actor":
@@ -440,19 +443,28 @@ function renderQueueFrame(geom: NodeGeometry): VNode {
   return v("g", { "data-uml-frame": "queue" }, [frame, leftCap, rightCap]);
 }
 
-function renderDatabaseFrame(geom: NodeGeometry): VNode {
+function renderDatabaseFrame(geom: NodeGeometry, opts: { external?: boolean } = {}): VNode {
   // Cylinder: top ellipse + side body + bottom curve. Using a single
-  // <path> for the body keeps the SVG compact and theme-friendly.
+  // <path> for the body keeps the SVG compact and theme-friendly. The
+  // `external` variant pulls the shared `--uml-c4-external-*` palette and
+  // a dashed stroke so an external database reads identically to the other
+  // external C4 elements (grey + dashed), matching c4model styling.
   const w = geom.width;
   const h = geom.height;
   const cap = DATABASE_CAP_HEIGHT;
-  const fill = "var(--uml-c4-database-bg, var(--uml-node-bg))";
-  const stroke = "var(--uml-c4-database-border, var(--uml-node-border))";
+  const fill = opts.external
+    ? "var(--uml-c4-external-bg, var(--uml-node-bg))"
+    : "var(--uml-c4-database-bg, var(--uml-node-bg))";
+  const stroke = opts.external
+    ? "var(--uml-c4-external-border, var(--uml-node-border))"
+    : "var(--uml-c4-database-border, var(--uml-node-border))";
+  const dash = opts.external ? { "stroke-dasharray": "6 4" } : {};
   const body = v("path", {
     d: `M 0 ${cap / 2} L 0 ${h - cap / 2} A ${w / 2} ${cap / 2} 0 0 0 ${w} ${h - cap / 2} L ${w} ${cap / 2}`,
     fill,
     stroke,
     "stroke-width": "1.5",
+    ...dash,
   });
   const top = v("ellipse", {
     cx: w / 2,
@@ -462,8 +474,10 @@ function renderDatabaseFrame(geom: NodeGeometry): VNode {
     fill,
     stroke,
     "stroke-width": "1.5",
+    ...dash,
   });
-  return v("g", { "data-uml-frame": "database" }, [body, top]);
+  const frameTag = opts.external ? "database-external" : "database";
+  return v("g", { "data-uml-frame": frameTag }, [body, top]);
 }
 
 interface HeaderLayout {
@@ -474,7 +488,7 @@ interface HeaderLayout {
 }
 
 function headerLayoutFor(node: DiagramNode): HeaderLayout {
-  if (node.kind === "database") {
+  if (node.kind === "database" || node.kind === "database-external") {
     return { topOffset: DATABASE_CAP_HEIGHT + 14, lineHeight: 16 };
   }
   if (node.kind === "person" || node.kind === "person-external") {
@@ -601,6 +615,7 @@ function c4TextColor(kind: NodeKind): string {
   if (kind === "component") return "var(--uml-c4-component-text, var(--uml-node-text))";
   if (kind === "component-external") return "var(--uml-c4-external-text, var(--uml-node-text))";
   if (kind === "database") return "var(--uml-c4-database-text, var(--uml-node-text))";
+  if (kind === "database-external") return "var(--uml-c4-external-text, var(--uml-node-text))";
   if (kind === "queue") return "var(--uml-c4-database-text, var(--uml-node-text))";
   return "var(--uml-node-text)";
 }
@@ -622,6 +637,7 @@ function formatTypeTag(node: DiagramNode): string {
     component: "Component",
     "component-external": "Component",
     database: "Database",
+    "database-external": "Database",
     queue: "Queue",
   };
   const prefix = labelByKind[node.kind] ?? "Element";

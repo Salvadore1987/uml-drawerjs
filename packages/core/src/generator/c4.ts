@@ -92,6 +92,30 @@ function formatC4Node(
         return formatContainerLike("ContainerDb", alias, label, node.technology, node.description);
       }
       return formatPersonLike("SystemDb", alias, label, node.description);
+    case "database-external":
+      // External-database twin of the `database` case: the parser folds
+      // SystemDb_Ext / ContainerDb_Ext / ComponentDb_Ext into this single
+      // kind, so the generator re-selects the macro by diagram tier (and the
+      // presence of technology) to keep the round-trip lossless per tier.
+      if (diagramType === "c4-component" && node.technology) {
+        return formatContainerLike(
+          "ComponentDb_Ext",
+          alias,
+          label,
+          node.technology,
+          node.description,
+        );
+      }
+      if (node.technology) {
+        return formatContainerLike(
+          "ContainerDb_Ext",
+          alias,
+          label,
+          node.technology,
+          node.description,
+        );
+      }
+      return formatPersonLike("SystemDb_Ext", alias, label, node.description);
     case "queue":
       if (diagramType === "c4-component" && node.technology) {
         return formatContainerLike(
