@@ -303,27 +303,73 @@ export function renderResizeHandles(geom: NodeGeometry): VNode[] {
     { side: "sw", x: 0, y: geom.height, cursor: "nesw-resize" },
     { side: "w", x: 0, y: geom.height / 2, cursor: "ew-resize" },
   ];
-  const HALF = 4;
-  return positions.map((p) =>
-    v(
-      "rect",
-      {
-        x: p.x - HALF,
-        y: p.y - HALF,
-        width: HALF * 2,
-        height: HALF * 2,
-        fill: "var(--uml-selection-handle, var(--uml-accent))",
-        stroke: "var(--uml-bg)",
-        "stroke-width": "1",
-        "data-resize-handle": p.side,
-      },
-      undefined,
-      {
-        style: `cursor: ${p.cursor}`,
-        classes: ["uml-node-resize-handle", `uml-node-resize-handle--${p.side}`],
-      },
-    ),
-  );
+  // Each handle is two rects: a large transparent HIT target (easy to grab,
+  // carries `data-resize-handle` + cursor) and a small visible DOT affordance.
+  // The big invisible grab zone makes resizing forgiving without bloating the
+  // visible handle. The dot has `pointer-events:none` so it never steals the
+  // grab from the hit rect rendered before it.
+  const HIT_HALF = 11;
+  const DOT_HALF = 5;
+  // Keep handles INSIDE the node bounds (they grow inward from each edge/corner)
+  // so the selection markers never stick out past the frame.
+  return positions.flatMap((p) => {
+    const hx = clampHandleSpan(p.x, HIT_HALF, 0, geom.width);
+    const hy = clampHandleSpan(p.y, HIT_HALF, 0, geom.height);
+    const dx = clampHandleSpan(p.x, DOT_HALF, 0, geom.width);
+    const dy = clampHandleSpan(p.y, DOT_HALF, 0, geom.height);
+    return [
+      v(
+        "rect",
+        {
+          x: hx.start,
+          y: hy.start,
+          width: hx.size,
+          height: hy.size,
+          fill: "transparent",
+          "data-resize-handle": p.side,
+        },
+        undefined,
+        {
+          style: `cursor: ${p.cursor}`,
+          classes: ["uml-node-resize-handle", `uml-node-resize-handle--${p.side}`],
+        },
+      ),
+      v(
+        "rect",
+        {
+          x: dx.start,
+          y: dy.start,
+          width: dx.size,
+          height: dy.size,
+          fill: "var(--uml-selection-handle, var(--uml-accent))",
+          stroke: "var(--uml-bg)",
+          "stroke-width": "1",
+        },
+        undefined,
+        {
+          classes: ["uml-node-resize-dot", `uml-node-resize-dot--${p.side}`],
+        },
+      ),
+    ];
+  });
+}
+
+/**
+ * Place a resize handle of half-size `half` centered at `center` but clamped so
+ * the whole handle stays within `[min, max]` — handles at an edge/corner grow
+ * inward instead of overhanging the element. Returns the rect's start + size.
+ */
+export function clampHandleSpan(
+  center: number,
+  half: number,
+  min: number,
+  max: number,
+): { start: number; size: number } {
+  const size = Math.min(half * 2, max - min);
+  let start = center - half;
+  if (start < min) start = min;
+  if (start + size > max) start = max - size;
+  return { start, size };
 }
 
 /**

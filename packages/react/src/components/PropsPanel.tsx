@@ -70,6 +70,25 @@ const SEQUENCE_EDGE_KIND_OPTIONS: ReadonlyArray<{ value: EdgeKind; label: string
   { value: "found-message", label: "Found message ([->)" },
   { value: "lost-message", label: "Lost message (->])" },
 ];
+const CLASS_EDGE_KINDS = new Set<EdgeKind>([
+  "association",
+  "inheritance",
+  "realization",
+  "composition",
+  "aggregation",
+  "dependency",
+]);
+// Arrow hints mirror the canonical forward arrows the generator emits
+// (`FORWARD_ARROWS` in generator/class.ts), so the dropdown reads the same
+// way the PlantUML source does.
+const CLASS_EDGE_KIND_OPTIONS: ReadonlyArray<{ value: EdgeKind; label: string }> = [
+  { value: "association", label: "Association (-->)" },
+  { value: "inheritance", label: "Inheritance (--|>)" },
+  { value: "realization", label: "Realization (..|>)" },
+  { value: "dependency", label: "Dependency (..>)" },
+  { value: "aggregation", label: "Aggregation (o--)" },
+  { value: "composition", label: "Composition (*--)" },
+];
 
 /**
  * Derive the canonical ER `EdgeKind` from a (source, target) cardinality
@@ -203,6 +222,23 @@ export function PropsPanel({
     if (!selectedEdge || !editor) return;
     editor.dispatch(updateEdgeCommand(selectedEdge.id, patch, editor.getState()));
   };
+  // Reverse the relation's direction by swapping its endpoints, so the arrow /
+  // navigation points the other way. Per-end roles/multiplicities and ER
+  // cardinality travel with their node; ER kind is re-derived so e.g.
+  // one-to-many flips to many-to-one.
+  const reverseEdgeDirection = (edge: DiagramEdge): void => {
+    const patch: Partial<DiagramEdge> = { source: edge.target, target: edge.source };
+    if (edge.ends) {
+      patch.ends = { source: edge.ends.target, target: edge.ends.source };
+    }
+    if (edge.cardinality) {
+      const source = edge.cardinality.target ?? "1";
+      const target = edge.cardinality.source ?? "1";
+      patch.cardinality = { source, target };
+      if (ER_EDGE_KINDS.has(edge.kind)) patch.kind = deriveErKind(source, target);
+    }
+    commitEdge(patch);
+  };
   const commitGroup = (patch: Partial<DiagramGroup>): void => {
     if (!selectedGroup || !editor) return;
     editor.dispatch(updateGroupCommand(selectedGroup.id, patch, editor.getState()));
@@ -325,6 +361,17 @@ export function PropsPanel({
           }}
         />
       </label>
+      <div className="uml-field">
+        <span>Direction</span>
+        <button
+          type="button"
+          className="uml-button"
+          title="Swap source ↔ target (reverse the relation)"
+          onClick={(): void => reverseEdgeDirection(edge)}
+        >
+          ↺ Reverse direction
+        </button>
+      </div>
       {C4_EDGE_KINDS.has(edge.kind) && (
         <label className="uml-field">
           <span>Technology</span>
@@ -367,6 +414,20 @@ export function PropsPanel({
             onChange={(e): void => commitEdge({ kind: e.target.value as EdgeKind })}
           >
             {SEQUENCE_EDGE_KIND_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : CLASS_EDGE_KINDS.has(edge.kind) ? (
+        <label className="uml-field">
+          <span>Kind</span>
+          <select
+            value={edge.kind}
+            onChange={(e): void => commitEdge({ kind: e.target.value as EdgeKind })}
+          >
+            {CLASS_EDGE_KIND_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>

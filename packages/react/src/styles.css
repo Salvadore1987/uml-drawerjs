@@ -697,6 +697,20 @@ select.uml-class-members__type {
   pointer-events: auto;
 }
 
+/* Visible dot affordance paired with each (larger, transparent) hit rect.
+   Never interactive — the hit rect owns the grab; the dot only shows where. */
+.uml-node-resize-dot {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+[data-uml-content][data-selected-count="single"]
+  .uml-node[data-selected="true"]
+  .uml-node-resize-dot {
+  opacity: 1;
+}
+
 /* Sequence-fragment resize handles — same visibility contract as node
    handles. N / S grow or shrink the chronological span by adding /
    removing edges to the first or last operand. E / W extend or contract
@@ -790,6 +804,19 @@ select.uml-class-members__type {
   .uml-group-resize-handle {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Visible dot affordance for group/package handles — see node dots above. */
+.uml-group-resize-dot {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+[data-uml-content][data-selected-count="single"]
+  [data-group-id][data-selected="true"]
+  .uml-group-resize-dot {
+  opacity: 1;
 }
 
 .uml-group__label-band {

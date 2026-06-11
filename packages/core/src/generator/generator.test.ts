@@ -580,6 +580,77 @@ describe("generatePlantUml — output shape", () => {
     expect(generated).toContain("  class Transaction");
   });
 
+  it("emits nested packages when a package contains another package", () => {
+    // Arrange — declared nesting: outer package contains an inner package
+    // which contains the class. The parser records this via openGroupStack.
+    const text =
+      `@startuml\n` +
+      `package "outer" {\n` +
+      `  package "inner" {\n` +
+      `    class Account\n` +
+      `  }\n` +
+      `}\n` +
+      `@enduml\n`;
+    const first = parsePlantUml(text, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+    expect(first.errors).toEqual([]);
+    const outer = first.ast.groups.find((g) => g.label === "outer");
+    const inner = first.ast.groups.find((g) => g.label === "inner");
+    expect(outer?.children).toContain(inner!.id);
+
+    // Act — the generator must nest `inner` inside `outer`, not emit siblings.
+    const generated = generatePlantUml(first.ast);
+
+    // Assert — `inner` is indented inside `outer`, and the class inside `inner`.
+    expect(generated).toMatch(
+      /package "outer" as \w+ \{\n {2}package "inner" as \w+ \{\n {4}class Account\n {2}\}\n\}/u,
+    );
+    // Round-trips: re-parsing keeps the nesting.
+    const second = parsePlantUml(generated, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+    const outer2 = second.ast.groups.find((g) => g.label === "outer");
+    const inner2 = second.ast.groups.find((g) => g.label === "inner");
+    expect(outer2?.children).toContain(inner2!.id);
+  });
+
+  it("infers package nesting from geometry when only sibling packages are declared", () => {
+    // Arrange — flat packages (as the buggy generator used to emit) plus
+    // layout overrides whose boxes show `inner` sitting inside `outer`. This
+    // mirrors a saved-then-reloaded diagram whose logical nesting was lost.
+    const text =
+      `@startuml\n` +
+      `' @drawer:meta {"layoutOverrides":{"outer":{"x":0,"y":0,"width":600,"height":400},"inner":{"x":40,"y":40,"width":300,"height":200}}}\n` +
+      `package "outer" as outer {\n` +
+      `}\n` +
+      `package "inner" as inner {\n` +
+      `  class Account\n` +
+      `}\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — geometry inference re-parented `inner` under `outer`.
+    expect(errors).toEqual([]);
+    const outer = ast.groups.find((g) => g.label === "outer");
+    const inner = ast.groups.find((g) => g.label === "inner");
+    expect(outer?.children).toContain(inner!.id);
+    const generated = generatePlantUml(ast);
+    expect(generated).toMatch(
+      /package "outer" as \w+ \{\n {2}package "inner" as \w+ \{\n {4}class Account\n {2}\}\n\}/u,
+    );
+  });
+
   it("round-trips a resized package's layout override (size survives re-parse)", () => {
     // Arrange — a package with an explicit {x,y,width,height} override (as a
     // user resize produces) plus one contained class.

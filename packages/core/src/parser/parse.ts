@@ -7,6 +7,7 @@ import { handleClassLine } from "./lines/class.js";
 import { handleErLine } from "./lines/er.js";
 import { handleSequenceLine } from "./lines/sequence.js";
 import { handleUniversalLine } from "./lines/shared.js";
+import { inferGroupNestingFromGeometry } from "./nesting.js";
 import { tokenizeLines } from "./tokenizer.js";
 import type { SourceLine } from "./tokenizer.js";
 
@@ -38,7 +39,11 @@ export function parsePlantUml(text: string, options: ParseOptions): ParseResult 
     ctx.errors.push(makeMissingMarkerError("enduml", lines));
   }
 
-  return { ast: finalize(ctx), errors: ctx.errors };
+  const ast = finalize(ctx);
+  // Reconstruct group→group nesting that only survives as geometry, so the
+  // generator can emit nested `package { … }` / boundaries instead of siblings.
+  inferGroupNestingFromGeometry(ast);
+  return { ast, errors: ctx.errors };
 }
 
 function dispatch(ctx: ParseContext, line: SourceLine): void {

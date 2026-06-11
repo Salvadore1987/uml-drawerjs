@@ -253,6 +253,95 @@ describe("Component composition", () => {
     expect(captured!.exportText()).not.toContain("$tags");
     expect(captured!.exportText()).not.toContain("AddRelTag");
   });
+
+  it("PropsPanel Kind select changes a class relationship's type", async () => {
+    // Arrange — a class diagram with one association edge; select it.
+    const initial =
+      `@startuml\n` + `class Alpha\n` + `class Beta\n` + `Alpha --> Beta\n` + `@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().edges).toHaveLength(1);
+    });
+    expect(captured!.getState().edges[0]!.kind).toBe("association");
+    const edgeId = captured!.getState().edges[0]!.id;
+    act(() => {
+      captured!.selection.set([edgeId]);
+    });
+
+    // The class edge form exposes the Kind dropdown as its only combobox.
+    const select = (await screen.findByRole("combobox")) as HTMLSelectElement;
+    expect(select.value).toBe("association");
+    // All six class relationship types are offered.
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toEqual([
+      "association",
+      "inheritance",
+      "realization",
+      "dependency",
+      "aggregation",
+      "composition",
+    ]);
+
+    // Act — switch to inheritance.
+    act(() => {
+      fireEvent.change(select, { target: { value: "inheritance" } });
+    });
+
+    // Assert — the AST kind changed and the source emits the inheritance arrow.
+    expect(captured!.getState().edges[0]!.kind).toBe("inheritance");
+    expect(captured!.exportText()).toContain("Alpha --|> Beta");
+  });
+
+  it("PropsPanel Reverse direction swaps a relationship's endpoints", async () => {
+    // Arrange — a class diagram with one directed association; select it.
+    const initial =
+      `@startuml\n` + `class Alpha\n` + `class Beta\n` + `Alpha --> Beta\n` + `@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().edges).toHaveLength(1);
+    });
+    const before = captured!.getState().edges[0]!;
+    const { source: origSource, target: origTarget } = before;
+    act(() => {
+      captured!.selection.set([before.id]);
+    });
+
+    // Act — click the Reverse direction button.
+    const button = await screen.findByRole("button", { name: /reverse direction/i });
+    act(() => {
+      fireEvent.click(button);
+    });
+
+    // Assert — endpoints swapped in the AST and the emitted arrow flips.
+    const after = captured!.getState().edges[0]!;
+    expect(after.source).toBe(origTarget);
+    expect(after.target).toBe(origSource);
+    expect(captured!.exportText()).toContain("Beta --> Alpha");
+
+    // Act — clicking again restores the original direction.
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /reverse direction/i }));
+    });
+    const restored = captured!.getState().edges[0]!;
+    expect(restored.source).toBe(origSource);
+    expect(restored.target).toBe(origTarget);
+  });
 });
 
 describe("Hook misuse", () => {

@@ -17,6 +17,7 @@ export {
   getOutgoingEdges,
   getIncomingEdges,
   getParentGroups,
+  collectGroupDescendants,
   ASYNC_EDGE_TAG,
   hasAsyncTag,
 } from "./query.js";

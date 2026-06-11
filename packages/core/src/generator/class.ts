@@ -2,6 +2,7 @@ import type {
   Attribute,
   Diagram,
   DiagramEdge,
+  DiagramGroup,
   DiagramNode,
   EdgeEndpoint,
   EdgeKind,
@@ -26,37 +27,53 @@ export function renderClass(diagram: Diagram, aliases: Map<string, string>): str
   const lines: string[] = [];
 
   // Emit packages first so their `{ … }` block contains the member nodes
-  // declared inside them, mirroring the parser's containment rules.
-  const childToPackage = new Map<string, string>();
-  for (const group of diagram.groups) {
-    if (group.kind === "package") {
-      for (const childId of group.children) childToPackage.set(childId, group.id);
-    }
-  }
-
+  // declared inside them, mirroring the parser's containment rules. Packages
+  // may nest other packages (`group.children` can hold group ids), so the
+  // emit is recursive: only top-level packages are emitted here, each
+  // descending into its child packages and nodes.
+  const groupById = new Map<string, DiagramGroup>(diagram.groups.map((g) => [g.id, g]));
   const packageGroups = diagram.groups.filter((g) => g.kind === "package");
   const nodesById = new Map<string, DiagramNode>(diagram.nodes.map((n) => [n.id, n]));
 
+  const nestedPackageIds = new Set<string>();
+  const nodeInPackage = new Set<string>();
   for (const group of packageGroups) {
+    for (const childId of group.children) {
+      if (groupById.get(childId)?.kind === "package") nestedPackageIds.add(childId);
+      else if (nodesById.has(childId)) nodeInPackage.add(childId);
+    }
+  }
+
+  const emitPackage = (group: DiagramGroup, indent: string): void => {
     // Emit a stable alias (`package "Label" as alias {`) so the alias-keyed
     // `@drawer:meta` layout override round-trips back onto the group — without
     // it a resized package reverts to its auto-fit / default size on re-parse.
     lines.push(
-      `package "${escapeStringLiteral(group.label)}" as ${lookupAlias(aliases, group.id)} {`,
+      `${indent}package "${escapeStringLiteral(group.label)}" as ${lookupAlias(aliases, group.id)} {`,
     );
     for (const childId of group.children) {
+      const childGroup = groupById.get(childId);
+      if (childGroup?.kind === "package") {
+        emitPackage(childGroup, `${indent}  `);
+        continue;
+      }
       const child = nodesById.get(childId);
       if (!child) continue;
       for (const declLine of formatClassDeclaration(child, aliases)) {
-        lines.push(`  ${declLine}`);
+        lines.push(`${indent}  ${declLine}`);
       }
     }
-    lines.push("}");
+    lines.push(`${indent}}`);
+  };
+
+  for (const group of packageGroups) {
+    if (nestedPackageIds.has(group.id)) continue; // emitted within its parent
+    emitPackage(group, "");
   }
 
   // Loose nodes — those not contained in any package.
   for (const node of diagram.nodes) {
-    if (childToPackage.has(node.id)) continue;
+    if (nodeInPackage.has(node.id)) continue;
     lines.push(...formatClassDeclaration(node, aliases));
   }
 

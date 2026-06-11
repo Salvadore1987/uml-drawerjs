@@ -53,3 +53,38 @@ export function hasAsyncTag(edge: DiagramEdge): boolean {
 export function getParentGroups(diagram: Diagram, elementId: string): DiagramGroup[] {
   return diagram.groups.filter((group) => group.children.includes(elementId));
 }
+
+/**
+ * Recursively collect every element contained in `groupId`, classified as
+ * node vs nested group. `group.children` holds node ids AND nested group ids;
+ * this walks the whole subtree so a parent move can carry all descendants.
+ * The root group itself is excluded. `seen` guards against malformed cycles.
+ */
+export function collectGroupDescendants(
+  diagram: Diagram,
+  groupId: string,
+): { nodeIds: string[]; groupIds: string[] } {
+  const groupById = new Map(diagram.groups.map((g) => [g.id, g]));
+  const isNode = new Set(diagram.nodes.map((n) => n.id));
+  const nodeIds: string[] = [];
+  const groupIds: string[] = [];
+  // Seed with the root so it can never re-enter as its own descendant via a
+  // malformed cycle (a→b→a).
+  const seen = new Set<string>([groupId]);
+  const walk = (gid: string): void => {
+    const group = groupById.get(gid);
+    if (!group) return;
+    for (const childId of group.children) {
+      if (seen.has(childId)) continue;
+      seen.add(childId);
+      if (groupById.has(childId)) {
+        groupIds.push(childId);
+        walk(childId);
+      } else if (isNode.has(childId)) {
+        nodeIds.push(childId);
+      }
+    }
+  };
+  walk(groupId);
+  return { nodeIds, groupIds };
+}
