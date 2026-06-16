@@ -40,10 +40,11 @@ describe("renderer/nodes — compartment content width", () => {
     expect(geomFor(node("class", "Order")).width).toBe(200);
   });
 
-  it("accounts for member rows and generics, not just the name", () => {
+  it("accounts for member rows, not just the name", () => {
     const wide = node("class", "Repo", {
-      generics: ["TAggregateRoot", "TIdentifier"],
-      operations: [{ id: "o1", name: "findAllByCriteriaAndSortOrder", visibility: "public" }],
+      operations: [
+        { id: "o1", name: "findAllByCriteriaAndSortOrderDescending", visibility: "public" },
+      ],
     });
     expect(compartmentContentWidth(wide)).toBeGreaterThan(200);
   });

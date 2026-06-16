@@ -52,6 +52,12 @@ const LIFELINE_KIND_OPTIONS: ReadonlyArray<{ value: NodeKind; label: string }> =
   { value: "queue", label: "Queue" },
   { value: "lifeline-collections", label: "Collections" },
 ];
+const CLASS_KIND_OPTIONS: ReadonlyArray<{ value: NodeKind; label: string }> = [
+  { value: "class", label: "Class" },
+  { value: "interface", label: "Interface" },
+  { value: "abstract-class", label: "Abstract Class" },
+  { value: "enum", label: "Enum" },
+];
 const SEQUENCE_EDGE_KINDS = new Set<EdgeKind>([
   "sync-call",
   "async-call",
@@ -312,6 +318,21 @@ export function PropsPanel({
           }}
         />
       </label>
+      {CLASS_LIKE_KINDS.has(node.kind) && (
+        <label className="uml-field">
+          <span>Type</span>
+          <select
+            value={node.kind}
+            onChange={(e): void => commitNode({ kind: e.target.value as NodeKind })}
+          >
+            {CLASS_KIND_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {CLASS_LIKE_KINDS.has(node.kind) && <ClassMembersEditor node={node} />}
       {node.kind === "entity" && <EntityMembersEditor node={node} />}
       {SEQUENCE_NODE_KINDS.has(node.kind) && (

@@ -454,19 +454,6 @@ describe("validateConstraints — diagram-type rules", () => {
     expect(codes).toContain(CONSTRAINT_ERROR_CODES.ClassEnumHasAttributes);
   });
 
-  it("rejects generics on an enum", () => {
-    // Arrange
-    const diagram = classDiagramWith({
-      nodes: [{ id: "n1", kind: "enum", label: "Status", generics: ["T"] }],
-    });
-
-    // Act
-    const codes = validateConstraints(diagram).map((e) => e.code);
-
-    // Assert
-    expect(codes).toContain(CONSTRAINT_ERROR_CODES.ClassEnumHasGenerics);
-  });
-
   it("rejects an abstract method on a concrete class", () => {
     // Arrange
     const diagram = classDiagramWith({
@@ -505,6 +492,58 @@ describe("validateConstraints — diagram-type rules", () => {
 
     // Assert
     expect(codes).toContain(CONSTRAINT_ERROR_CODES.ClassInterfaceMethodNotAbstract);
+  });
+
+  it("rejects an interface that declares fields (attributes)", () => {
+    // Arrange — a class converted to interface keeps its private fields, which
+    // is invalid: an interface declares only operations.
+    const diagram = classDiagramWith({
+      nodes: [
+        {
+          id: "n1",
+          kind: "interface",
+          label: "Repository",
+          attributes: [{ id: "a1", name: "cache", visibility: "private" }],
+        },
+      ],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert
+    expect(codes).toContain(CONSTRAINT_ERROR_CODES.ClassInterfaceHasAttributes);
+  });
+
+  it("offers a quick-fix that clears the interface's attributes", () => {
+    // Arrange
+    const diagram = classDiagramWith({
+      nodes: [
+        {
+          id: "n1",
+          kind: "interface",
+          label: "Repository",
+          attributes: [{ id: "a1", name: "cache", visibility: "private" }],
+        },
+      ],
+    });
+    const error = validateConstraints(diagram).find(
+      (e) => e.code === CONSTRAINT_ERROR_CODES.ClassInterfaceHasAttributes,
+    );
+    expect(error).toBeDefined();
+
+    // Act — build and apply the quick-fix command.
+    const command = buildQuickFixCommand(diagram, error!);
+    expect(command).not.toBeNull();
+    const next = command!.apply(diagram);
+
+    // Assert — the interface no longer carries any attributes, and the rule
+    // no longer fires on the fixed diagram.
+    const fixed = next.nodes.find((n) => n.id === "n1");
+    expect(fixed?.attributes ?? []).toHaveLength(0);
+    expect(validateConstraints(next).map((e) => e.code)).not.toContain(
+      CONSTRAINT_ERROR_CODES.ClassInterfaceHasAttributes,
+    );
   });
 
   it("accepts an abstract method on an abstract-class without complaint", () => {
@@ -573,6 +612,43 @@ describe("validateLint — soft warnings", () => {
         { id: "e1", source: "a", target: "c", kind: "association" },
         { id: "e2", source: "b", target: "c", kind: "association" },
       ],
+    });
+
+    // Act
+    const dupes = validateLint(diagram).filter((e) => e.code === LINT_ERROR_CODES.DuplicateLabel);
+
+    // Assert
+    expect(dupes.map((e) => e.nodeId).sort()).toEqual(["a", "b"]);
+  });
+
+  it("does not flag the same label in different packages (different parent groups)", () => {
+    // Arrange — two distinct classes both named DeliveryAddress, one per package.
+    const diagram = classDiagramWith({
+      nodes: [
+        { id: "dto", kind: "class", label: "DeliveryAddress" },
+        { id: "domain", kind: "class", label: "DeliveryAddress" },
+      ],
+      groups: [
+        { id: "g-dto", kind: "package", label: "dto", children: ["dto"] },
+        { id: "g-domain", kind: "package", label: "domain", children: ["domain"] },
+      ],
+    });
+
+    // Act
+    const dupes = validateLint(diagram).filter((e) => e.code === LINT_ERROR_CODES.DuplicateLabel);
+
+    // Assert — same simple name in different packages is legitimate.
+    expect(dupes).toEqual([]);
+  });
+
+  it("still flags the same label within a single package", () => {
+    // Arrange — two same-named classes in the *same* package collide.
+    const diagram = classDiagramWith({
+      nodes: [
+        { id: "a", kind: "class", label: "Order" },
+        { id: "b", kind: "class", label: "Order" },
+      ],
+      groups: [{ id: "g", kind: "package", label: "domain", children: ["a", "b"] }],
     });
 
     // Act

@@ -9,7 +9,7 @@ import { errorAtLine, SYNTAX_ERROR_CODES } from "../errors.js";
 import type { ParseContext } from "../context.js";
 import { freshId, resolveAlias } from "../context.js";
 import type { SourceLine } from "../tokenizer.js";
-import { applyGenerics, handleClassMember } from "./classMembers.js";
+import { handleClassMember } from "./classMembers.js";
 
 /**
  * Class-diagram declarations and relationship arrows. Member bodies
@@ -25,14 +25,14 @@ import { applyGenerics, handleClassMember } from "./classMembers.js";
 // bare `\w+` identifiers (spaces, punctuation) round-trip instead of
 // collapsing to a generated alias.
 const NODE_DECL =
-  /^(?:(abstract)\s+)?(class|interface|enum|abstract)\s+(?:"([^"]+)"\s+as\s+(\w+)|(\w+))(?:\s+as\s+(\w+))?(?:\s*<\s*([^<>]+(?:<[^<>]*>[^<>]*)*)\s*>)?(?:\s*<<\s*([\w-]+)\s*>>)?(\s*\{)?$/u;
+  /^(?:(abstract)\s+)?(class|interface|enum|abstract)\s+(?:"([^"]+)"\s+as\s+(\w+)|(\w+))(?:\s+as\s+(\w+))?(?:\s*<\s*([^<>]+(?:<[^<>]*>[^<>]*)*)\s*>)?(?:\s*<<\s*([^<>]+?)\s*>>)?(\s*\{)?$/u;
 
 /**
  * UML package container. Authors write `package "com.bank" {` or
  * `package com.bank {`; both forms are accepted. Nested packages are
  * supported via the same `openGroupStack` machinery used for C4 boundaries.
  */
-const PACKAGE_DECL = /^package\s+(?:"([^"]+)"|(\S+))(?:\s+as\s+(\w+))?(?:\s*<<[\w-]+>>)?\s*\{$/u;
+const PACKAGE_DECL = /^package\s+(?:"([^"]+)"|(\S+))(?:\s+as\s+(\w+))?(?:\s*<<[^<>]+>>)?\s*\{$/u;
 
 const EDGE_LINE =
   /^(\w+)\s+("(?:[^"\\]|\\.)*"\s+)?(\.\.\|>|--\|>|\.\.>|\*--|o--|<\|--|<\|\.\.|<--|-->|<-\.|\.->|--|\.\.) ?\s*("(?:[^"\\]|\\.)*"\s+)?(\w+)(?:\s*:\s*(.+))?$/u;
@@ -148,7 +148,9 @@ function consumeNodeDecl(ctx: ParseContext, match: RegExpExecArray): void {
   const quotedAlias = match[4];
   const bareIdent = match[5];
   const trailingAlias = match[6];
-  const generics = match[7];
+  // match[7] is the legacy class-level generics capture (e.g. `class Box<T>`).
+  // Generics are no longer modelled — the group stays in NODE_DECL so old
+  // declarations still parse, but the captured value is ignored.
   const stereotype = match[8];
   const openBrace = match[9];
   if (!keyword) return;
@@ -175,7 +177,6 @@ function consumeNodeDecl(ctx: ParseContext, match: RegExpExecArray): void {
   // `"label" as alias` token (keeps the alias stable across round-trips).
   if (quotedAlias !== undefined || trailingAlias !== undefined) node.alias = alias;
   if (stereotype) node.stereotype = stereotype;
-  applyGenerics(node, generics);
   ctx.nodes.push(node);
 
   // Attach to the innermost open package group so `package com.bank { class

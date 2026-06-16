@@ -492,12 +492,12 @@ describe("generatePlantUml — output shape", () => {
     expect(generated).toContain('Rel(p, s, "Uses", "HTTPS")');
   });
 
-  it("round-trips class members, generics, enum literals and per-end multiplicity", () => {
+  it("round-trips class members, enum literals and per-end multiplicity", () => {
     // Arrange — exercises every classic-UML extension landed in PR-1..3.
     const text =
       `@startuml\n` +
-      `interface Repository<T> {\n` +
-      `  {abstract} +findById(id: String): T\n` +
+      `interface Repository {\n` +
+      `  {abstract} +findById(id: String): String\n` +
       `}\n` +
       `abstract class AbstractEntity {\n` +
       `  {abstract} +validate(): void\n` +
@@ -535,7 +535,7 @@ describe("generatePlantUml — output shape", () => {
     expect(second.ast).toEqual(first.ast);
 
     // Spot-check the generator emitted UML modifiers and per-end multiplicity.
-    expect(generated).toContain("interface Repository<T> {");
+    expect(generated).toContain("interface Repository {");
     expect(generated).toContain("abstract class AbstractEntity {");
     expect(generated).toContain("{abstract} +validate(): void");
     expect(generated).toContain("{static} +nextId(): String");

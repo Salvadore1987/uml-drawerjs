@@ -606,7 +606,7 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
     y += layout.lineHeight;
   }
 
-  const labelText = appendGenerics(node.label, node.generics);
+  const labelText = node.label;
   // Italic the class label for interface / abstract-class to match UML
   // convention (abstract class names are typeset in italics). Class kinds
   // also get a bold weight so the type name stands out from the body — the
@@ -1053,11 +1053,6 @@ function renderKindSpot(node: DiagramNode, headerH: number): VNode {
   );
 }
 
-function appendGenerics(label: string, generics: string[] | undefined): string {
-  if (!generics || generics.length === 0) return label;
-  return `${label}<${generics.join(", ")}>`;
-}
-
 /**
  * Header height for a node. Compartment nodes that show a stereotype line
  * (interface / abstract-class / enum always do; a class with an explicit
@@ -1088,14 +1083,14 @@ export function compartmentContentWidth(node: DiagramNode): number {
     widest = Math.max(widest, text.length * charWidth);
   };
 
-  consider(appendGenerics(node.label, node.generics), NAME_CHAR_WIDTH);
+  consider(node.label, NAME_CHAR_WIDTH);
   const stereotype = node.stereotype ?? syntheticStereotype(node.kind);
   if (stereotype) consider(`«${stereotype}»`, STEREOTYPE_CHAR_WIDTH);
 
   // Class-like nodes carry a left-anchored kind spot; reserve enough width that
   // the centered title/stereotype never overlaps it.
   if (isClassLike(node.kind)) {
-    const nameWidth = appendGenerics(node.label, node.generics).length * NAME_CHAR_WIDTH;
+    const nameWidth = node.label.length * NAME_CHAR_WIDTH;
     widest = Math.max(widest, nameWidth + SPOT_RESERVE);
   }
 

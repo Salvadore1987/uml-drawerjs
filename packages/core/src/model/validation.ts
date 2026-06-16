@@ -226,7 +226,6 @@ const nodeSchema = z
     description: z.string().optional(),
     attributes: z.array(attributeSchema).optional(),
     operations: z.array(operationSchema).optional(),
-    generics: z.array(z.string()).optional(),
     enumLiterals: z.array(enumLiteralSchema).optional(),
     activations: z.array(activationIntervalSchema).optional(),
     style: nodeStyleSchema.optional(),

@@ -104,8 +104,9 @@ abstract class AbstractEntity {
     ]);
   });
 
-  it("parses generic parameters on class declarations", () => {
-    // Arrange
+  it("tolerates legacy class-level generics without error (generics are no longer modelled)", () => {
+    // Arrange — class-level generics were removed; old `class Box<T>` source must
+    // still parse (the `<…>` is ignored), so existing diagrams keep opening.
     const source = `@startuml
 interface Repository<T>
 class Cache<K, V extends Comparable<V>>
@@ -114,13 +115,14 @@ class Cache<K, V extends Comparable<V>>
     // Act
     const { ast, errors } = parseClass(source);
 
-    // Assert
+    // Assert — nodes parse with their labels; no generics retained, no errors.
     expect(errors).toEqual([]);
-    expect(ast.nodes.find((n) => n.label === "Repository")?.generics).toEqual(["T"]);
-    expect(ast.nodes.find((n) => n.label === "Cache")?.generics).toEqual([
-      "K",
-      "V extends Comparable<V>",
-    ]);
+    const repository = ast.nodes.find((n) => n.label === "Repository");
+    const cache = ast.nodes.find((n) => n.label === "Cache");
+    expect(repository).toBeDefined();
+    expect(cache).toBeDefined();
+    expect("generics" in (repository ?? {})).toBe(false);
+    expect("generics" in (cache ?? {})).toBe(false);
   });
 
   it("collects enum literals into enumLiterals (never into attributes)", () => {
@@ -171,6 +173,33 @@ class Outside
     expect(childLabels).toEqual(["Account", "Transaction"]);
     // Outside class is at top level.
     expect(ast.nodes.find((n) => n.label === "Outside")).toBeDefined();
+  });
+
+  it("parses annotation-style stereotypes containing '@' (round-trip with the generator)", () => {
+    // Arrange — Spring-style annotations used as stereotypes. The generator
+    // emits these verbatim; the parser must read them back or the node is
+    // silently dropped on reload (regression: `<<@...>>` previously failed
+    // the NODE_DECL match and vanished).
+    const source = `@startuml
+package "svc" <<@Module>> {
+  class OrderController <<@RestController>> {
+    +create(): Object
+  }
+  interface OrderRepository <<@Repository>>
+}
+@enduml`;
+
+    // Act
+    const { ast, errors } = parseClass(source);
+
+    // Assert — both nodes survive with their '@' stereotypes intact.
+    expect(errors).toEqual([]);
+    const controller = ast.nodes.find((n) => n.label === "OrderController");
+    const repo = ast.nodes.find((n) => n.label === "OrderRepository");
+    expect(controller?.stereotype).toBe("@RestController");
+    expect(repo?.stereotype).toBe("@Repository");
+    const pkg = ast.groups.find((g) => g.kind === "package");
+    expect(pkg?.children).toHaveLength(2);
   });
 
   it("falls through unparseable member lines to opaque without losing the AST", () => {

@@ -377,12 +377,6 @@ export interface DiagramNode {
   attributes?: Attribute[];
   operations?: Operation[];
   /**
-   * Class-only: generic type parameters in declaration order. Each entry is
-   * the raw token (e.g. `"T"`, `"K extends Comparable<K>"`) — the renderer
-   * joins them with commas inside `<…>`. Empty array is treated as absent.
-   */
-  generics?: string[];
-  /**
    * Class-only (kind === "enum"): the literal values in declaration order.
    * Modelled as a separate field rather than reusing `attributes` so the
    * validator can hard-error on `enum.attributes` (see ADR-0007).

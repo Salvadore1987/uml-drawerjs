@@ -342,6 +342,164 @@ describe("Component composition", () => {
     expect(restored.source).toBe(origSource);
     expect(restored.target).toBe(origTarget);
   });
+
+  it("PropsPanel Type select changes a class node's kind in place", async () => {
+    // Arrange — a class diagram with one class node; select it.
+    const initial = `@startuml\nclass Alpha\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes).toHaveLength(1);
+    });
+    const node = captured!.getState().nodes[0]!;
+    expect(node.kind).toBe("class");
+    act(() => {
+      captured!.selection.set([node.id]);
+    });
+
+    // The Type dropdown is labelled "Type" and offers the four class kinds.
+    const select = (await screen.findByRole("combobox", { name: "Type" })) as HTMLSelectElement;
+    expect(select.value).toBe("class");
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toEqual(["class", "interface", "abstract-class", "enum"]);
+
+    // Act — switch to interface.
+    act(() => {
+      fireEvent.change(select, { target: { value: "interface" } });
+    });
+
+    // Assert — same node id, kind changed, source emits the interface keyword.
+    const after = captured!.getState().nodes[0]!;
+    expect(after.id).toBe(node.id);
+    expect(after.kind).toBe("interface");
+    expect(captured!.exportText()).toContain("interface Alpha");
+  });
+
+  it("PropsPanel hides the Type select for a non-class node", async () => {
+    // Arrange — a C4 context diagram; its System node is not class-like.
+    const initial = `@startuml\nSystem(s, "System")\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="c4-context" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes).toHaveLength(1);
+    });
+    act(() => {
+      captured!.selection.set([captured!.getState().nodes[0]!.id]);
+    });
+
+    // Assert — no Type dropdown for a non-class-like kind.
+    await screen.findByRole("form");
+    expect(screen.queryByRole("combobox", { name: "Type" })).toBeNull();
+  });
+
+  it("parameterizes a generic member type via per-argument fields", async () => {
+    // Arrange — a class with one attribute typed `String`.
+    const initial = `@startuml\nclass Box {\n  -items: String\n}\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes[0]?.attributes ?? []).toHaveLength(1);
+    });
+    act(() => {
+      captured!.selection.set([captured!.getState().nodes[0]!.id]);
+    });
+
+    // Act — switch the attribute type to the Map generic, then fill key/value.
+    const baseSelect = (await screen.findByRole("combobox", {
+      name: "Attribute type",
+    })) as HTMLSelectElement;
+    act(() => {
+      fireEvent.change(baseSelect, { target: { value: "Map" } });
+    });
+    const keySelect = (await screen.findByRole("combobox", {
+      name: "Attribute type key",
+    })) as HTMLSelectElement;
+    act(() => {
+      fireEvent.change(keySelect, { target: { value: "String" } });
+    });
+    const valueSelect = (await screen.findByRole("combobox", {
+      name: "Attribute type value",
+    })) as HTMLSelectElement;
+    act(() => {
+      fireEvent.change(valueSelect, { target: { value: "Integer" } });
+    });
+
+    // Assert — the composed generic type is stored on the attribute.
+    expect(captured!.getState().nodes[0]!.attributes?.[0]?.type).toBe("Map<String, Integer>");
+    expect(captured!.exportText()).toContain("items: Map<String, Integer>");
+  });
+
+  it("decomposes an existing generic member type into base + argument fields", async () => {
+    // Arrange — an attribute already typed `List<String>`.
+    const initial = `@startuml\nclass Box {\n  -items: List<String>\n}\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes[0]?.attributes?.[0]?.type).toBe("List<String>");
+    });
+    act(() => {
+      captured!.selection.set([captured!.getState().nodes[0]!.id]);
+    });
+
+    // Assert — base select shows List, element select shows String.
+    const baseSelect = (await screen.findByRole("combobox", {
+      name: "Attribute type",
+    })) as HTMLSelectElement;
+    expect(baseSelect.value).toBe("List");
+    const elementSelect = (await screen.findByRole("combobox", {
+      name: "Attribute type element",
+    })) as HTMLSelectElement;
+    expect(elementSelect.value).toBe("String");
+  });
+
+  it("no longer renders the class-level Generics input", async () => {
+    const initial = `@startuml\nclass Box {\n  -items: String\n}\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes).toHaveLength(1);
+    });
+    act(() => {
+      captured!.selection.set([captured!.getState().nodes[0]!.id]);
+    });
+    await screen.findByRole("form");
+    expect(screen.queryByText(/Generics/i)).toBeNull();
+  });
 });
 
 describe("Hook misuse", () => {

@@ -1,6 +1,5 @@
 import type {
   Attribute,
-  DiagramNode,
   EnumLiteral,
   Operation,
   OperationParameter,
@@ -269,28 +268,4 @@ function parseParameters(list: string): OperationParameter[] {
     params.push(param);
   }
   return params;
-}
-
-/** Apply parsed generic-list source to a node (called from `class.ts` declaration handler). */
-export function applyGenerics(node: DiagramNode, raw: string | undefined): void {
-  if (!raw) return;
-  const text = raw.trim();
-  if (text === "") return;
-  // Split on commas at top level, like parameter parsing.
-  const parts: string[] = [];
-  let depth = 0;
-  let buffer = "";
-  for (const ch of text) {
-    if (ch === "<") depth++;
-    else if (ch === ">") depth = Math.max(0, depth - 1);
-    if (ch === "," && depth === 0) {
-      parts.push(buffer);
-      buffer = "";
-      continue;
-    }
-    buffer += ch;
-  }
-  if (buffer.trim() !== "") parts.push(buffer);
-  const generics = parts.map((p) => p.trim()).filter((p) => p !== "");
-  if (generics.length > 0) node.generics = generics;
 }

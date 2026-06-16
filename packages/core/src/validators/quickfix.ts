@@ -5,7 +5,7 @@ import { updateGroupCommand } from "../commands/group.js";
 import { updateNodeCommand } from "../commands/updateNode.js";
 import { findEdge, findGroup, findNode } from "../model/query.js";
 import type { Diagram, DiagramError } from "../model/types.js";
-import { LINT_ERROR_CODES, SEMANTIC_ERROR_CODES } from "./codes.js";
+import { CONSTRAINT_ERROR_CODES, LINT_ERROR_CODES, SEMANTIC_ERROR_CODES } from "./codes.js";
 
 /**
  * Quick-fix registry. Each entry maps an error code to a builder that
@@ -87,6 +87,15 @@ const REGISTRY: Record<string, QuickFixSuggestion> = {
       const nodeId = error.nodeId;
       if (!nodeId || !findNode(diagram, nodeId)) return null;
       return removeNodeCommand(nodeId, diagram);
+    },
+  },
+  [CONSTRAINT_ERROR_CODES.ClassInterfaceHasAttributes]: {
+    code: CONSTRAINT_ERROR_CODES.ClassInterfaceHasAttributes,
+    label: "Remove fields from interface",
+    build(diagram, error) {
+      const nodeId = error.nodeId;
+      if (!nodeId || !findNode(diagram, nodeId)) return null;
+      return updateNodeCommand(nodeId, { attributes: [] }, diagram);
     },
   },
 };

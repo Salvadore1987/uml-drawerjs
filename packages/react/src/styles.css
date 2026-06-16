@@ -353,7 +353,6 @@
 }
 
 .uml-class-members__name,
-.uml-class-members__type,
 .uml-class-members__params {
   font: inherit;
   font-size: var(--uml-font-size-sm);
@@ -365,8 +364,25 @@
   min-width: 0;
 }
 
-select.uml-class-members__type {
-  flex: 0 1 140px;
+/* Type picker: a base <select> plus one <select> per generic type argument. */
+.uml-class-members__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.uml-class-members__type > select {
+  font: inherit;
+  font-size: var(--uml-font-size-sm);
+  background-color: var(--uml-bg);
+  color: var(--uml-text);
+  border: 1px solid var(--uml-border);
+  border-radius: var(--uml-radius-sm);
+  padding: 4px 6px;
+  min-width: 0;
+  flex: 1 1 60px;
 }
 
 .uml-class-members__params-list {
@@ -403,10 +419,6 @@ select.uml-class-members__type {
 }
 
 .uml-class-members__name {
-  flex: 1 1 80px;
-}
-
-.uml-class-members__type {
   flex: 1 1 80px;
 }
 

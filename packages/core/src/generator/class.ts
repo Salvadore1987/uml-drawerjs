@@ -96,15 +96,14 @@ function formatClassHead(node: DiagramNode, aliases: Map<string, string>): strin
   // alias index fell back to a generated token), emit the `"label" as alias`
   // form so the real label round-trips instead of showing the alias/GUID.
   const name = formatNameToken(node, aliases);
-  const generics = formatGenerics(node.generics);
   const stereotype = node.stereotype ? ` <<${node.stereotype}>>` : "";
   switch (node.kind) {
     case "class":
-      return `class ${name}${generics}${stereotype}`;
+      return `class ${name}${stereotype}`;
     case "interface":
-      return `interface ${name}${generics}${stereotype}`;
+      return `interface ${name}${stereotype}`;
     case "abstract-class":
-      return `abstract class ${name}${generics}${stereotype}`;
+      return `abstract class ${name}${stereotype}`;
     case "enum":
       return `enum ${name}${stereotype}`;
     default:
@@ -123,11 +122,6 @@ function formatNameToken(node: DiagramNode, aliases: Map<string, string>): strin
   const alias = nodeAlias(aliases, node);
   if (alias === node.label) return alias;
   return `"${escapeStringLiteral(node.label)}" as ${alias}`;
-}
-
-function formatGenerics(generics: string[] | undefined): string {
-  if (!generics || generics.length === 0) return "";
-  return `<${generics.join(", ")}>`;
 }
 
 function formatMembers(node: DiagramNode): string[] {

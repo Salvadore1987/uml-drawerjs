@@ -41,6 +41,7 @@ export const CONSTRAINT_ERROR_CODES = {
   ClassEnumHasGenerics: "CONSTRAINT_CLASS_ENUM_HAS_GENERICS",
   ClassAbstractOutsideAbstractClass: "CONSTRAINT_CLASS_ABSTRACT_OUTSIDE_ABSTRACT",
   ClassInterfaceMethodNotAbstract: "CONSTRAINT_CLASS_INTERFACE_METHOD_NOT_ABSTRACT",
+  ClassInterfaceHasAttributes: "CONSTRAINT_CLASS_INTERFACE_HAS_ATTRIBUTES",
   // ER diagram — entities are attributes-only.
   ErEntityHasOperations: "CONSTRAINT_ER_ENTITY_HAS_OPERATIONS",
   ErEntityHasEnumLiterals: "CONSTRAINT_ER_ENTITY_HAS_ENUM_LITERALS",
