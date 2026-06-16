@@ -1,5 +1,20 @@
 # @uml-drawer/react
 
+## 0.7.0
+
+### Minor Changes
+
+- feat(props): "To front" / "To back" buttons for nodes and groups
+
+  The Properties panel now offers **To front** / **To back** buttons for a selected node or
+  group (package/boundary), dispatching the new core reorder commands so authors can control
+  which overlapping element paints on top.
+
+### Patch Changes
+
+- Updated dependencies
+  - @uml-drawer/core@0.5.0
+
 ## 0.6.0
 
 ### Minor Changes

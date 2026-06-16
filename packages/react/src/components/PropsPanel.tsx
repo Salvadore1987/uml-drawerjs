@@ -2,6 +2,8 @@ import {
   removeEdgeCommand,
   removeGroupCommand,
   removeNodeCommand,
+  reorderGroupCommand,
+  reorderNodeCommand,
   updateEdgeCommand,
   updateGroupCommand,
   updateNodeCommand,
@@ -350,6 +352,32 @@ export function PropsPanel({
           </select>
         </label>
       )}
+      <div className="uml-props-panel__zorder">
+        <button
+          type="button"
+          className="uml-button"
+          title="Bring to front (paint on top of its siblings)"
+          onClick={(): void => {
+            if (!editor) return;
+            const command = reorderNodeCommand(node.id, "front", editor.getState());
+            if (command) editor.dispatch(command);
+          }}
+        >
+          To front
+        </button>
+        <button
+          type="button"
+          className="uml-button"
+          title="Send to back (paint behind its siblings)"
+          onClick={(): void => {
+            if (!editor) return;
+            const command = reorderNodeCommand(node.id, "back", editor.getState());
+            if (command) editor.dispatch(command);
+          }}
+        >
+          To back
+        </button>
+      </div>
       <button
         type="button"
         className="uml-button uml-button--danger"
@@ -585,6 +613,32 @@ export function PropsPanel({
           }}
         />
       </label>
+      <div className="uml-props-panel__zorder">
+        <button
+          type="button"
+          className="uml-button"
+          title="Bring to front (paint on top of its siblings)"
+          onClick={(): void => {
+            if (!editor) return;
+            const command = reorderGroupCommand(group.id, "front", editor.getState());
+            if (command) editor.dispatch(command);
+          }}
+        >
+          To front
+        </button>
+        <button
+          type="button"
+          className="uml-button"
+          title="Send to back (paint behind its siblings)"
+          onClick={(): void => {
+            if (!editor) return;
+            const command = reorderGroupCommand(group.id, "back", editor.getState());
+            if (command) editor.dispatch(command);
+          }}
+        >
+          To back
+        </button>
+      </div>
       <button
         type="button"
         className="uml-button uml-button--danger"

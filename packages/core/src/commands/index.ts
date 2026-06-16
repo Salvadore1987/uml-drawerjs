@@ -86,6 +86,15 @@ export type {
   RemoveGroupPayload,
 } from "./group.js";
 
+export { reorderNodeCommand, reorderGroupCommand } from "./reorder.js";
+export type {
+  ReorderDirection,
+  ReorderNodeCommand,
+  ReorderNodePayload,
+  ReorderGroupCommand,
+  ReorderGroupPayload,
+} from "./reorder.js";
+
 export { applyLayoutCommand } from "./applyLayout.js";
 export type { ApplyLayoutCommand, ApplyLayoutPayload } from "./applyLayout.js";
 

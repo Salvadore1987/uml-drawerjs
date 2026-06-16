@@ -1,6 +1,6 @@
 {
   "name": "@uml-drawer/codemirror-plantuml",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": false,
   "description": "CodeMirror 6 language extension for the PlantUML subset supported by UML Drawer JS — syntax highlighting, diagnostics with quick-fix lens, context-aware autocomplete, and snippets.",
   "license": "MIT",

@@ -480,6 +480,39 @@ describe("Component composition", () => {
     expect(elementSelect.value).toBe("String");
   });
 
+  it("PropsPanel 'To front' brings the selected node to the end of the paint order", async () => {
+    // Arrange — two top-level classes; select the first.
+    const initial = `@startuml\nclass Alpha\nclass Beta\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes).toHaveLength(2);
+    });
+    const first = captured!.getState().nodes[0]!;
+    expect(first.label).toBe("Alpha");
+    act(() => {
+      captured!.selection.set([first.id]);
+    });
+
+    // Act — click "To front".
+    const button = await screen.findByRole("button", { name: "To front" });
+    act(() => {
+      fireEvent.click(button);
+    });
+
+    // Assert — Alpha is now last (painted on top) and the source reflects it.
+    expect(captured!.getState().nodes.map((n) => n.label)).toEqual(["Beta", "Alpha"]);
+    const text = captured!.exportText();
+    expect(text.indexOf("class Beta")).toBeLessThan(text.indexOf("class Alpha"));
+  });
+
   it("no longer renders the class-level Generics input", async () => {
     const initial = `@startuml\nclass Box {\n  -items: String\n}\n@enduml\n`;
     let captured: Probe | null = null;

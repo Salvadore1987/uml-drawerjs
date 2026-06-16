@@ -264,6 +264,16 @@
   color: var(--uml-danger);
 }
 
+.uml-props-panel__zorder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.uml-props-panel__zorder > .uml-button {
+  flex: 1 1 auto;
+}
+
 .uml-props-panel__empty,
 .uml-props-panel__multi {
   color: var(--uml-text-muted);

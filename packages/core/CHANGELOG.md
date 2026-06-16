@@ -1,5 +1,17 @@
 # @uml-drawer/core
 
+## 0.5.0
+
+### Minor Changes
+
+- feat(commands): add reorderNodeCommand / reorderGroupCommand (bring to front / send to back)
+
+  New commands move a node or group to the front (end) or back (start) of the paint order by
+  reordering `diagram.nodes` / `diagram.groups`. A packaged node or nested group is also
+  reordered within its parent's `children`, so the z-order change round-trips through the
+  generated PlantUML (package members emit in `children` order). Undoable via the captured
+  before/after arrays.
+
 ## 0.4.1
 
 ### Patch Changes
