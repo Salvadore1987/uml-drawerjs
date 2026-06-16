@@ -1,5 +1,11 @@
 # @uml-drawer/react
 
+## 0.3.5
+
+### Patch Changes
+
+- Offer generic collection types (`List<E>`, `Map<K,V>`, `Set<E>`, `Collection<E>`) in the class-diagram member type selects (attributes, return types, parameters).
+
 ## 0.2.0
 
 ### Minor Changes

@@ -44,6 +44,13 @@ const STEREOTYPE_CHAR_WIDTH = 6.5; // font-size-sm (12px) sans stereotype line
 const COMPARTMENT_PAD_X = 24; // total horizontal padding (left + right) inside the frame
 const STEREOTYPE_ROW_HEIGHT = 16; // extra header height when a stereotype row is shown
 
+// Kind "spot" — the PlantUML/IntelliJ circled letter (C / I / A / E) drawn in
+// the top-left of a class-like node's header so the element kind is obvious at
+// a glance, independent of the (centered) stereotype/title text.
+const SPOT_R = 9; // circle radius
+const SPOT_CX = 16; // circle center x from the frame's left edge
+const SPOT_RESERVE = 52; // width reserved so a centered title clears the left spot
+
 const C4_KINDS = new Set<NodeKind>([
   "person",
   "person-external",
@@ -146,6 +153,7 @@ export function renderNode(args: RenderNodeArgs): VNode {
   }
   children.push(...renderHeaderRows(node, geometry));
   if (isClassLike(node.kind)) {
+    children.push(renderKindSpot(node, headerH));
     const literalCount = node.enumLiterals?.length ?? 0;
     const attrCount = node.attributes?.length ?? 0;
     const opCount = node.operations?.length ?? 0;
@@ -987,6 +995,64 @@ function syntheticStereotype(kind: NodeKind): string | undefined {
   return undefined;
 }
 
+/** Single-letter spot glyph per class-like kind (PlantUML/IntelliJ convention). */
+function kindSpotChar(kind: NodeKind): string | undefined {
+  if (kind === "class") return "C";
+  if (kind === "interface") return "I";
+  if (kind === "abstract-class") return "A";
+  if (kind === "enum") return "E";
+  return undefined;
+}
+
+/** Spot circle fill per kind — reuses existing semantic theme tokens. */
+function kindSpotColor(kind: NodeKind): string {
+  if (kind === "interface") return "var(--uml-info)";
+  if (kind === "abstract-class") return "var(--uml-warning)";
+  if (kind === "enum") return "var(--uml-accent)";
+  return "var(--uml-success)"; // class
+}
+
+/**
+ * The kind spot: a small colored circle with a centered letter, anchored to the
+ * top-left of the header band and vertically centered within it. The letter is
+ * filled with `--uml-node-bg` so it "punches out" to the page background colour,
+ * staying legible against the saturated circle in both light and dark themes.
+ */
+function renderKindSpot(node: DiagramNode, headerH: number): VNode {
+  const letter = kindSpotChar(node.kind) ?? "";
+  const cy = headerH / 2;
+  return v(
+    "g",
+    { "data-uml-spot": node.kind },
+    [
+      v("circle", {
+        cx: SPOT_CX,
+        cy,
+        r: SPOT_R,
+        fill: kindSpotColor(node.kind),
+        stroke: "var(--uml-node-border)",
+        "stroke-width": "1",
+      }),
+      v(
+        "text",
+        {
+          x: SPOT_CX,
+          y: cy,
+          "text-anchor": "middle",
+          "dominant-baseline": "central",
+          "font-family": "var(--uml-font-sans)",
+          "font-size": "var(--uml-font-size-sm)",
+          "font-weight": "700",
+          fill: "var(--uml-node-bg)",
+        },
+        undefined,
+        { text: letter },
+      ),
+    ],
+    { classes: ["uml-node-spot", `uml-node-spot--${node.kind}`] },
+  );
+}
+
 function appendGenerics(label: string, generics: string[] | undefined): string {
   if (!generics || generics.length === 0) return label;
   return `${label}<${generics.join(", ")}>`;
@@ -1025,6 +1091,13 @@ export function compartmentContentWidth(node: DiagramNode): number {
   consider(appendGenerics(node.label, node.generics), NAME_CHAR_WIDTH);
   const stereotype = node.stereotype ?? syntheticStereotype(node.kind);
   if (stereotype) consider(`«${stereotype}»`, STEREOTYPE_CHAR_WIDTH);
+
+  // Class-like nodes carry a left-anchored kind spot; reserve enough width that
+  // the centered title/stereotype never overlaps it.
+  if (isClassLike(node.kind)) {
+    const nameWidth = appendGenerics(node.label, node.generics).length * NAME_CHAR_WIDTH;
+    widest = Math.max(widest, nameWidth + SPOT_RESERVE);
+  }
 
   if (node.kind === "enum") {
     for (const literal of node.enumLiterals ?? []) consider(literal.name, ROW_CHAR_WIDTH);

@@ -58,6 +58,14 @@ const PRIMITIVE_TYPES = [
   "Object",
 ] as const;
 
+/**
+ * Generic collection types offered as ready-made templates in the type
+ * selects. The placeholder parameters (`E`, `K`, `V`) follow the JDK
+ * conventions; authors refine them to concrete element types in the source
+ * editor when needed.
+ */
+const COLLECTION_TYPES = ["List<E>", "Map<K,V>", "Set<E>", "Collection<E>"] as const;
+
 const CLASS_LIKE_KINDS = new Set<NodeKind>(["class", "interface", "abstract-class", "enum"]);
 
 /**
@@ -71,7 +79,7 @@ function useTypeOptions(): string[] {
     const labels = ast.nodes
       .filter((n) => CLASS_LIKE_KINDS.has(n.kind) && n.label.trim() !== "")
       .map((n) => n.label.trim());
-    const merged = new Set<string>([...PRIMITIVE_TYPES, ...labels]);
+    const merged = new Set<string>([...PRIMITIVE_TYPES, ...COLLECTION_TYPES, ...labels]);
     return [...merged].sort((a, b) => a.localeCompare(b));
   }, [ast]);
 }
