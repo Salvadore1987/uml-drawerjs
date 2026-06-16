@@ -1,5 +1,16 @@
 # @uml-drawer/react
 
+## 0.8.0
+
+### Minor Changes
+
+- feat(palette): drop new elements at the visible viewport center
+
+  Adding a node or group from the palette now places it at the center of the currently
+  visible canvas (derived from the editor's pan/zoom) instead of always at the diagram origin,
+  so new elements no longer land off-screen after the user has panned or zoomed. Repeated node
+  adds fan out with a small cascade. Falls back to the origin when no pan/zoom is available.
+
 ## 0.7.0
 
 ### Minor Changes

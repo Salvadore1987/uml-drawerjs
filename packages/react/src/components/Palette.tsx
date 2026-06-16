@@ -4,6 +4,7 @@ import {
   addFragmentCommand,
   addGroupCommand,
   addNodeCommand,
+  moveNodeCommand,
 } from "@uml-drawer/core/commands";
 import type {
   CombinedFragment,
@@ -16,6 +17,14 @@ import type {
 import { uuidv7 } from "@uml-drawer/core/model";
 import { useContext, useMemo, type HTMLAttributes } from "react";
 import { UmlEditorContext } from "../internal/context.js";
+import { viewportCenterInDiagram } from "../internal/viewport.js";
+
+/** Default node size used to center a freshly-added node (RENDERER_DEFAULTS). */
+const NEW_NODE_HALF_WIDTH = 100;
+const NEW_NODE_HALF_HEIGHT = 40;
+/** New boundary/package default rect size (mirrors the addGroup default). */
+const NEW_GROUP_WIDTH = 320;
+const NEW_GROUP_HEIGHT = 200;
 
 export interface PaletteItem {
   /** AST kind to instantiate when the user activates the item. */
@@ -238,9 +247,34 @@ export function Palette({
 
   const composedClassName = ["uml-palette", className].filter(Boolean).join(" ");
 
+  /**
+   * Diagram-space center of the currently visible canvas, so a newly-added
+   * element lands in view instead of at the origin (off-screen once the user
+   * has panned / zoomed). Returns `null` when it can't be computed (no
+   * pan/zoom, SSR, or a not-yet-laid-out host) — callers then fall back to the
+   * previous origin placement.
+   */
+  const newElementCenter = (): { x: number; y: number } | null => {
+    if (typeof document === "undefined" || !editor?.panZoom) return null;
+    const host = document.querySelector(".uml-canvas-host") as HTMLElement | null;
+    if (!host || host.clientWidth === 0) return null;
+    return viewportCenterInDiagram(host.clientWidth, host.clientHeight, editor.panZoom.getState());
+  };
+
   const handleAdd = (item: PaletteItem): void => {
     if (!editor) return;
     if (item.target === "group") {
+      // Center the default rect on the visible viewport so it isn't created
+      // off-screen; fall back to the origin when the center is unavailable.
+      const center = newElementCenter();
+      const rect = center
+        ? {
+            x: center.x - NEW_GROUP_WIDTH / 2,
+            y: center.y - NEW_GROUP_HEIGHT / 2,
+            width: NEW_GROUP_WIDTH,
+            height: NEW_GROUP_HEIGHT,
+          }
+        : { x: 0, y: 0, width: NEW_GROUP_WIDTH, height: NEW_GROUP_HEIGHT };
       editor.dispatch(
         addGroupCommand(
           {
@@ -249,9 +283,7 @@ export function Palette({
             label: `New ${item.label}`,
             children: [],
           },
-          // Default rect so the freshly-added boundary appears at a
-          // known place; the user can drag/resize it from there.
-          { x: 0, y: 0, width: 320, height: 200 },
+          rect,
         ),
       );
       return;
@@ -378,13 +410,32 @@ export function Palette({
       editor.selection.set([fragment.id]);
       return;
     }
+    const nodeId = uuidv7();
     editor.dispatch(
       addNodeCommand({
-        id: uuidv7(),
+        id: nodeId,
         kind: item.kind as NodeKind,
         label: `New ${item.label}`,
       }),
     );
+    // Drop the node at the visible viewport center (centered by its default
+    // size) instead of the origin. A small cascade keeps repeated adds from
+    // stacking exactly. Skipped when the center can't be resolved.
+    const center = newElementCenter();
+    if (center) {
+      const state = editor.getState();
+      const cascade = ((state.nodes.length - 1) % 6) * 24;
+      editor.dispatch(
+        moveNodeCommand(
+          nodeId,
+          {
+            x: center.x - NEW_NODE_HALF_WIDTH + cascade,
+            y: center.y - NEW_NODE_HALF_HEIGHT + cascade,
+          },
+          state,
+        ),
+      );
+    }
   };
 
   return (
