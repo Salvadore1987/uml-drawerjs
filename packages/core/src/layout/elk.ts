@@ -1,4 +1,5 @@
 import type { Diagram, DiagramEdge, DiagramNode } from "../model/types.js";
+import { compartmentContentWidth } from "../renderer/nodes.js";
 import type {
   ElkConstructorLike,
   ElkEdgeLike,
@@ -87,9 +88,13 @@ function buildElkGraph(diagram: Diagram, ctx: ElkBuildContext): ElkNodeLike {
 
   const nodeById = new Map(diagram.nodes.map((n) => [n.id, n] as const));
 
+  // Compartment nodes (class / interface / enum / entity) reserve the width
+  // their widest text line needs, so ELK spaces neighbours around the real
+  // footprint instead of the uniform default — no overlap once the renderer
+  // grows the box to the same width.
   const buildNode = (node: DiagramNode): ElkNodeLike => ({
     id: node.id,
-    width: ctx.nodeWidth,
+    width: Math.max(ctx.nodeWidth, compartmentContentWidth(node)),
     height: ctx.nodeHeight,
   });
 

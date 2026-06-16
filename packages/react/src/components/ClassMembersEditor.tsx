@@ -58,28 +58,154 @@ const PRIMITIVE_TYPES = [
   "Object",
 ] as const;
 
+/**
+ * Generic container types whose type arguments are filled via dedicated
+ * fields in `TypeField`. `params` lists the argument slots; each name doubles
+ * as the empty-option placeholder ("element", "key", "value").
+ */
+interface GenericBase {
+  readonly base: string;
+  readonly params: readonly string[];
+}
+const GENERIC_BASES: readonly GenericBase[] = [
+  { base: "List", params: ["element"] },
+  { base: "Set", params: ["element"] },
+  { base: "Collection", params: ["element"] },
+  { base: "Map", params: ["key", "value"] },
+];
+const GENERIC_BASE_NAMES = GENERIC_BASES.map((g) => g.base);
+function genericDef(base: string): GenericBase | undefined {
+  return GENERIC_BASES.find((g) => g.base === base);
+}
+
 const CLASS_LIKE_KINDS = new Set<NodeKind>(["class", "interface", "abstract-class", "enum"]);
 
 /**
- * Live list of types eligible for attribute / return-type / parameter
- * selects: built-in primitives plus every class-like node label currently
- * in the diagram. Sorted, deduplicated, recomputed on AST change.
+ * Type option catalog for the member type selects:
+ *  - `baseOptions`: primitives + generic container bases + class-like node
+ *    labels — shown in the top-level type select.
+ *  - `argOptions`: primitives + class-like labels — shown in the per-argument
+ *    selects of a generic type (no nested generics in this version).
+ * Sorted, deduplicated, recomputed on AST change.
  */
-function useTypeOptions(): string[] {
+function useTypeCatalog(): { baseOptions: string[]; argOptions: string[] } {
   const { ast } = useEditorState();
   return useMemo(() => {
     const labels = ast.nodes
       .filter((n) => CLASS_LIKE_KINDS.has(n.kind) && n.label.trim() !== "")
       .map((n) => n.label.trim());
-    const merged = new Set<string>([...PRIMITIVE_TYPES, ...labels]);
-    return [...merged].sort((a, b) => a.localeCompare(b));
+    const argOptions = [...new Set<string>([...PRIMITIVE_TYPES, ...labels])].sort((a, b) =>
+      a.localeCompare(b),
+    );
+    const baseOptions = [
+      ...new Set<string>([...PRIMITIVE_TYPES, ...GENERIC_BASE_NAMES, ...labels]),
+    ].sort((a, b) => a.localeCompare(b));
+    return { baseOptions, argOptions };
   }, [ast]);
+}
+
+/** Split a generic arg list on top-level commas (depth-aware for nested `<…>`). */
+function splitTypeArgs(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let buffer = "";
+  for (const ch of text) {
+    if (ch === "<") depth++;
+    else if (ch === ">") depth = Math.max(0, depth - 1);
+    if (ch === "," && depth === 0) {
+      parts.push(buffer);
+      buffer = "";
+      continue;
+    }
+    buffer += ch;
+  }
+  parts.push(buffer);
+  return parts.map((p) => p.trim());
+}
+
+/** Decompose `Map<String, Integer>` → `{ base, args }` for a known generic base. */
+function parseGenericType(type: string): { base: string; args: string[] } | null {
+  const trimmed = type.trim();
+  const match = /^([A-Za-z_]\w*)\s*<(.*)>\s*$/u.exec(trimmed);
+  if (match && genericDef(match[1] ?? "")) {
+    const inner = (match[2] ?? "").trim();
+    return { base: match[1]!, args: inner === "" ? [] : splitTypeArgs(inner) };
+  }
+  if (genericDef(trimmed)) return { base: trimmed, args: [] };
+  return null;
+}
+
+/** Compose a type string from a base and its args (trailing empty slots dropped). */
+function composeGenericType(base: string, args: readonly string[]): string {
+  const slots = [...args];
+  while (slots.length > 0 && (slots[slots.length - 1] ?? "").trim() === "") slots.pop();
+  if (slots.length === 0) return base;
+  return `${base}<${slots.map((a) => a.trim()).join(", ")}>`;
+}
+
+/**
+ * Type selector for attribute / return / parameter types. A primitive or
+ * class label is stored verbatim; choosing a generic container (List/Map/…)
+ * reveals one select per type argument and stores the composed string
+ * (e.g. `Map<String, Integer>`). The `—` option clears the type.
+ */
+interface TypeFieldProps {
+  readonly label: string;
+  readonly value: string | undefined;
+  readonly onChange: (next: string | undefined) => void;
+}
+function TypeField({ label, value, onChange }: TypeFieldProps): JSX.Element {
+  const { baseOptions, argOptions } = useTypeCatalog();
+  const parsed = parseGenericType(value ?? "");
+  const base = parsed ? parsed.base : (value ?? "");
+  const def = genericDef(base);
+  const args = parsed?.args ?? [];
+  return (
+    <span className="uml-class-members__type">
+      <select
+        aria-label={label}
+        value={base}
+        onChange={(e): void => {
+          const next = e.target.value;
+          if (next === "") {
+            onChange(undefined);
+            return;
+          }
+          onChange(genericDef(next) ? composeGenericType(next, []) : next);
+        }}
+      >
+        <option value="">—</option>
+        {baseOptions.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
+      {def?.params.map((paramName, i) => (
+        <select
+          key={paramName}
+          aria-label={`${label} ${paramName}`}
+          value={args[i] ?? ""}
+          onChange={(e): void => {
+            const nextArgs = def.params.map((_, j) => (j === i ? e.target.value : (args[j] ?? "")));
+            onChange(composeGenericType(base, nextArgs));
+          }}
+        >
+          <option value="">{paramName}</option>
+          {argOptions.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      ))}
+    </span>
+  );
 }
 
 export function ClassMembersEditor({ node }: ClassMembersEditorProps): JSX.Element {
   const ctx = useContext(UmlEditorContext);
   const editor = ctx?.editor ?? null;
-  const types = useTypeOptions();
 
   const isClass = node.kind === "class" || node.kind === "abstract-class";
   const isInterface = node.kind === "interface";
@@ -99,17 +225,6 @@ export function ClassMembersEditor({ node }: ClassMembersEditorProps): JSX.Eleme
 
   return (
     <div className="uml-class-members">
-      {!isEnum && (
-        <ClassGenericsEditor
-          generics={node.generics ?? []}
-          onChange={(next): void =>
-            setNode((prev) =>
-              next.length > 0 ? { ...prev, generics: next } : omit(prev, "generics"),
-            )
-          }
-        />
-      )}
-
       {isEnum ? (
         <EnumLiteralsSection
           literals={node.enumLiterals ?? []}
@@ -123,7 +238,6 @@ export function ClassMembersEditor({ node }: ClassMembersEditorProps): JSX.Eleme
         <>
           <AttributesSection
             attributes={node.attributes ?? []}
-            types={types}
             onChange={(next): void =>
               setNode((prev) =>
                 next.length > 0 ? { ...prev, attributes: next } : omit(prev, "attributes"),
@@ -133,7 +247,6 @@ export function ClassMembersEditor({ node }: ClassMembersEditorProps): JSX.Eleme
           <OperationsSection
             operations={node.operations ?? []}
             interfaceImpliedAbstract={isInterface}
-            types={types}
             onChange={(next): void =>
               setNode((prev) =>
                 next.length > 0 ? { ...prev, operations: next } : omit(prev, "operations"),
@@ -146,42 +259,14 @@ export function ClassMembersEditor({ node }: ClassMembersEditorProps): JSX.Eleme
   );
 }
 
-/* ----------------------------- Generics ----------------------------- */
-
-interface ClassGenericsEditorProps {
-  readonly generics: string[];
-  readonly onChange: (next: string[]) => void;
-}
-
-function ClassGenericsEditor({ generics, onChange }: ClassGenericsEditorProps): JSX.Element {
-  const value = generics.join(", ");
-  return (
-    <label className="uml-field">
-      <span>Generics (comma-separated, e.g. T, K extends Comparable&lt;K&gt;)</span>
-      <input
-        type="text"
-        defaultValue={value}
-        onBlur={(e): void => {
-          const next = e.target.value
-            .split(",")
-            .map((s) => s.trim())
-            .filter((s) => s.length > 0);
-          if (next.join(",") !== generics.join(",")) onChange(next);
-        }}
-      />
-    </label>
-  );
-}
-
 /* ---------------------------- Attributes ---------------------------- */
 
 interface AttributesSectionProps {
   readonly attributes: Attribute[];
-  readonly types: readonly string[];
   readonly onChange: (next: Attribute[]) => void;
 }
 
-function AttributesSection({ attributes, types, onChange }: AttributesSectionProps): JSX.Element {
+function AttributesSection({ attributes, onChange }: AttributesSectionProps): JSX.Element {
   const replace = (index: number, transform: (prev: Attribute) => Attribute): void => {
     onChange(attributes.map((attr, i) => (i === index ? transform(attr) : attr)));
   };
@@ -227,23 +312,15 @@ function AttributesSection({ attributes, types, onChange }: AttributesSectionPro
                 className="uml-class-members__name"
               />
               <span className="uml-class-members__sep">:</span>
-              <select
-                aria-label="Attribute type"
-                value={attr.type ?? ""}
-                onChange={(e): void =>
+              <TypeField
+                label="Attribute type"
+                value={attr.type}
+                onChange={(next): void =>
                   replace(index, (prev) =>
-                    e.target.value === "" ? omit(prev, "type") : { ...prev, type: e.target.value },
+                    next === undefined ? omit(prev, "type") : { ...prev, type: next },
                   )
                 }
-                className="uml-class-members__type"
-              >
-                <option value="">—</option>
-                {types.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              />
               <label className="uml-class-members__flag" title="Static (rendered with underline)">
                 <input
                   type="checkbox"
@@ -295,14 +372,12 @@ function AttributesSection({ attributes, types, onChange }: AttributesSectionPro
 interface OperationsSectionProps {
   readonly operations: Operation[];
   readonly interfaceImpliedAbstract: boolean;
-  readonly types: readonly string[];
   readonly onChange: (next: Operation[]) => void;
 }
 
 function OperationsSection({
   operations,
   interfaceImpliedAbstract,
-  types,
   onChange,
 }: OperationsSectionProps): JSX.Element {
   const replace = (index: number, transform: (prev: Operation) => Operation): void => {
@@ -377,25 +452,15 @@ function OperationsSection({
                   className="uml-class-members__name"
                 />
                 <span className="uml-class-members__sep">:</span>
-                <select
-                  aria-label="Return type"
-                  value={op.returnType ?? ""}
-                  onChange={(e): void =>
+                <TypeField
+                  label="Return type"
+                  value={op.returnType}
+                  onChange={(next): void =>
                     replace(index, (prev) =>
-                      e.target.value === ""
-                        ? omit(prev, "returnType")
-                        : { ...prev, returnType: e.target.value },
+                      next === undefined ? omit(prev, "returnType") : { ...prev, returnType: next },
                     )
                   }
-                  className="uml-class-members__type"
-                >
-                  <option value="">—</option>
-                  {types.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                />
                 <button
                   type="button"
                   aria-label="Remove operation"
@@ -421,24 +486,15 @@ function OperationsSection({
                       }
                     />
                     <span className="uml-class-members__sep">:</span>
-                    <select
-                      aria-label="Parameter type"
-                      value={param.type ?? ""}
-                      onChange={(e): void =>
+                    <TypeField
+                      label="Parameter type"
+                      value={param.type}
+                      onChange={(next): void =>
                         updateParam(index, pIndex, (prev) =>
-                          e.target.value === ""
-                            ? omit(prev, "type")
-                            : { ...prev, type: e.target.value },
+                          next === undefined ? omit(prev, "type") : { ...prev, type: next },
                         )
                       }
-                    >
-                      <option value="">—</option>
-                      {types.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
+                    />
                     <input
                       type="text"
                       aria-label="Default value"
@@ -606,5 +662,4 @@ const NODE_PATCHABLE_KEYS = [
   "attributes",
   "operations",
   "enumLiterals",
-  "generics",
 ] as const satisfies ReadonlyArray<keyof DiagramNode>;

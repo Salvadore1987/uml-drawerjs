@@ -47,7 +47,7 @@ import {
 import type { ActivationResizeSide, FragmentResizeSide } from "../commands/index.js";
 import type { CommandBus } from "../commands/index.js";
 import type { History } from "../history/index.js";
-import { uuidv7 } from "../model/index.js";
+import { collectGroupDescendants, uuidv7 } from "../model/index.js";
 import type { DiagramType, EdgeKind } from "../model/types.js";
 import type { SelectionModel } from "./selection.js";
 import { DEFAULT_SNAP, snapValue } from "./snap.js";
@@ -129,6 +129,12 @@ interface DragState {
    * DOM mutation is cheap.
    */
   readonly movingNodes: readonly MovingNode[];
+  /**
+   * Move-only on groups: nested descendant groups (their frames) to translate
+   * alongside the dragged parent. The parent's own child nodes — and every
+   * deeper node — live in `movingNodes`; this carries the nested group frames.
+   */
+  readonly movingGroups: readonly { id: string; original: Rect }[];
   /** True once the pointer has moved beyond `DRAG_THRESHOLD_PX`. */
   hasMoved: boolean;
   /** Live ghost line for connect mode. */
@@ -1670,6 +1676,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
           startClient: { x: event.clientX, y: event.clientY },
           startLayout,
           movingNodes: [],
+          movingGroups: [],
           hasMoved: false,
           ghostLine: null,
           marqueeRect: null,
@@ -1744,6 +1751,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       startClient: { x: event.clientX, y: event.clientY },
       startLayout,
       movingNodes,
+      movingGroups: [],
       hasMoved: false,
       ghostLine: null,
       marqueeRect: null,
@@ -1790,6 +1798,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
           startClient: { x: event.clientX, y: event.clientY },
           startLayout,
           movingNodes: [],
+          movingGroups: [],
           hasMoved: false,
           ghostLine: null,
           marqueeRect: null,
@@ -1805,16 +1814,50 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       }
     }
 
-    // Otherwise: move the boundary. Capture each child's original
-    // coordinate so the move-loop translates the whole bundle on the
-    // same `(dx, dy)` vector.
+    // Otherwise: move the boundary together with everything that belongs to
+    // it. "Belongs" = recorded model descendants (children, recursively)
+    // UNION everything geometrically inside the group's box. The geometric
+    // sweep is essential: in practice users stack elements on top of a
+    // package/boundary without that ever being recorded as model nesting, so
+    // a children-only move would leave them behind. Captured once at
+    // pointerdown so the whole bundle translates on the same `(dx, dy)`.
     selection.set([groupId]);
-    const movingChildren: MovingNode[] = groupModel.children
-      .map((childId) => {
-        const coord = overrides[childId] ?? { x: 0, y: 0 };
-        return { id: childId, original: { x: coord.x, y: coord.y } };
+    const centerInside = (box: Rect): boolean => {
+      const cx = box.x + box.width / 2;
+      const cy = box.y + box.height / 2;
+      return (
+        cx >= rect.x && cx <= rect.x + rect.width && cy >= rect.y && cy <= rect.y + rect.height
+      );
+    };
+    const descendants = collectGroupDescendants(diagram, groupId);
+    const nodeIdSet = new Set<string>(descendants.nodeIds);
+    const groupIdSet = new Set<string>(descendants.groupIds);
+    contentGroup.querySelectorAll("[data-node-id]").forEach((el) => {
+      if (!(el instanceof SVGGraphicsElement)) return;
+      const id = el.getAttribute("data-node-id");
+      if (!id || nodeIdSet.has(id)) return;
+      if (centerInside(nodeRectInLayout(el))) nodeIdSet.add(id);
+    });
+    contentGroup.querySelectorAll("[data-group-id]").forEach((el) => {
+      if (!(el instanceof SVGGraphicsElement)) return;
+      const id = el.getAttribute("data-group-id");
+      if (!id || id === groupId || groupIdSet.has(id)) return;
+      if (centerInside(groupRectInLayout(el))) groupIdSet.add(id);
+    });
+    const movingChildren: MovingNode[] = [...nodeIdSet].map((id) => {
+      const escaped = id.replaceAll('"', '\\"');
+      const el = contentGroup.querySelector(`[data-node-id="${escaped}"]`);
+      const r = el instanceof SVGGraphicsElement ? nodeRectInLayout(el) : null;
+      const coord = overrides[id] ?? (r ? { x: r.x, y: r.y } : { x: 0, y: 0 });
+      return { id, original: { x: coord.x, y: coord.y } };
+    });
+    const movingGroups = [...groupIdSet]
+      .map((id) => {
+        const escaped = id.replaceAll('"', '\\"');
+        const el = contentGroup.querySelector(`[data-group-id="${escaped}"]`);
+        return el instanceof SVGGraphicsElement ? { id, original: groupRectInLayout(el) } : null;
       })
-      .filter((m) => diagram.nodes.some((n) => n.id === m.id));
+      .filter((g): g is { id: string; original: Rect } => g !== null);
 
     drag = {
       mode: "move",
@@ -1824,6 +1867,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       startClient: { x: event.clientX, y: event.clientY },
       startLayout,
       movingNodes: movingChildren,
+      movingGroups,
       hasMoved: false,
       ghostLine: null,
       marqueeRect: null,
@@ -1859,6 +1903,7 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
       startClient: { x: event.clientX, y: event.clientY },
       startLayout,
       movingNodes: [],
+      movingGroups: [],
       hasMoved: false,
       ghostLine: null,
       marqueeRect: rect,
@@ -1998,6 +2043,16 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
           width: drag.groupOriginalRect.width,
           height: drag.groupOriginalRect.height,
         });
+        // Nested group frames follow the parent by the same delta (their
+        // child nodes are already translated via `movingNodes` above).
+        for (const mg of drag.movingGroups) {
+          applyEphemeralGroupRect(contentGroup, mg.id, {
+            x: mg.original.x + ddx,
+            y: mg.original.y + ddy,
+            width: mg.original.width,
+            height: mg.original.height,
+          });
+        }
       }
       // Drag-into-boundary highlight: only when dragging a node, not the
       // boundary itself (otherwise we'd light up the boundary we're
@@ -2127,10 +2182,22 @@ export function attachInteractions(initial: InteractionsOptions): InteractionsCo
           { x: orig.x + ddx, y: orig.y + ddy, width: orig.width, height: orig.height },
           diagram,
         );
+        const nestedGroupMoves = finished.movingGroups.map((mg) =>
+          moveGroupCommand(
+            mg.id,
+            {
+              x: mg.original.x + ddx,
+              y: mg.original.y + ddy,
+              width: mg.original.width,
+              height: mg.original.height,
+            },
+            diagram,
+          ),
+        );
         const childMoves = finished.movingNodes.map((m) =>
           moveNodeCommand(m.id, { x: m.original.x + ddx, y: m.original.y + ddy }, diagram),
         );
-        history.dispatchAll([groupCmd, ...childMoves]);
+        history.dispatchAll([groupCmd, ...nestedGroupMoves, ...childMoves]);
         return;
       }
 

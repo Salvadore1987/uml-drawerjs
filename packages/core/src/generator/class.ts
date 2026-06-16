@@ -2,6 +2,7 @@ import type {
   Attribute,
   Diagram,
   DiagramEdge,
+  DiagramGroup,
   DiagramNode,
   EdgeEndpoint,
   EdgeKind,
@@ -10,7 +11,7 @@ import type {
   OperationParameter,
   Visibility,
 } from "../model/types.js";
-import { lookupAlias, nodeAlias } from "./format.js";
+import { escapeStringLiteral, lookupAlias, nodeAlias } from "./format.js";
 
 /**
  * Render a class-diagram body. Node declarations are emitted in `ast.nodes`
@@ -26,32 +27,53 @@ export function renderClass(diagram: Diagram, aliases: Map<string, string>): str
   const lines: string[] = [];
 
   // Emit packages first so their `{ … }` block contains the member nodes
-  // declared inside them, mirroring the parser's containment rules.
-  const childToPackage = new Map<string, string>();
-  for (const group of diagram.groups) {
-    if (group.kind === "package") {
-      for (const childId of group.children) childToPackage.set(childId, group.id);
-    }
-  }
-
+  // declared inside them, mirroring the parser's containment rules. Packages
+  // may nest other packages (`group.children` can hold group ids), so the
+  // emit is recursive: only top-level packages are emitted here, each
+  // descending into its child packages and nodes.
+  const groupById = new Map<string, DiagramGroup>(diagram.groups.map((g) => [g.id, g]));
   const packageGroups = diagram.groups.filter((g) => g.kind === "package");
   const nodesById = new Map<string, DiagramNode>(diagram.nodes.map((n) => [n.id, n]));
 
+  const nestedPackageIds = new Set<string>();
+  const nodeInPackage = new Set<string>();
   for (const group of packageGroups) {
-    lines.push(`package "${group.label}" {`);
     for (const childId of group.children) {
+      if (groupById.get(childId)?.kind === "package") nestedPackageIds.add(childId);
+      else if (nodesById.has(childId)) nodeInPackage.add(childId);
+    }
+  }
+
+  const emitPackage = (group: DiagramGroup, indent: string): void => {
+    // Emit a stable alias (`package "Label" as alias {`) so the alias-keyed
+    // `@drawer:meta` layout override round-trips back onto the group — without
+    // it a resized package reverts to its auto-fit / default size on re-parse.
+    lines.push(
+      `${indent}package "${escapeStringLiteral(group.label)}" as ${lookupAlias(aliases, group.id)} {`,
+    );
+    for (const childId of group.children) {
+      const childGroup = groupById.get(childId);
+      if (childGroup?.kind === "package") {
+        emitPackage(childGroup, `${indent}  `);
+        continue;
+      }
       const child = nodesById.get(childId);
       if (!child) continue;
       for (const declLine of formatClassDeclaration(child, aliases)) {
-        lines.push(`  ${declLine}`);
+        lines.push(`${indent}  ${declLine}`);
       }
     }
-    lines.push("}");
+    lines.push(`${indent}}`);
+  };
+
+  for (const group of packageGroups) {
+    if (nestedPackageIds.has(group.id)) continue; // emitted within its parent
+    emitPackage(group, "");
   }
 
   // Loose nodes — those not contained in any package.
   for (const node of diagram.nodes) {
-    if (childToPackage.has(node.id)) continue;
+    if (nodeInPackage.has(node.id)) continue;
     lines.push(...formatClassDeclaration(node, aliases));
   }
 
@@ -69,28 +91,37 @@ function formatClassDeclaration(node: DiagramNode, aliases: Map<string, string>)
 }
 
 function formatClassHead(node: DiagramNode, aliases: Map<string, string>): string {
-  const alias = nodeAlias(aliases, node);
-  const generics = formatGenerics(node.generics);
+  // `class Foo` ties the visual name to the alias; when the label can't be
+  // used as the alias verbatim (spaces / punctuation / a duplicate, so the
+  // alias index fell back to a generated token), emit the `"label" as alias`
+  // form so the real label round-trips instead of showing the alias/GUID.
+  const name = formatNameToken(node, aliases);
   const stereotype = node.stereotype ? ` <<${node.stereotype}>>` : "";
   switch (node.kind) {
     case "class":
-      return `class ${alias}${generics}${stereotype}`;
+      return `class ${name}${stereotype}`;
     case "interface":
-      return `interface ${alias}${generics}${stereotype}`;
+      return `interface ${name}${stereotype}`;
     case "abstract-class":
-      return `abstract class ${alias}${generics}${stereotype}`;
+      return `abstract class ${name}${stereotype}`;
     case "enum":
-      return `enum ${alias}${stereotype}`;
+      return `enum ${name}${stereotype}`;
     default:
       // Class diagrams shouldn't see other kinds; emit `class` as a safe
       // fallback so the generator never throws on malformed AST.
-      return `class ${alias}${stereotype}`;
+      return `class ${name}${stereotype}`;
   }
 }
 
-function formatGenerics(generics: string[] | undefined): string {
-  if (!generics || generics.length === 0) return "";
-  return `<${generics.join(", ")}>`;
+/**
+ * Name token for a class-like declaration: a bare `alias` when the alias is
+ * exactly the label, otherwise the `"label" as alias` form so labels that
+ * aren't valid PlantUML identifiers survive the round-trip.
+ */
+function formatNameToken(node: DiagramNode, aliases: Map<string, string>): string {
+  const alias = nodeAlias(aliases, node);
+  if (alias === node.label) return alias;
+  return `"${escapeStringLiteral(node.label)}" as ${alias}`;
 }
 
 function formatMembers(node: DiagramNode): string[] {

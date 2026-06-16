@@ -259,7 +259,6 @@ export const diagramJsonSchema = {
         description: { type: "string" },
         attributes: { type: "array", items: { $ref: "#/$defs/attribute" } },
         operations: { type: "array", items: { $ref: "#/$defs/operation" } },
-        generics: { type: "array", items: { type: "string" } },
         enumLiterals: { type: "array", items: { $ref: "#/$defs/enumLiteral" } },
         activations: { type: "array", items: { $ref: "#/$defs/activationInterval" } },
         style: { $ref: "#/$defs/nodeStyle" },

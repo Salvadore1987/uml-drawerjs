@@ -1,4 +1,5 @@
 import type { Diagram, DiagramGroup, LayoutCoordinate } from "../model/types.js";
+import { clampHandleSpan } from "./nodes.js";
 import { v } from "./types.js";
 import type { NodeGeometry, VNode } from "./types.js";
 
@@ -19,6 +20,19 @@ const DEFAULT_EMPTY_WIDTH = 320;
 const DEFAULT_EMPTY_HEIGHT = 200;
 const LABEL_INSET_X = 16;
 const LABEL_INSET_Y = 18;
+
+/**
+ * Inward grab-band width (px) for the frame hit area. The transparent grab
+ * band is drawn on a path inset by `GRAB_BAND / 2` and stroked with
+ * `GRAB_BAND`, so its OUTER edge sits on the visible border and the band
+ * extends only INWARD — selecting the frame never bleeds outside the element.
+ */
+const GRAB_BAND = 18;
+
+/** Half-band inset, clamped so the band never exceeds the box. */
+function grabBandInset(box: { width: number; height: number }): number {
+  return Math.max(0, Math.min(GRAB_BAND / 2, box.width / 2 - 1, box.height / 2 - 1));
+}
 
 export interface GroupBox {
   readonly id: string;
@@ -60,7 +74,7 @@ export function computeGroupBoxes(args: ComputeGroupBoxesArgs): GroupBox[] {
       });
       continue;
     }
-    const auto = autoFitFromChildren(group, nodeGeometry, override);
+    const auto = autoFitFromChildren(group, nodeGeometry, override, overrides);
     if (auto) {
       boxes.push(auto);
       continue;
@@ -82,20 +96,33 @@ function autoFitFromChildren(
   group: DiagramGroup,
   nodeGeometry: ReadonlyMap<string, NodeGeometry>,
   override: LayoutCoordinate | undefined,
+  overrides: Record<string, LayoutCoordinate>,
 ): GroupBox | null {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let maxY = Number.NEGATIVE_INFINITY;
   let any = false;
+  const include = (x: number, y: number, w: number, h: number): void => {
+    any = true;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x + w > maxX) maxX = x + w;
+    if (y + h > maxY) maxY = y + h;
+  };
   for (const childId of group.children) {
     const geom = nodeGeometry.get(childId);
-    if (!geom) continue;
-    any = true;
-    if (geom.x < minX) minX = geom.x;
-    if (geom.y < minY) minY = geom.y;
-    if (geom.x + geom.width > maxX) maxX = geom.x + geom.width;
-    if (geom.y + geom.height > maxY) maxY = geom.y + geom.height;
+    if (geom) {
+      include(geom.x, geom.y, geom.width, geom.height);
+      continue;
+    }
+    // Nested group child: it has no node geometry, so fall back to its own
+    // override box (a sized package/boundary) when present, so a parent that
+    // contains only sub-groups still auto-fits around them.
+    const childBox = overrides[childId];
+    if (childBox && childBox.width !== undefined && childBox.height !== undefined) {
+      include(childBox.x, childBox.y, childBox.width, childBox.height);
+    }
   }
   if (!any) return null;
   // Top padding is larger so the label has room without overlapping the
@@ -140,6 +167,7 @@ export function renderGroupLayer(args: RenderGroupLayerArgs): VNode {
 }
 
 function renderBoundaryFrame(box: GroupBox, group: DiagramGroup | undefined): VNode {
+  const inset = grabBandInset(box);
   return v(
     "g",
     {
@@ -166,6 +194,29 @@ function renderBoundaryFrame(box: GroupBox, group: DiagramGroup | undefined): VN
         },
         undefined,
         { classes: ["uml-group", "uml-group-boundary"] },
+      ),
+      // Invisible grab band over the dashed border so the frame is easy to
+      // click for select / move — the visible stroke alone is ~1.5px. Drawn on
+      // an inset rect + stroked by `inset * 2`, so the band's outer edge sits
+      // on the border and extends only INWARD (never bleeds outside the box).
+      // `pointer-events: stroke` keeps the fill click-through so enclosed nodes
+      // stay selectable.
+      v(
+        "rect",
+        {
+          x: box.x + inset,
+          y: box.y + inset,
+          width: box.width - inset * 2,
+          height: box.height - inset * 2,
+          rx: Math.max(0, 12 - inset),
+          ry: Math.max(0, 12 - inset),
+          fill: "none",
+          stroke: "transparent",
+          "stroke-width": String(inset * 2),
+          "pointer-events": "stroke",
+        },
+        undefined,
+        { style: "cursor: move", classes: ["uml-group__hit"] },
       ),
       v(
         "rect",
@@ -253,6 +304,17 @@ function renderPackageFrame(box: GroupBox, group: DiagramGroup): VNode {
   const label = group.label || "(package)";
   const tabWidth = packageTabWidth(label, box.width);
   const d = packagePathD(box, tabWidth);
+  // Inward grab band: an inset folder outline stroked by `inset * 2`, so its
+  // outer edge sits on the visible border and never bleeds outside the package.
+  const inset = grabBandInset(box);
+  const innerBox: GroupBox = {
+    id: box.id,
+    x: box.x + inset,
+    y: box.y + inset,
+    width: box.width - inset * 2,
+    height: box.height - inset * 2,
+  };
+  const hitD = packagePathD(innerBox, packageTabWidth(label, innerBox.width));
   return v(
     "g",
     {
@@ -295,6 +357,20 @@ function renderPackageFrame(box: GroupBox, group: DiagramGroup): VNode {
         {
           classes: ["uml-group", "uml-group-package"],
         },
+      ),
+      // Invisible inward grab band along the package outline so the thin
+      // border is easy to click for select / move without bleeding outside.
+      v(
+        "path",
+        {
+          d: hitD,
+          fill: "none",
+          stroke: "transparent",
+          "stroke-width": String(inset * 2),
+          "pointer-events": "stroke",
+        },
+        undefined,
+        { style: "cursor: move", classes: ["uml-group__hit"] },
       ),
       // Tab fill — rendered on top of the path so the tab background can
       // differ from the body. Pointer-events `auto` on the tab makes the
@@ -354,25 +430,55 @@ function renderGroupResizeHandles(box: GroupBox): VNode[] {
     { side: "sw", x: box.x, y: box.y + box.height, cursor: "nesw-resize" },
     { side: "w", x: box.x, y: box.y + box.height / 2, cursor: "ew-resize" },
   ];
-  const HALF = 4;
-  return positions.map((p) =>
-    v(
-      "rect",
-      {
-        x: p.x - HALF,
-        y: p.y - HALF,
-        width: HALF * 2,
-        height: HALF * 2,
-        fill: "var(--uml-selection-handle, var(--uml-accent))",
-        stroke: "var(--uml-bg)",
-        "stroke-width": "1",
-        "data-resize-handle": p.side,
-      },
-      undefined,
-      {
-        style: `cursor: ${p.cursor}`,
-        classes: ["uml-group-resize-handle", `uml-group-resize-handle--${p.side}`],
-      },
-    ),
-  );
+  // Two rects per handle: a large transparent HIT target (easy to grab,
+  // carries `data-resize-handle` + cursor) and a small visible DOT affordance
+  // with `pointer-events:none`. Mirrors `renderResizeHandles` for nodes.
+  const HIT_HALF = 11;
+  const DOT_HALF = 5;
+  // Keep handles INSIDE the frame (they grow inward from each edge/corner) so
+  // the selection markers never stick out past the package/boundary border.
+  const minX = box.x;
+  const maxX = box.x + box.width;
+  const minY = box.y;
+  const maxY = box.y + box.height;
+  return positions.flatMap((p) => {
+    const hx = clampHandleSpan(p.x, HIT_HALF, minX, maxX);
+    const hy = clampHandleSpan(p.y, HIT_HALF, minY, maxY);
+    const dx = clampHandleSpan(p.x, DOT_HALF, minX, maxX);
+    const dy = clampHandleSpan(p.y, DOT_HALF, minY, maxY);
+    return [
+      v(
+        "rect",
+        {
+          x: hx.start,
+          y: hy.start,
+          width: hx.size,
+          height: hy.size,
+          fill: "transparent",
+          "data-resize-handle": p.side,
+        },
+        undefined,
+        {
+          style: `cursor: ${p.cursor}`,
+          classes: ["uml-group-resize-handle", `uml-group-resize-handle--${p.side}`],
+        },
+      ),
+      v(
+        "rect",
+        {
+          x: dx.start,
+          y: dy.start,
+          width: dx.size,
+          height: dy.size,
+          fill: "var(--uml-selection-handle, var(--uml-accent))",
+          stroke: "var(--uml-bg)",
+          "stroke-width": "1",
+        },
+        undefined,
+        {
+          classes: ["uml-group-resize-dot", `uml-group-resize-dot--${p.side}`],
+        },
+      ),
+    ];
+  });
 }

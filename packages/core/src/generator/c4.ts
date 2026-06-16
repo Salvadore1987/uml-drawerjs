@@ -1,5 +1,11 @@
 import { hasAsyncTag } from "../model/query.js";
-import type { Diagram, DiagramEdge, DiagramNode, DiagramType } from "../model/types.js";
+import type {
+  Diagram,
+  DiagramEdge,
+  DiagramGroup,
+  DiagramNode,
+  DiagramType,
+} from "../model/types.js";
 import { escapeStringLiteral, lookupAlias, nodeAlias } from "./format.js";
 
 /**
@@ -28,20 +34,42 @@ export function renderC4(diagram: Diagram, aliases: Map<string, string>): string
     lines.push('AddRelTag("async", $lineStyle = DashedLine())');
   }
 
-  for (const group of diagram.groups) {
-    if (group.kind !== "boundary") continue;
-    const alias = lookupAlias(aliases, group.id);
-    lines.push(`${boundaryMacro}(${alias}, "${escapeStringLiteral(group.label)}") {`);
+  // Boundaries may nest other boundaries (`group.children` can hold group
+  // ids), so emit recursively: only top-level boundaries here, each descending
+  // into its child boundaries and nodes.
+  const groupById = new Map<string, DiagramGroup>(diagram.groups.map((g) => [g.id, g]));
+  const boundaryGroups = diagram.groups.filter((g) => g.kind === "boundary");
+  const nodesById = new Map<string, DiagramNode>(diagram.nodes.map((n) => [n.id, n]));
+
+  const nestedBoundaryIds = new Set<string>();
+  const groupedNodeIds = new Set<string>();
+  for (const group of boundaryGroups) {
     for (const childId of group.children) {
-      const child = diagram.nodes.find((n) => n.id === childId);
-      if (child) lines.push(`  ${formatC4Node(child, aliases, diagram.type)}`);
+      if (groupById.get(childId)?.kind === "boundary") nestedBoundaryIds.add(childId);
+      else if (nodesById.has(childId)) groupedNodeIds.add(childId);
     }
-    lines.push("}");
   }
 
-  const groupedNodeIds = new Set(
-    diagram.groups.filter((g) => g.kind === "boundary").flatMap((g) => g.children),
-  );
+  const emitBoundary = (group: DiagramGroup, indent: string): void => {
+    const alias = lookupAlias(aliases, group.id);
+    lines.push(`${indent}${boundaryMacro}(${alias}, "${escapeStringLiteral(group.label)}") {`);
+    for (const childId of group.children) {
+      const childGroup = groupById.get(childId);
+      if (childGroup?.kind === "boundary") {
+        emitBoundary(childGroup, `${indent}  `);
+        continue;
+      }
+      const child = nodesById.get(childId);
+      if (child) lines.push(`${indent}  ${formatC4Node(child, aliases, diagram.type)}`);
+    }
+    lines.push(`${indent}}`);
+  };
+
+  for (const group of boundaryGroups) {
+    if (nestedBoundaryIds.has(group.id)) continue; // emitted within its parent
+    emitBoundary(group, "");
+  }
+
   for (const node of diagram.nodes) {
     if (groupedNodeIds.has(node.id)) continue;
     lines.push(formatC4Node(node, aliases, diagram.type));
@@ -92,6 +120,30 @@ function formatC4Node(
         return formatContainerLike("ContainerDb", alias, label, node.technology, node.description);
       }
       return formatPersonLike("SystemDb", alias, label, node.description);
+    case "database-external":
+      // External-database twin of the `database` case: the parser folds
+      // SystemDb_Ext / ContainerDb_Ext / ComponentDb_Ext into this single
+      // kind, so the generator re-selects the macro by diagram tier (and the
+      // presence of technology) to keep the round-trip lossless per tier.
+      if (diagramType === "c4-component" && node.technology) {
+        return formatContainerLike(
+          "ComponentDb_Ext",
+          alias,
+          label,
+          node.technology,
+          node.description,
+        );
+      }
+      if (node.technology) {
+        return formatContainerLike(
+          "ContainerDb_Ext",
+          alias,
+          label,
+          node.technology,
+          node.description,
+        );
+      }
+      return formatPersonLike("SystemDb_Ext", alias, label, node.description);
     case "queue":
       if (diagramType === "c4-component" && node.technology) {
         return formatContainerLike(

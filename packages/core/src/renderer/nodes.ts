@@ -34,6 +34,23 @@ const DESC_PAD_X = 10; // horizontal inset inside the node frame
 const DESC_CHAR_WIDTH = 6; // avg glyph width estimate for font-size-sm italic
 const DESC_MAX_LINES = 5; // safety cap so a long description can't grow forever
 
+// Average glyph-width estimates (px) used to grow compartment nodes
+// (class / interface / abstract-class / enum / entity) so their name and
+// member rows never spill past the frame — the same estimation idiom as
+// DESC_CHAR_WIDTH, padded generously because real glyph widths vary by font.
+const NAME_CHAR_WIDTH = 8.5; // font-size-base (14px), bold sans header label
+const ROW_CHAR_WIDTH = 7.2; // font-size-sm (12px) mono attribute / operation rows
+const STEREOTYPE_CHAR_WIDTH = 6.5; // font-size-sm (12px) sans stereotype line
+const COMPARTMENT_PAD_X = 24; // total horizontal padding (left + right) inside the frame
+const STEREOTYPE_ROW_HEIGHT = 16; // extra header height when a stereotype row is shown
+
+// Kind "spot" — the PlantUML/IntelliJ circled letter (C / I / A / E) drawn in
+// the top-left of a class-like node's header so the element kind is obvious at
+// a glance, independent of the (centered) stereotype/title text.
+const SPOT_R = 9; // circle radius
+const SPOT_CX = 16; // circle center x from the frame's left edge
+const SPOT_RESERVE = 52; // width reserved so a centered title clears the left spot
+
 const C4_KINDS = new Set<NodeKind>([
   "person",
   "person-external",
@@ -44,6 +61,7 @@ const C4_KINDS = new Set<NodeKind>([
   "component",
   "component-external",
   "database",
+  "database-external",
   "queue",
 ]);
 
@@ -58,14 +76,20 @@ const C4_KINDS = new Set<NodeKind>([
  * only one literals compartment.
  */
 export function computeNodeGeometry(args: RenderNodeArgs): NodeGeometry {
-  const { node, x, y, width, height } = args;
+  const { node, x, y, height } = args;
   const rowHeights = isClassLike(node.kind)
     ? classRowHeights(node)
     : node.kind === "entity"
       ? entityRowHeights(node)
       : 0;
+  // Compartment nodes (class / interface / abstract-class / enum / entity)
+  // grow to fit their widest text line so the name and member rows never
+  // spill past the frame; their header also grows to fit a stereotype row.
+  // C4 nodes keep the caller's width (they wrap descriptions instead).
+  const width = Math.max(args.width, compartmentContentWidth(node));
+  const headerH = isCompartmentNode(node.kind) ? compartmentHeaderHeight(node) : HEADER_HEIGHT;
   const c4Padding = c4ExtraHeight(node, width);
-  const finalHeight = Math.max(height, HEADER_HEIGHT + rowHeights + c4Padding);
+  const finalHeight = Math.max(height, headerH + rowHeights + c4Padding);
   return { id: node.id, x, y, width, height: finalHeight };
 }
 
@@ -102,7 +126,7 @@ function entityRowHeights(node: DiagramNode): number {
 function c4ExtraHeight(node: DiagramNode, width: number): number {
   if (!C4_KINDS.has(node.kind)) return 0;
   let extra = 0;
-  if (node.kind === "database") extra += DATABASE_CAP_HEIGHT;
+  if (node.kind === "database" || node.kind === "database-external") extra += DATABASE_CAP_HEIGHT;
   if (node.kind === "person" || node.kind === "person-external") extra += PERSON_ICON_HEIGHT;
   // c4model.com requires every element to carry a type tag like
   // "[Software System]" / "[Person]" — we render it on a dedicated row
@@ -119,18 +143,22 @@ export function renderNode(args: RenderNodeArgs): VNode {
   const geometry = computeNodeGeometry(args);
   const { node } = args;
   const children: VNode[] = [];
+  // Header band / dividers / member rows all anchor to this height so a
+  // stereotyped node's taller header pushes the body down in lockstep.
+  const headerH = compartmentHeaderHeight(node);
 
   children.push(renderFrame(node, geometry));
   if (isCompartmentNode(node.kind)) {
-    children.push(renderClassHeaderBand(geometry));
+    children.push(renderClassHeaderBand(geometry, headerH));
   }
   children.push(...renderHeaderRows(node, geometry));
   if (isClassLike(node.kind)) {
+    children.push(renderKindSpot(node, headerH));
     const literalCount = node.enumLiterals?.length ?? 0;
     const attrCount = node.attributes?.length ?? 0;
     const opCount = node.operations?.length ?? 0;
     if (literalCount > 0) {
-      children.push(...renderEnumLiteralRows(node.enumLiterals ?? [], geometry));
+      children.push(...renderEnumLiteralRows(node.enumLiterals ?? [], geometry, headerH));
     }
     if (attrCount > 0) {
       children.push(
@@ -139,6 +167,7 @@ export function renderNode(args: RenderNodeArgs): VNode {
           geometry,
           node.kind,
           literalCount * ATTRIBUTE_ROW_HEIGHT,
+          headerH,
         ),
       );
     }
@@ -146,16 +175,23 @@ export function renderNode(args: RenderNodeArgs): VNode {
       const opOffset =
         literalCount * ATTRIBUTE_ROW_HEIGHT +
         (attrCount > 0 ? attrCount * ATTRIBUTE_ROW_HEIGHT : EMPTY_COMPARTMENT_HEIGHT);
-      children.push(...renderOperationRows(node.operations ?? [], geometry, opOffset));
+      children.push(...renderOperationRows(node.operations ?? [], geometry, opOffset, headerH));
     }
     children.push(
-      ...renderClassCompartmentDividers(geometry, node.kind, literalCount, attrCount, opCount),
+      ...renderClassCompartmentDividers(
+        geometry,
+        node.kind,
+        literalCount,
+        attrCount,
+        opCount,
+        headerH,
+      ),
     );
   } else if (node.kind === "entity") {
     // Entity: single attributes compartment under the header. UML/IE
     // notation — PK underlined, FK with `+ ` prefix, NN (required) bold.
-    children.push(compartmentDivider(geometry, HEADER_HEIGHT));
-    children.push(...renderEntityAttributeRows(node.attributes ?? [], geometry));
+    children.push(compartmentDivider(geometry, headerH));
+    children.push(...renderEntityAttributeRows(node.attributes ?? [], geometry, headerH));
   }
 
   // Port handles — four small circles at edge midpoints. Hidden by
@@ -212,6 +248,8 @@ function renderFrame(node: DiagramNode, geom: NodeGeometry): VNode {
       return renderC4Rect(geom, "external", { dashed: true });
     case "database":
       return renderDatabaseFrame(geom);
+    case "database-external":
+      return renderDatabaseFrame(geom, { external: true });
     case "queue":
       return renderQueueFrame(geom);
     case "actor":
@@ -273,27 +311,73 @@ export function renderResizeHandles(geom: NodeGeometry): VNode[] {
     { side: "sw", x: 0, y: geom.height, cursor: "nesw-resize" },
     { side: "w", x: 0, y: geom.height / 2, cursor: "ew-resize" },
   ];
-  const HALF = 4;
-  return positions.map((p) =>
-    v(
-      "rect",
-      {
-        x: p.x - HALF,
-        y: p.y - HALF,
-        width: HALF * 2,
-        height: HALF * 2,
-        fill: "var(--uml-selection-handle, var(--uml-accent))",
-        stroke: "var(--uml-bg)",
-        "stroke-width": "1",
-        "data-resize-handle": p.side,
-      },
-      undefined,
-      {
-        style: `cursor: ${p.cursor}`,
-        classes: ["uml-node-resize-handle", `uml-node-resize-handle--${p.side}`],
-      },
-    ),
-  );
+  // Each handle is two rects: a large transparent HIT target (easy to grab,
+  // carries `data-resize-handle` + cursor) and a small visible DOT affordance.
+  // The big invisible grab zone makes resizing forgiving without bloating the
+  // visible handle. The dot has `pointer-events:none` so it never steals the
+  // grab from the hit rect rendered before it.
+  const HIT_HALF = 11;
+  const DOT_HALF = 5;
+  // Keep handles INSIDE the node bounds (they grow inward from each edge/corner)
+  // so the selection markers never stick out past the frame.
+  return positions.flatMap((p) => {
+    const hx = clampHandleSpan(p.x, HIT_HALF, 0, geom.width);
+    const hy = clampHandleSpan(p.y, HIT_HALF, 0, geom.height);
+    const dx = clampHandleSpan(p.x, DOT_HALF, 0, geom.width);
+    const dy = clampHandleSpan(p.y, DOT_HALF, 0, geom.height);
+    return [
+      v(
+        "rect",
+        {
+          x: hx.start,
+          y: hy.start,
+          width: hx.size,
+          height: hy.size,
+          fill: "transparent",
+          "data-resize-handle": p.side,
+        },
+        undefined,
+        {
+          style: `cursor: ${p.cursor}`,
+          classes: ["uml-node-resize-handle", `uml-node-resize-handle--${p.side}`],
+        },
+      ),
+      v(
+        "rect",
+        {
+          x: dx.start,
+          y: dy.start,
+          width: dx.size,
+          height: dy.size,
+          fill: "var(--uml-selection-handle, var(--uml-accent))",
+          stroke: "var(--uml-bg)",
+          "stroke-width": "1",
+        },
+        undefined,
+        {
+          classes: ["uml-node-resize-dot", `uml-node-resize-dot--${p.side}`],
+        },
+      ),
+    ];
+  });
+}
+
+/**
+ * Place a resize handle of half-size `half` centered at `center` but clamped so
+ * the whole handle stays within `[min, max]` — handles at an edge/corner grow
+ * inward instead of overhanging the element. Returns the rect's start + size.
+ */
+export function clampHandleSpan(
+  center: number,
+  half: number,
+  min: number,
+  max: number,
+): { start: number; size: number } {
+  const size = Math.min(half * 2, max - min);
+  let start = center - half;
+  if (start < min) start = min;
+  if (start + size > max) start = max - size;
+  return { start, size };
 }
 
 /**
@@ -440,19 +524,28 @@ function renderQueueFrame(geom: NodeGeometry): VNode {
   return v("g", { "data-uml-frame": "queue" }, [frame, leftCap, rightCap]);
 }
 
-function renderDatabaseFrame(geom: NodeGeometry): VNode {
+function renderDatabaseFrame(geom: NodeGeometry, opts: { external?: boolean } = {}): VNode {
   // Cylinder: top ellipse + side body + bottom curve. Using a single
-  // <path> for the body keeps the SVG compact and theme-friendly.
+  // <path> for the body keeps the SVG compact and theme-friendly. The
+  // `external` variant pulls the shared `--uml-c4-external-*` palette and
+  // a dashed stroke so an external database reads identically to the other
+  // external C4 elements (grey + dashed), matching c4model styling.
   const w = geom.width;
   const h = geom.height;
   const cap = DATABASE_CAP_HEIGHT;
-  const fill = "var(--uml-c4-database-bg, var(--uml-node-bg))";
-  const stroke = "var(--uml-c4-database-border, var(--uml-node-border))";
+  const fill = opts.external
+    ? "var(--uml-c4-external-bg, var(--uml-node-bg))"
+    : "var(--uml-c4-database-bg, var(--uml-node-bg))";
+  const stroke = opts.external
+    ? "var(--uml-c4-external-border, var(--uml-node-border))"
+    : "var(--uml-c4-database-border, var(--uml-node-border))";
+  const dash = opts.external ? { "stroke-dasharray": "6 4" } : {};
   const body = v("path", {
     d: `M 0 ${cap / 2} L 0 ${h - cap / 2} A ${w / 2} ${cap / 2} 0 0 0 ${w} ${h - cap / 2} L ${w} ${cap / 2}`,
     fill,
     stroke,
     "stroke-width": "1.5",
+    ...dash,
   });
   const top = v("ellipse", {
     cx: w / 2,
@@ -462,8 +555,10 @@ function renderDatabaseFrame(geom: NodeGeometry): VNode {
     fill,
     stroke,
     "stroke-width": "1.5",
+    ...dash,
   });
-  return v("g", { "data-uml-frame": "database" }, [body, top]);
+  const frameTag = opts.external ? "database-external" : "database";
+  return v("g", { "data-uml-frame": frameTag }, [body, top]);
 }
 
 interface HeaderLayout {
@@ -474,7 +569,7 @@ interface HeaderLayout {
 }
 
 function headerLayoutFor(node: DiagramNode): HeaderLayout {
-  if (node.kind === "database") {
+  if (node.kind === "database" || node.kind === "database-external") {
     return { topOffset: DATABASE_CAP_HEIGHT + 14, lineHeight: 16 };
   }
   if (node.kind === "person" || node.kind === "person-external") {
@@ -511,7 +606,7 @@ function renderHeaderRows(node: DiagramNode, geom: NodeGeometry): VNode[] {
     y += layout.lineHeight;
   }
 
-  const labelText = appendGenerics(node.label, node.generics);
+  const labelText = node.label;
   // Italic the class label for interface / abstract-class to match UML
   // convention (abstract class names are typeset in italics). Class kinds
   // also get a bold weight so the type name stands out from the body — the
@@ -601,6 +696,7 @@ function c4TextColor(kind: NodeKind): string {
   if (kind === "component") return "var(--uml-c4-component-text, var(--uml-node-text))";
   if (kind === "component-external") return "var(--uml-c4-external-text, var(--uml-node-text))";
   if (kind === "database") return "var(--uml-c4-database-text, var(--uml-node-text))";
+  if (kind === "database-external") return "var(--uml-c4-external-text, var(--uml-node-text))";
   if (kind === "queue") return "var(--uml-c4-database-text, var(--uml-node-text))";
   return "var(--uml-node-text)";
 }
@@ -622,6 +718,7 @@ function formatTypeTag(node: DiagramNode): string {
     component: "Component",
     "component-external": "Component",
     database: "Database",
+    "database-external": "Database",
     queue: "Queue",
   };
   const prefix = labelByKind[node.kind] ?? "Element";
@@ -694,13 +791,14 @@ function renderAttributeRows(
   _geom: NodeGeometry,
   kind: NodeKind,
   baseOffset: number,
+  headerHeight: number,
 ): VNode[] {
   return attributes.map((attribute, index) =>
     v(
       "text",
       {
         x: 12,
-        y: HEADER_HEIGHT + baseOffset + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        y: headerHeight + baseOffset + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
@@ -721,13 +819,14 @@ function renderOperationRows(
   operations: readonly Operation[],
   _geom: NodeGeometry,
   baseOffset: number,
+  headerHeight: number,
 ): VNode[] {
   return operations.map((operation, index) =>
     v(
       "text",
       {
         x: 12,
-        y: HEADER_HEIGHT + baseOffset + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        y: headerHeight + baseOffset + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
@@ -755,7 +854,11 @@ function renderOperationRows(
  * Uses `<tspan>` children so the styling can be applied selectively to the
  * name segment without leaking into the type segment.
  */
-function renderEntityAttributeRows(attributes: readonly Attribute[], _geom: NodeGeometry): VNode[] {
+function renderEntityAttributeRows(
+  attributes: readonly Attribute[],
+  _geom: NodeGeometry,
+  headerHeight: number,
+): VNode[] {
   return attributes.map((attribute, index) => {
     const tspans: VNode[] = [];
 
@@ -788,7 +891,7 @@ function renderEntityAttributeRows(attributes: readonly Attribute[], _geom: Node
       "text",
       {
         x: 12,
-        y: HEADER_HEIGHT + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        y: headerHeight + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
@@ -802,13 +905,14 @@ function renderEntityAttributeRows(attributes: readonly Attribute[], _geom: Node
 function renderEnumLiteralRows(
   literals: readonly { id: string; name: string }[],
   _geom: NodeGeometry,
+  headerHeight: number,
 ): VNode[] {
   return literals.map((literal, index) =>
     v(
       "text",
       {
         x: 12,
-        y: HEADER_HEIGHT + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
+        y: headerHeight + ATTRIBUTE_ROW_HEIGHT * (index + 1) - 6,
         "font-family": "var(--uml-font-mono)",
         "font-size": "var(--uml-font-size-sm)",
         fill: "var(--uml-node-text)",
@@ -837,10 +941,11 @@ function renderClassCompartmentDividers(
   literalCount: number,
   attrCount: number,
   opCount: number,
+  headerHeight: number,
 ): VNode[] {
   const lines: VNode[] = [];
   // Header divider — always present, just below the stereotype + name band.
-  lines.push(compartmentDivider(geom, HEADER_HEIGHT));
+  lines.push(compartmentDivider(geom, headerHeight));
 
   if (kind === "enum") {
     return lines;
@@ -850,7 +955,7 @@ function renderClassCompartmentDividers(
   // and operations (bottom). The literal-count branch is dead for these
   // kinds (literals only exist on enums), but we keep the offset general so
   // the math reads symmetrically.
-  const offset = HEADER_HEIGHT + literalCount * ATTRIBUTE_ROW_HEIGHT;
+  const offset = headerHeight + literalCount * ATTRIBUTE_ROW_HEIGHT;
   if (literalCount > 0) {
     lines.push(compartmentDivider(geom, offset));
   }
@@ -861,12 +966,12 @@ function renderClassCompartmentDividers(
   return lines;
 }
 
-function renderClassHeaderBand(geom: NodeGeometry): VNode {
+function renderClassHeaderBand(geom: NodeGeometry, headerHeight: number): VNode {
   return v("rect", {
     x: 0,
     y: 0,
     width: geom.width,
-    height: HEADER_HEIGHT,
+    height: headerHeight,
     fill: "var(--uml-class-header-bg, var(--uml-bg-elevated))",
     stroke: "none",
   });
@@ -890,9 +995,131 @@ function syntheticStereotype(kind: NodeKind): string | undefined {
   return undefined;
 }
 
-function appendGenerics(label: string, generics: string[] | undefined): string {
-  if (!generics || generics.length === 0) return label;
-  return `${label}<${generics.join(", ")}>`;
+/** Single-letter spot glyph per class-like kind (PlantUML/IntelliJ convention). */
+function kindSpotChar(kind: NodeKind): string | undefined {
+  if (kind === "class") return "C";
+  if (kind === "interface") return "I";
+  if (kind === "abstract-class") return "A";
+  if (kind === "enum") return "E";
+  return undefined;
+}
+
+/** Spot circle fill per kind — reuses existing semantic theme tokens. */
+function kindSpotColor(kind: NodeKind): string {
+  if (kind === "interface") return "var(--uml-info)";
+  if (kind === "abstract-class") return "var(--uml-warning)";
+  if (kind === "enum") return "var(--uml-accent)";
+  return "var(--uml-success)"; // class
+}
+
+/**
+ * The kind spot: a small colored circle with a centered letter, anchored to the
+ * top-left of the header band and vertically centered within it. The letter is
+ * filled with `--uml-node-bg` so it "punches out" to the page background colour,
+ * staying legible against the saturated circle in both light and dark themes.
+ */
+function renderKindSpot(node: DiagramNode, headerH: number): VNode {
+  const letter = kindSpotChar(node.kind) ?? "";
+  const cy = headerH / 2;
+  return v(
+    "g",
+    { "data-uml-spot": node.kind },
+    [
+      v("circle", {
+        cx: SPOT_CX,
+        cy,
+        r: SPOT_R,
+        fill: kindSpotColor(node.kind),
+        stroke: "var(--uml-node-border)",
+        "stroke-width": "1",
+      }),
+      v(
+        "text",
+        {
+          x: SPOT_CX,
+          y: cy,
+          "text-anchor": "middle",
+          "dominant-baseline": "central",
+          "font-family": "var(--uml-font-sans)",
+          "font-size": "var(--uml-font-size-sm)",
+          "font-weight": "700",
+          fill: "var(--uml-node-bg)",
+        },
+        undefined,
+        { text: letter },
+      ),
+    ],
+    { classes: ["uml-node-spot", `uml-node-spot--${node.kind}`] },
+  );
+}
+
+/**
+ * Header height for a node. Compartment nodes that show a stereotype line
+ * (interface / abstract-class / enum always do; a class with an explicit
+ * stereotype too) need a taller header so the name sits below the
+ * stereotype yet still above the first compartment divider. Everything
+ * else keeps the base `HEADER_HEIGHT`.
+ */
+export function compartmentHeaderHeight(node: DiagramNode): number {
+  if (!isCompartmentNode(node.kind)) return HEADER_HEIGHT;
+  const stereotype = node.stereotype ?? syntheticStereotype(node.kind);
+  return stereotype ? HEADER_HEIGHT + STEREOTYPE_ROW_HEIGHT : HEADER_HEIGHT;
+}
+
+/**
+ * Estimated minimum width (px) a compartment node needs so its widest text
+ * line — the (possibly generic) name, the stereotype, or any member row —
+ * fits inside the frame. Returns `0` for non-compartment kinds so callers
+ * can uniformly `Math.max(defaultWidth, compartmentContentWidth(node))`.
+ *
+ * Widths are estimated from average glyph widths (same approach as
+ * `descriptionLines`); the generous `COMPARTMENT_PAD_X` buffer absorbs the
+ * inaccuracy so text never touches the border.
+ */
+export function compartmentContentWidth(node: DiagramNode): number {
+  if (!isCompartmentNode(node.kind)) return 0;
+  let widest = 0;
+  const consider = (text: string, charWidth: number): void => {
+    widest = Math.max(widest, text.length * charWidth);
+  };
+
+  consider(node.label, NAME_CHAR_WIDTH);
+  const stereotype = node.stereotype ?? syntheticStereotype(node.kind);
+  if (stereotype) consider(`«${stereotype}»`, STEREOTYPE_CHAR_WIDTH);
+
+  // Class-like nodes carry a left-anchored kind spot; reserve enough width that
+  // the centered title/stereotype never overlaps it.
+  if (isClassLike(node.kind)) {
+    const nameWidth = node.label.length * NAME_CHAR_WIDTH;
+    widest = Math.max(widest, nameWidth + SPOT_RESERVE);
+  }
+
+  if (node.kind === "enum") {
+    for (const literal of node.enumLiterals ?? []) consider(literal.name, ROW_CHAR_WIDTH);
+  } else if (node.kind === "entity") {
+    for (const attribute of node.attributes ?? [])
+      consider(entityRowText(attribute), ROW_CHAR_WIDTH);
+  } else {
+    for (const attribute of node.attributes ?? [])
+      consider(formatAttribute(attribute, node.kind), ROW_CHAR_WIDTH);
+    for (const operation of node.operations ?? [])
+      consider(formatOperation(operation), ROW_CHAR_WIDTH);
+  }
+
+  return widest === 0 ? 0 : Math.ceil(widest + COMPARTMENT_PAD_X);
+}
+
+/**
+ * Plain-text rendering of an entity attribute row, mirroring the segments
+ * `renderEntityAttributeRows` lays out (FK prefix + name + type + default).
+ * Used only for width estimation, so styling markers are ignored.
+ */
+function entityRowText(attribute: Attribute): string {
+  const fk = attribute.foreignKey === true && attribute.primaryKey !== true ? "+ " : "";
+  const type = attribute.type ? `: ${attribute.type}` : "";
+  const def =
+    attribute.default !== undefined && attribute.default !== "" ? ` = ${attribute.default}` : "";
+  return `${fk}${attribute.name}${type}${def}`;
 }
 
 function formatAttribute(attribute: Attribute, _kind: NodeKind): string {

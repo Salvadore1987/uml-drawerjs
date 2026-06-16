@@ -184,6 +184,45 @@ describe("generatePlantUml — output shape", () => {
     expect(ctnOut).toContain('ContainerDb(d, "Postgres", "PostgreSQL")');
   });
 
+  it("emits SystemDb_Ext / ContainerDb_Ext / ComponentDb_Ext for kind 'database-external' by tier", () => {
+    // Arrange — the same external-database kind must round-trip to the
+    // tier-correct macro: SystemDb_Ext on Context, ContainerDb_Ext on
+    // Container, ComponentDb_Ext on Component.
+    const ctxText = `@startuml\nSystemDb_Ext(d, "Legacy")\n@enduml\n`;
+    const ctxParsed = parsePlantUml(ctxText, {
+      diagramType: "c4-context",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    const ctnText = `@startuml\nContainerDb_Ext(d, "Legacy", "Oracle")\n@enduml\n`;
+    const ctnParsed = parsePlantUml(ctnText, {
+      diagramType: "c4-container",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    const cmpText = `@startuml\nComponentDb_Ext(d, "Legacy", "Oracle")\n@enduml\n`;
+    const cmpParsed = parsePlantUml(cmpText, {
+      diagramType: "c4-component",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — all three parse to the single `database-external` kind.
+    expect(ctxParsed.ast.nodes[0]?.kind).toBe("database-external");
+    expect(ctnParsed.ast.nodes[0]?.kind).toBe("database-external");
+    expect(cmpParsed.ast.nodes[0]?.kind).toBe("database-external");
+
+    // Act
+    const ctxOut = generatePlantUml(ctxParsed.ast);
+    const ctnOut = generatePlantUml(ctnParsed.ast);
+    const cmpOut = generatePlantUml(cmpParsed.ast);
+
+    // Assert — each tier regenerates its own external-database macro.
+    expect(ctxOut).toContain('SystemDb_Ext(d, "Legacy")');
+    expect(ctnOut).toContain('ContainerDb_Ext(d, "Legacy", "Oracle")');
+    expect(cmpOut).toContain('ComponentDb_Ext(d, "Legacy", "Oracle")');
+  });
+
   it("emits Container_Ext for kind 'container-external' (round-trip)", () => {
     // Arrange
     const text = `@startuml\nContainer_Ext(pay, "Payments", "REST", "Third-party")\n@enduml\n`;
@@ -453,12 +492,12 @@ describe("generatePlantUml — output shape", () => {
     expect(generated).toContain('Rel(p, s, "Uses", "HTTPS")');
   });
 
-  it("round-trips class members, generics, enum literals and per-end multiplicity", () => {
+  it("round-trips class members, enum literals and per-end multiplicity", () => {
     // Arrange — exercises every classic-UML extension landed in PR-1..3.
     const text =
       `@startuml\n` +
-      `interface Repository<T> {\n` +
-      `  {abstract} +findById(id: String): T\n` +
+      `interface Repository {\n` +
+      `  {abstract} +findById(id: String): String\n` +
       `}\n` +
       `abstract class AbstractEntity {\n` +
       `  {abstract} +validate(): void\n` +
@@ -496,7 +535,7 @@ describe("generatePlantUml — output shape", () => {
     expect(second.ast).toEqual(first.ast);
 
     // Spot-check the generator emitted UML modifiers and per-end multiplicity.
-    expect(generated).toContain("interface Repository<T> {");
+    expect(generated).toContain("interface Repository {");
     expect(generated).toContain("abstract class AbstractEntity {");
     expect(generated).toContain("{abstract} +validate(): void");
     expect(generated).toContain("{static} +nextId(): String");
@@ -536,9 +575,116 @@ describe("generatePlantUml — output shape", () => {
     expect(second.errors).toEqual([]);
     expect(second.ast.groups).toHaveLength(1);
     expect(second.ast.groups[0]?.label).toBe("com.bank");
-    expect(generated).toContain('package "com.bank" {');
+    expect(generated).toMatch(/package "com\.bank" as \w+ \{/u);
     expect(generated).toContain("  class Account");
     expect(generated).toContain("  class Transaction");
+  });
+
+  it("emits nested packages when a package contains another package", () => {
+    // Arrange — declared nesting: outer package contains an inner package
+    // which contains the class. The parser records this via openGroupStack.
+    const text =
+      `@startuml\n` +
+      `package "outer" {\n` +
+      `  package "inner" {\n` +
+      `    class Account\n` +
+      `  }\n` +
+      `}\n` +
+      `@enduml\n`;
+    const first = parsePlantUml(text, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+    expect(first.errors).toEqual([]);
+    const outer = first.ast.groups.find((g) => g.label === "outer");
+    const inner = first.ast.groups.find((g) => g.label === "inner");
+    expect(outer?.children).toContain(inner!.id);
+
+    // Act — the generator must nest `inner` inside `outer`, not emit siblings.
+    const generated = generatePlantUml(first.ast);
+
+    // Assert — `inner` is indented inside `outer`, and the class inside `inner`.
+    expect(generated).toMatch(
+      /package "outer" as \w+ \{\n {2}package "inner" as \w+ \{\n {4}class Account\n {2}\}\n\}/u,
+    );
+    // Round-trips: re-parsing keeps the nesting.
+    const second = parsePlantUml(generated, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+    const outer2 = second.ast.groups.find((g) => g.label === "outer");
+    const inner2 = second.ast.groups.find((g) => g.label === "inner");
+    expect(outer2?.children).toContain(inner2!.id);
+  });
+
+  it("infers package nesting from geometry when only sibling packages are declared", () => {
+    // Arrange — flat packages (as the buggy generator used to emit) plus
+    // layout overrides whose boxes show `inner` sitting inside `outer`. This
+    // mirrors a saved-then-reloaded diagram whose logical nesting was lost.
+    const text =
+      `@startuml\n` +
+      `' @drawer:meta {"layoutOverrides":{"outer":{"x":0,"y":0,"width":600,"height":400},"inner":{"x":40,"y":40,"width":300,"height":200}}}\n` +
+      `package "outer" as outer {\n` +
+      `}\n` +
+      `package "inner" as inner {\n` +
+      `  class Account\n` +
+      `}\n` +
+      `@enduml\n`;
+
+    // Act
+    const { ast, errors } = parsePlantUml(text, {
+      diagramType: "class",
+      diagramId: "diag",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — geometry inference re-parented `inner` under `outer`.
+    expect(errors).toEqual([]);
+    const outer = ast.groups.find((g) => g.label === "outer");
+    const inner = ast.groups.find((g) => g.label === "inner");
+    expect(outer?.children).toContain(inner!.id);
+    const generated = generatePlantUml(ast);
+    expect(generated).toMatch(
+      /package "outer" as \w+ \{\n {2}package "inner" as \w+ \{\n {4}class Account\n {2}\}\n\}/u,
+    );
+  });
+
+  it("round-trips a resized package's layout override (size survives re-parse)", () => {
+    // Arrange — a package with an explicit {x,y,width,height} override (as a
+    // user resize produces) plus one contained class.
+    const groupId = "0198gggg-1111-7000-8000-gggggggggggg";
+    const nodeId = "0198nnnn-2222-7000-8000-nnnnnnnnnnnn";
+    const diagram = createEmptyDiagram("class");
+    diagram.nodes.push({ id: nodeId, kind: "class", label: "Account" });
+    diagram.groups.push({ id: groupId, kind: "package", label: "com.bank", children: [nodeId] });
+    diagram.metadata.layoutOverrides = {
+      [groupId]: { x: 50, y: 60, width: 400, height: 300 },
+      [nodeId]: { x: 80, y: 120 },
+    };
+
+    // Act
+    const generated = generatePlantUml(diagram);
+    const { ast } = parsePlantUml(generated, {
+      diagramType: "class",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert — the package is emitted with a stable alias and its size maps
+    // back onto the re-parsed group id (not orphaned → no default-size revert).
+    expect(generated).toMatch(/package "com\.bank" as \w+ \{/u);
+    const group = ast.groups[0];
+    expect(group?.label).toBe("com.bank");
+    expect(ast.metadata.layoutOverrides?.[group!.id]).toEqual({
+      x: 50,
+      y: 60,
+      width: 400,
+      height: 300,
+    });
+    // Round-trip is stable.
+    expect(generatePlantUml(ast)).toBe(generated);
   });
 });
 
@@ -794,5 +940,54 @@ describe("C4 node extras (stereotype / technology) round-trip", () => {
 
     // Assert — no sidecar for class diagrams.
     expect(generated).not.toContain("nodeExtras");
+  });
+
+  it('round-trips a class label that isn\'t a bare identifier via `"label" as alias`', () => {
+    // Arrange — a freshly added class carries a spaced placeholder label and
+    // no alias (the palette dispatches addNodeCommand with `New Class`).
+    const diagram = createEmptyDiagram("class");
+    diagram.nodes.push({
+      id: "0198abcd-1234-7000-8000-aaaaaaaaaaaa",
+      kind: "class",
+      label: "New Class",
+    });
+
+    // Act — generate, then re-parse, then generate again.
+    const generated = generatePlantUml(diagram);
+    const { ast } = parsePlantUml(generated, {
+      diagramType: "class",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+    const regenerated = generatePlantUml(ast);
+
+    // Assert — the label survives as a quoted name (not a GUID), and the
+    // round-trip is stable.
+    expect(generated).toContain('class "New Class" as ');
+    expect(generated).not.toMatch(/class n_[0-9a-f_]+\s*$/mu);
+    expect(ast.nodes[0]?.label).toBe("New Class");
+    expect(regenerated).toBe(generated);
+  });
+
+  it('round-trips an entity label that isn\'t a bare identifier via `"label" as alias`', () => {
+    // Arrange
+    const diagram = createEmptyDiagram("er");
+    diagram.nodes.push({
+      id: "0198abcd-1234-7000-8000-bbbbbbbbbbbb",
+      kind: "entity",
+      label: "Customer Order",
+    });
+
+    // Act
+    const generated = generatePlantUml(diagram);
+    const { ast } = parsePlantUml(generated, {
+      diagramType: "er",
+      diagramId: "d",
+      idFactory: makeCounterFactory(),
+    });
+
+    // Assert
+    expect(generated).toContain('entity "Customer Order" as ');
+    expect(ast.nodes[0]?.label).toBe("Customer Order");
   });
 });

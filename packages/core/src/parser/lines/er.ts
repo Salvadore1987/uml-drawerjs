@@ -96,6 +96,9 @@ function consumeEntityDecl(ctx: ParseContext, match: RegExpExecArray): void {
   const id = resolveAlias(ctx, alias, "create");
   if (id === null) return;
   const node: DiagramNode = { id, kind: "entity", label };
+  // Keep the explicit alias so the generator re-emits the same
+  // `"label" as alias` token across round-trips.
+  if (quotedAlias !== undefined || trailingAlias !== undefined) node.alias = alias;
   ctx.nodes.push(node);
 
   if (openBrace !== undefined) {

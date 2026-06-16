@@ -253,6 +253,286 @@ describe("Component composition", () => {
     expect(captured!.exportText()).not.toContain("$tags");
     expect(captured!.exportText()).not.toContain("AddRelTag");
   });
+
+  it("PropsPanel Kind select changes a class relationship's type", async () => {
+    // Arrange — a class diagram with one association edge; select it.
+    const initial =
+      `@startuml\n` + `class Alpha\n` + `class Beta\n` + `Alpha --> Beta\n` + `@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().edges).toHaveLength(1);
+    });
+    expect(captured!.getState().edges[0]!.kind).toBe("association");
+    const edgeId = captured!.getState().edges[0]!.id;
+    act(() => {
+      captured!.selection.set([edgeId]);
+    });
+
+    // The class edge form exposes the Kind dropdown as its only combobox.
+    const select = (await screen.findByRole("combobox")) as HTMLSelectElement;
+    expect(select.value).toBe("association");
+    // All six class relationship types are offered.
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toEqual([
+      "association",
+      "inheritance",
+      "realization",
+      "dependency",
+      "aggregation",
+      "composition",
+    ]);
+
+    // Act — switch to inheritance.
+    act(() => {
+      fireEvent.change(select, { target: { value: "inheritance" } });
+    });
+
+    // Assert — the AST kind changed and the source emits the inheritance arrow.
+    expect(captured!.getState().edges[0]!.kind).toBe("inheritance");
+    expect(captured!.exportText()).toContain("Alpha --|> Beta");
+  });
+
+  it("PropsPanel Reverse direction swaps a relationship's endpoints", async () => {
+    // Arrange — a class diagram with one directed association; select it.
+    const initial =
+      `@startuml\n` + `class Alpha\n` + `class Beta\n` + `Alpha --> Beta\n` + `@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().edges).toHaveLength(1);
+    });
+    const before = captured!.getState().edges[0]!;
+    const { source: origSource, target: origTarget } = before;
+    act(() => {
+      captured!.selection.set([before.id]);
+    });
+
+    // Act — click the Reverse direction button.
+    const button = await screen.findByRole("button", { name: /reverse direction/i });
+    act(() => {
+      fireEvent.click(button);
+    });
+
+    // Assert — endpoints swapped in the AST and the emitted arrow flips.
+    const after = captured!.getState().edges[0]!;
+    expect(after.source).toBe(origTarget);
+    expect(after.target).toBe(origSource);
+    expect(captured!.exportText()).toContain("Beta --> Alpha");
+
+    // Act — clicking again restores the original direction.
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /reverse direction/i }));
+    });
+    const restored = captured!.getState().edges[0]!;
+    expect(restored.source).toBe(origSource);
+    expect(restored.target).toBe(origTarget);
+  });
+
+  it("PropsPanel Type select changes a class node's kind in place", async () => {
+    // Arrange — a class diagram with one class node; select it.
+    const initial = `@startuml\nclass Alpha\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes).toHaveLength(1);
+    });
+    const node = captured!.getState().nodes[0]!;
+    expect(node.kind).toBe("class");
+    act(() => {
+      captured!.selection.set([node.id]);
+    });
+
+    // The Type dropdown is labelled "Type" and offers the four class kinds.
+    const select = (await screen.findByRole("combobox", { name: "Type" })) as HTMLSelectElement;
+    expect(select.value).toBe("class");
+    const optionValues = Array.from(select.options).map((o) => o.value);
+    expect(optionValues).toEqual(["class", "interface", "abstract-class", "enum"]);
+
+    // Act — switch to interface.
+    act(() => {
+      fireEvent.change(select, { target: { value: "interface" } });
+    });
+
+    // Assert — same node id, kind changed, source emits the interface keyword.
+    const after = captured!.getState().nodes[0]!;
+    expect(after.id).toBe(node.id);
+    expect(after.kind).toBe("interface");
+    expect(captured!.exportText()).toContain("interface Alpha");
+  });
+
+  it("PropsPanel hides the Type select for a non-class node", async () => {
+    // Arrange — a C4 context diagram; its System node is not class-like.
+    const initial = `@startuml\nSystem(s, "System")\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="c4-context" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes).toHaveLength(1);
+    });
+    act(() => {
+      captured!.selection.set([captured!.getState().nodes[0]!.id]);
+    });
+
+    // Assert — no Type dropdown for a non-class-like kind.
+    await screen.findByRole("form");
+    expect(screen.queryByRole("combobox", { name: "Type" })).toBeNull();
+  });
+
+  it("parameterizes a generic member type via per-argument fields", async () => {
+    // Arrange — a class with one attribute typed `String`.
+    const initial = `@startuml\nclass Box {\n  -items: String\n}\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes[0]?.attributes ?? []).toHaveLength(1);
+    });
+    act(() => {
+      captured!.selection.set([captured!.getState().nodes[0]!.id]);
+    });
+
+    // Act — switch the attribute type to the Map generic, then fill key/value.
+    const baseSelect = (await screen.findByRole("combobox", {
+      name: "Attribute type",
+    })) as HTMLSelectElement;
+    act(() => {
+      fireEvent.change(baseSelect, { target: { value: "Map" } });
+    });
+    const keySelect = (await screen.findByRole("combobox", {
+      name: "Attribute type key",
+    })) as HTMLSelectElement;
+    act(() => {
+      fireEvent.change(keySelect, { target: { value: "String" } });
+    });
+    const valueSelect = (await screen.findByRole("combobox", {
+      name: "Attribute type value",
+    })) as HTMLSelectElement;
+    act(() => {
+      fireEvent.change(valueSelect, { target: { value: "Integer" } });
+    });
+
+    // Assert — the composed generic type is stored on the attribute.
+    expect(captured!.getState().nodes[0]!.attributes?.[0]?.type).toBe("Map<String, Integer>");
+    expect(captured!.exportText()).toContain("items: Map<String, Integer>");
+  });
+
+  it("decomposes an existing generic member type into base + argument fields", async () => {
+    // Arrange — an attribute already typed `List<String>`.
+    const initial = `@startuml\nclass Box {\n  -items: List<String>\n}\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes[0]?.attributes?.[0]?.type).toBe("List<String>");
+    });
+    act(() => {
+      captured!.selection.set([captured!.getState().nodes[0]!.id]);
+    });
+
+    // Assert — base select shows List, element select shows String.
+    const baseSelect = (await screen.findByRole("combobox", {
+      name: "Attribute type",
+    })) as HTMLSelectElement;
+    expect(baseSelect.value).toBe("List");
+    const elementSelect = (await screen.findByRole("combobox", {
+      name: "Attribute type element",
+    })) as HTMLSelectElement;
+    expect(elementSelect.value).toBe("String");
+  });
+
+  it("PropsPanel 'To front' brings the selected node to the end of the paint order", async () => {
+    // Arrange — two top-level classes; select the first.
+    const initial = `@startuml\nclass Alpha\nclass Beta\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes).toHaveLength(2);
+    });
+    const first = captured!.getState().nodes[0]!;
+    expect(first.label).toBe("Alpha");
+    act(() => {
+      captured!.selection.set([first.id]);
+    });
+
+    // Act — click "To front".
+    const button = await screen.findByRole("button", { name: "To front" });
+    act(() => {
+      fireEvent.click(button);
+    });
+
+    // Assert — Alpha is now last (painted on top) and the source reflects it.
+    expect(captured!.getState().nodes.map((n) => n.label)).toEqual(["Beta", "Alpha"]);
+    const text = captured!.exportText();
+    expect(text.indexOf("class Beta")).toBeLessThan(text.indexOf("class Alpha"));
+  });
+
+  it("no longer renders the class-level Generics input", async () => {
+    const initial = `@startuml\nclass Box {\n  -items: String\n}\n@enduml\n`;
+    let captured: Probe | null = null;
+    render(
+      <UmlEditor diagramType="class" defaultValue={initial}>
+        <Canvas />
+        <PropsPanel />
+        <ProbeEditor onReady={(ed) => (captured = ed)} />
+      </UmlEditor>,
+    );
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+      expect(captured!.getState().nodes).toHaveLength(1);
+    });
+    act(() => {
+      captured!.selection.set([captured!.getState().nodes[0]!.id]);
+    });
+    await screen.findByRole("form");
+    expect(screen.queryByText(/Generics/i)).toBeNull();
+  });
 });
 
 describe("Hook misuse", () => {

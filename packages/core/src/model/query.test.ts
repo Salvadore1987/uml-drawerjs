@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createEmptyDiagram } from "./factory.js";
 import { uuidv7 } from "./ids.js";
 import {
+  collectGroupDescendants,
   findEdge,
   findGroup,
   findNode,
@@ -121,5 +122,40 @@ describe("getParentGroups", () => {
 
     // Act & Assert
     expect(getParentGroups(diagram, carol.id)).toEqual([]);
+  });
+});
+
+describe("collectGroupDescendants", () => {
+  it("collects nodes and nested groups recursively, excluding the root", () => {
+    // Arrange — outer package → inner package → leaf class, plus a direct
+    // child class on the outer package.
+    const leaf = makeNode("Leaf");
+    const direct = makeNode("Direct");
+    const inner = makeGroup("inner", [leaf.id]);
+    const outer = makeGroup("outer", [direct.id, inner.id]);
+    const diagram: Diagram = {
+      ...createEmptyDiagram("class"),
+      nodes: [leaf, direct],
+      groups: [outer, inner],
+    };
+
+    // Act
+    const result = collectGroupDescendants(diagram, outer.id);
+
+    // Assert — every descendant node + the nested group; root excluded.
+    expect(new Set(result.nodeIds)).toEqual(new Set([direct.id, leaf.id]));
+    expect(result.groupIds).toEqual([inner.id]);
+  });
+
+  it("returns empty lists for an empty / unknown group and tolerates a cycle", () => {
+    // Arrange — two groups that (illegally) contain each other.
+    const a = makeGroup("a", []);
+    const b = makeGroup("b", [a.id]);
+    a.children.push(b.id);
+    const diagram: Diagram = { ...createEmptyDiagram("class"), groups: [a, b] };
+
+    // Act & Assert — no infinite loop; only the reachable nested group.
+    expect(collectGroupDescendants(diagram, a.id)).toEqual({ nodeIds: [], groupIds: [b.id] });
+    expect(collectGroupDescendants(diagram, "missing")).toEqual({ nodeIds: [], groupIds: [] });
   });
 });

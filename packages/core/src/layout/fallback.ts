@@ -1,4 +1,5 @@
 import type { Diagram } from "../model/types.js";
+import { compartmentContentWidth } from "../renderer/nodes.js";
 import type { LayoutCoordinates, LayoutOptions, LayoutResult } from "./types.js";
 import { resolveDefaults } from "./types.js";
 
@@ -16,7 +17,12 @@ export function layoutGrid(diagram: Diagram, options?: LayoutOptions): LayoutRes
   // even when empty) and members read more naturally with extra room — bump
   // the inter-node gap modestly when no explicit spacing was passed.
   const spacing = options?.spacing ?? (diagram.type === "class" ? 80 : defaults.spacing);
-  const nodeWidth = defaults.nodeWidth;
+  // Keep the grid uniform, but widen every cell to the widest compartment
+  // node so a long class name / member row can't overflow into its neighbour.
+  const nodeWidth = diagram.nodes.reduce(
+    (max, node) => Math.max(max, compartmentContentWidth(node)),
+    defaults.nodeWidth,
+  );
   const nodeHeight = defaults.nodeHeight;
   const coordinates: LayoutCoordinates = {};
 

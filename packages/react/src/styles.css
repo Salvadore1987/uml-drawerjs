@@ -264,6 +264,16 @@
   color: var(--uml-danger);
 }
 
+.uml-props-panel__zorder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.uml-props-panel__zorder > .uml-button {
+  flex: 1 1 auto;
+}
+
 .uml-props-panel__empty,
 .uml-props-panel__multi {
   color: var(--uml-text-muted);
@@ -353,7 +363,6 @@
 }
 
 .uml-class-members__name,
-.uml-class-members__type,
 .uml-class-members__params {
   font: inherit;
   font-size: var(--uml-font-size-sm);
@@ -365,8 +374,25 @@
   min-width: 0;
 }
 
-select.uml-class-members__type {
-  flex: 0 1 140px;
+/* Type picker: a base <select> plus one <select> per generic type argument. */
+.uml-class-members__type {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.uml-class-members__type > select {
+  font: inherit;
+  font-size: var(--uml-font-size-sm);
+  background-color: var(--uml-bg);
+  color: var(--uml-text);
+  border: 1px solid var(--uml-border);
+  border-radius: var(--uml-radius-sm);
+  padding: 4px 6px;
+  min-width: 0;
+  flex: 1 1 60px;
 }
 
 .uml-class-members__params-list {
@@ -403,10 +429,6 @@ select.uml-class-members__type {
 }
 
 .uml-class-members__name {
-  flex: 1 1 80px;
-}
-
-.uml-class-members__type {
   flex: 1 1 80px;
 }
 
@@ -697,6 +719,20 @@ select.uml-class-members__type {
   pointer-events: auto;
 }
 
+/* Visible dot affordance paired with each (larger, transparent) hit rect.
+   Never interactive — the hit rect owns the grab; the dot only shows where. */
+.uml-node-resize-dot {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+[data-uml-content][data-selected-count="single"]
+  .uml-node[data-selected="true"]
+  .uml-node-resize-dot {
+  opacity: 1;
+}
+
 /* Sequence-fragment resize handles — same visibility contract as node
    handles. N / S grow or shrink the chronological span by adding /
    removing edges to the first or last operand. E / W extend or contract
@@ -790,6 +826,19 @@ select.uml-class-members__type {
   .uml-group-resize-handle {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Visible dot affordance for group/package handles — see node dots above. */
+.uml-group-resize-dot {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+[data-uml-content][data-selected-count="single"]
+  [data-group-id][data-selected="true"]
+  .uml-group-resize-dot {
+  opacity: 1;
 }
 
 .uml-group__label-band {

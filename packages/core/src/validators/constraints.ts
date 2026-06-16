@@ -101,16 +101,16 @@ function enforceClassMemberRules(diagram: Diagram, errors: DiagramError[]): void
           nodeId: node.id,
         });
       }
-      if ((node.generics?.length ?? 0) > 0) {
+    }
+    if (node.kind === "interface") {
+      if ((node.attributes?.length ?? 0) > 0) {
         errors.push({
           severity: "error",
-          code: CONSTRAINT_ERROR_CODES.ClassEnumHasGenerics,
-          message: `Enum '${node.label}' cannot declare generic type parameters`,
+          code: CONSTRAINT_ERROR_CODES.ClassInterfaceHasAttributes,
+          message: `Interface '${node.label}' cannot declare fields (attributes) — interfaces define only operations`,
           nodeId: node.id,
         });
       }
-    }
-    if (node.kind === "interface") {
       for (const op of node.operations ?? []) {
         if (op.abstract === false) {
           errors.push({
@@ -184,6 +184,7 @@ const C4_NODE_KINDS = new Set<NodeKind>([
   "component",
   "component-external",
   "database",
+  "database-external",
   "queue",
 ]);
 
@@ -204,6 +205,7 @@ const C4_CONTEXT_NODE_KINDS = new Set<NodeKind>([
   "system",
   "system-external",
   "database",
+  "database-external",
   "queue",
 ]);
 
@@ -223,6 +225,7 @@ const C4_CONTAINER_NODE_KINDS = new Set<NodeKind>([
   "container",
   "container-external",
   "database",
+  "database-external",
   "queue",
 ]);
 const CLASS_NODE_KINDS = new Set<NodeKind>(["class", "interface", "abstract-class", "enum"]);
@@ -411,14 +414,6 @@ function enforceEntityMemberRules(diagram: Diagram, errors: DiagramError[]): voi
         severity: "error",
         code: CONSTRAINT_ERROR_CODES.ErEntityHasEnumLiterals,
         message: `Entity '${node.label}' cannot declare enum literals`,
-        nodeId: node.id,
-      });
-    }
-    if ((node.generics?.length ?? 0) > 0) {
-      errors.push({
-        severity: "error",
-        code: CONSTRAINT_ERROR_CODES.ErEntityHasGenerics,
-        message: `Entity '${node.label}' cannot declare generic type parameters`,
         nodeId: node.id,
       });
     }

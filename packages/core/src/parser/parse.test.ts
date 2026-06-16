@@ -305,7 +305,7 @@ describe("parsePlantUml — C4 macro coverage", () => {
     expect(kinds).toEqual(["person", "person-external"]);
   });
 
-  it("SystemDb / SystemDb_Ext map to kind 'database' on a Context diagram", () => {
+  it("SystemDb maps to 'database' and SystemDb_Ext to 'database-external' on a Context diagram", () => {
     // Arrange
     const text = `@startuml\nSystemDb(d1, "Audit Log", "Stores trails")\nSystemDb_Ext(d2, "Vendor DB")\n@enduml\n`;
 
@@ -316,9 +316,10 @@ describe("parsePlantUml — C4 macro coverage", () => {
       idFactory: makeDeterministicIdFactory(),
     });
 
-    // Assert
+    // Assert — the `_Ext` variant carries its own external kind so it can
+    // round-trip back to `SystemDb_Ext` and render grey + dashed.
     expect(errors).toEqual([]);
-    expect(ast.nodes.map((n) => n.kind)).toEqual(["database", "database"]);
+    expect(ast.nodes.map((n) => n.kind)).toEqual(["database", "database-external"]);
     expect(ast.nodes[0]?.description).toBe("Stores trails");
   });
 
