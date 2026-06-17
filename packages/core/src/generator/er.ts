@@ -18,7 +18,7 @@ export function renderEr(diagram: Diagram, aliases: Map<string, string>): string
       lines.push(head);
     } else {
       lines.push(`${head} {`);
-      for (const attr of attrs) lines.push(`  ${formatErAttribute(attr)}`);
+      for (const attr of attrs) lines.push(`  ${formatErAttribute(attr, aliases)}`);
       lines.push("}");
     }
   }
@@ -43,6 +43,9 @@ const FORWARD_ARROWS: Partial<Record<EdgeKind, string>> = {
   "one-to-one": "||--||",
   "one-to-many": "||--o{",
   "many-to-many": "}o--o{",
+  // UML ownership relations between entities (no crow's-foot cardinality).
+  composition: "*--",
+  aggregation: "o--",
 };
 
 function formatErEdge(edge: DiagramEdge, aliases: Map<string, string>): string {
@@ -53,7 +56,7 @@ function formatErEdge(edge: DiagramEdge, aliases: Map<string, string>): string {
   return `${from} ${arrow} ${to}${suffix}`;
 }
 
-function formatErAttribute(attr: Attribute): string {
+function formatErAttribute(attr: Attribute, aliases: Map<string, string>): string {
   // Prefix marker: `*` for primary key (implies NN), `+` for foreign key.
   // Both can apply (a column can be both PK and FK), but the line shape only
   // shows one prefix — PK wins (it implies non-null and is the dominant
@@ -68,5 +71,12 @@ function formatErAttribute(attr: Attribute): string {
   // the marker if NN was explicitly set, but PK already forces non-null so
   // it's redundant there.
   if (attr.nullable === false && !attr.primaryKey) line += " <<NN>>";
+  // Foreign-key target: `<<FK alias>>` or `<<FK alias.column>>`. The target
+  // entity is resolved to its PlantUML alias so the reference round-trips.
+  if (attr.references) {
+    const targetAlias = lookupAlias(aliases, attr.references.entity);
+    const col = attr.references.column ? `.${attr.references.column}` : "";
+    line += ` <<FK ${targetAlias}${col}>>`;
+  }
   return line;
 }

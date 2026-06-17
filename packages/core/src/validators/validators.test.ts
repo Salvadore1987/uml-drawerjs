@@ -214,6 +214,29 @@ describe("validateConstraints — diagram-type rules", () => {
     expect(codes).toContain(CONSTRAINT_ERROR_CODES.ErCardinalityMissing);
   });
 
+  it("allows composition / aggregation between ER entities without cardinality", () => {
+    // Arrange — UML ownership relations are valid ER edges and carry no
+    // crow's-foot cardinality.
+    const diagram = erDiagramWith({
+      nodes: [
+        { id: "a", kind: "entity", label: "Order" },
+        { id: "b", kind: "entity", label: "OrderLine" },
+        { id: "c", kind: "entity", label: "Tag" },
+      ],
+      edges: [
+        { id: "e1", source: "a", target: "b", kind: "composition" },
+        { id: "e2", source: "a", target: "c", kind: "aggregation" },
+      ],
+    });
+
+    // Act
+    const codes = validateConstraints(diagram).map((e) => e.code);
+
+    // Assert — neither kind-rejection nor a spurious missing-cardinality error.
+    expect(codes).not.toContain(CONSTRAINT_ERROR_CODES.EdgeKindNotAllowed);
+    expect(codes).not.toContain(CONSTRAINT_ERROR_CODES.ErCardinalityMissing);
+  });
+
   it("rejects ER cardinality tokens that don't match the supported grammar", () => {
     // Arrange
     const diagram = erDiagramWith({
@@ -585,6 +608,76 @@ describe("validateLint — soft warnings", () => {
     // Assert
     expect(orphans).toHaveLength(1);
     expect(orphans[0]).toMatchObject({ nodeId: "lonely", severity: "warning" });
+  });
+
+  it("does not warn about standalone entities in ER diagrams", () => {
+    // Arrange — a lone table with no relationships is valid ER modelling.
+    const diagram = erDiagramWith({
+      nodes: [{ id: "orders", kind: "entity", label: "Orders" }],
+    });
+
+    // Act
+    const errors = validateLint(diagram);
+
+    // Assert
+    expect(errors.filter((e) => e.code === LINT_ERROR_CODES.OrphanNode)).toEqual([]);
+  });
+
+  it("warns about a FK column referencing an unknown entity", () => {
+    // Arrange
+    const diagram = erDiagramWith({
+      nodes: [
+        {
+          id: "order",
+          kind: "entity",
+          label: "Order",
+          attributes: [
+            { id: "a1", name: "customer_id", foreignKey: true, references: { entity: "ghost" } },
+          ],
+        },
+      ],
+    });
+
+    // Act
+    const dangling = validateLint(diagram).filter(
+      (e) => e.code === LINT_ERROR_CODES.DanglingFkReference,
+    );
+
+    // Assert
+    expect(dangling).toHaveLength(1);
+    expect(dangling[0]).toMatchObject({ nodeId: "order", severity: "warning" });
+  });
+
+  it("does not warn when a FK column resolves to an existing entity + column", () => {
+    // Arrange
+    const diagram = erDiagramWith({
+      nodes: [
+        {
+          id: "customer",
+          kind: "entity",
+          label: "Customer",
+          attributes: [{ id: "c1", name: "id", primaryKey: true }],
+        },
+        {
+          id: "order",
+          kind: "entity",
+          label: "Order",
+          attributes: [
+            {
+              id: "a1",
+              name: "customer_id",
+              foreignKey: true,
+              references: { entity: "customer", column: "id" },
+            },
+          ],
+        },
+      ],
+    });
+
+    // Act / Assert
+    expect(
+      validateLint(diagram).filter((e) => e.code === LINT_ERROR_CODES.DanglingFkReference),
+    ).toEqual([]);
   });
 
   it("does not warn about orphan participants in sequence diagrams", () => {

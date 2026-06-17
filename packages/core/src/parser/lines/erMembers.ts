@@ -1,6 +1,6 @@
 import type { Attribute } from "../../model/types.js";
 import type { ParseContext } from "../context.js";
-import { freshId } from "../context.js";
+import { freshId, resolveAlias } from "../context.js";
 
 /**
  * Entity-body grammar (PlantUML IE / UML-ER). Activated when the parser is
@@ -18,7 +18,10 @@ import { freshId } from "../context.js";
 
 const PK_PREFIX = /^\*\s*/u;
 const FK_PREFIX = /^\+\s*/u;
-const NN_TAIL = /\s+<<\s*(?:NN|not\s+null)\s*>>\s*$/iu;
+/** Any trailing `<<...>>` stereotype (NN / not null / FK target). */
+const STEREO_TAIL = /\s*<<\s*([^>]*?)\s*>>\s*$/u;
+const NN_INNER = /^(?:NN|not\s+null)$/iu;
+const FK_INNER = /^FK\s+([^.\s]+)(?:\.([^.\s]+))?$/iu;
 const FIELD_LINE = /^([A-Za-z_][\w]*)\s*(?::\s*([^=]+?))?\s*(?:=\s*(.+))?\s*$/u;
 
 export function handleEntityMember(ctx: ParseContext, rawText: string): boolean {
@@ -48,13 +51,29 @@ function parseEntityAttribute(ctx: ParseContext, text: string): Attribute | null
   let primaryKey = false;
   let foreignKey = false;
   let nullable: boolean | undefined;
+  let references: Attribute["references"];
 
-  // 1. Trailing `<<NN>>` / `<<not null>>` marker — strip first so it doesn't
-  //    interfere with the field grammar.
-  const nnMatch = NN_TAIL.exec(rest);
-  if (nnMatch) {
-    nullable = false;
-    rest = rest.slice(0, nnMatch.index).trimEnd();
+  // 1. Trailing `<<...>>` stereotypes — strip from the end so they don't
+  //    interfere with the field grammar. The generator emits `<<NN>>` then
+  //    `<<FK target>>`, so loop to consume every trailing token regardless of
+  //    order. `NN` → not-null; `FK alias[.col]` → references.
+  for (;;) {
+    const tail = STEREO_TAIL.exec(rest);
+    if (!tail) break;
+    const inner = tail[1]?.trim() ?? "";
+    if (NN_INNER.test(inner)) {
+      nullable = false;
+    } else {
+      const fk = FK_INNER.exec(inner);
+      if (fk) {
+        const entity = resolveAlias(ctx, fk[1]!, "create")!;
+        references = fk[2] ? { entity, column: fk[2] } : { entity };
+        foreignKey = true;
+      } else {
+        break; // unknown stereotype — leave it for the field grammar / opaque
+      }
+    }
+    rest = rest.slice(0, tail.index).trimEnd();
   }
 
   // 2. PK marker `*` (PlantUML IE primary key). Implies NN.
@@ -85,5 +104,6 @@ function parseEntityAttribute(ctx: ParseContext, text: string): Attribute | null
   if (primaryKey) attr.primaryKey = true;
   if (foreignKey) attr.foreignKey = true;
   if (nullable === false) attr.nullable = false;
+  if (references) attr.references = references;
   return attr;
 }

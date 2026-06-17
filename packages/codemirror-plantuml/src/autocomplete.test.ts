@@ -112,6 +112,48 @@ describe("plantUmlCompletions — context-aware proposals", () => {
     expect(result).toBeNull();
   });
 
+  it("proposes SQL types in ER attribute-type position", () => {
+    // Arrange — cursor right after the colon of an entity column.
+    const doc = '@startuml\nentity "Order" as order {\n  total : NUM\n}\n@enduml\n';
+    const pos = doc.indexOf("NUM") + "NUM".length;
+
+    // Act
+    const result = complete(doc, pos, "er");
+
+    // Assert — SQL vocabulary, not keywords/snippets.
+    const ls = labels(result);
+    expect(ls).toContain("NUMERIC");
+    expect(ls).toContain("VARCHAR");
+    expect(ls).not.toContain("entity");
+    expect(ls).not.toContain("@startuml");
+  });
+
+  it("tolerates the PK marker before an ER column name", () => {
+    // Arrange
+    const doc = '@startuml\nentity "Order" as order {\n  * id : UUI\n}\n@enduml\n';
+    const pos = doc.indexOf("UUI") + "UUI".length;
+
+    // Act
+    const result = complete(doc, pos, "er");
+
+    // Assert
+    expect(labels(result)).toContain("UUID");
+  });
+
+  it("proposes Java types in class attribute-type position", () => {
+    // Arrange
+    const doc = "@startuml\nclass Order {\n  total : Big\n}\n@enduml\n";
+    const pos = doc.indexOf("Big") + "Big".length;
+
+    // Act
+    const result = complete(doc, pos, "class");
+
+    // Assert — Java vocabulary, and crucially NOT the SQL-only types.
+    const ls = labels(result);
+    expect(ls).toContain("BigDecimal");
+    expect(ls).not.toContain("VARCHAR");
+  });
+
   it("extraCompletions are appended", () => {
     // Arrange & Act
     const result = complete("@startuml\n", "@startuml\n".length, "class", {

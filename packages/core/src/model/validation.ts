@@ -142,6 +142,7 @@ const attributeSchema = z
     primaryKey: z.boolean().optional(),
     foreignKey: z.boolean().optional(),
     nullable: z.boolean().optional(),
+    references: z.object({ entity: z.string(), column: z.string().optional() }).strict().optional(),
     description: z.string().optional(),
   })
   .strict();

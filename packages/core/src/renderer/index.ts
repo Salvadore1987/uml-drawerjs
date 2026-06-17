@@ -21,7 +21,7 @@ import { computeGroupBoxes, renderGroupLayer } from "./groups.js";
 import { renderSequenceDiagram } from "./sequence.js";
 import { layoutGrid } from "../layout/fallback.js";
 import { layoutSequence } from "../layout/sequence.js";
-import type { Diagram } from "../model/types.js";
+import type { Diagram, DiagramEdge } from "../model/types.js";
 import { resolveRendererDefaults, v } from "./types.js";
 import type { NodeGeometry, RenderedDiagram, RendererOptions, VNode } from "./types.js";
 
@@ -85,6 +85,31 @@ export function renderDiagram(diagram: Diagram, options: RendererOptions = {}): 
         ? renderEdge({ edge, source, target, labelOverride })
         : renderEdge({ edge, source, target }),
     );
+  }
+
+  // Foreign-key connectors are derived from `attribute.references` (ER) rather
+  // than stored as edges — the `<<FK>>` annotation is the single source of
+  // truth, so this renders a dashed crow's-foot link to the referenced entity
+  // without any AST/edge bookkeeping.
+  if (diagram.type === "er") {
+    for (const node of diagram.nodes) {
+      for (const attr of node.attributes ?? []) {
+        const ref = attr.references;
+        if (!ref) continue;
+        const source = geometry.get(node.id);
+        const target = geometry.get(ref.entity);
+        if (!source || !target) continue; // dangling ref — surfaced by lint
+        const fkEdge: DiagramEdge = {
+          id: `fk:${node.id}:${attr.id}`,
+          source: node.id,
+          target: ref.entity,
+          kind: "one-to-many",
+          cardinality: { source: "0..*", target: "1" },
+          label: ref.column ? `${attr.name} → ${ref.column}` : attr.name,
+        };
+        edgeVNodes.push(renderEdge({ edge: fkEdge, source, target, fk: true }));
+      }
+    }
   }
 
   const groupBoxes = computeGroupBoxes({ diagram, nodeGeometry: geometry });

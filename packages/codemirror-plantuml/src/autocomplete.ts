@@ -6,6 +6,7 @@ import type {
 } from "@codemirror/autocomplete";
 import { parsePlantUml } from "@uml-drawer/core/parser";
 import type { Diagram, DiagramType } from "@uml-drawer/core/model";
+import { typeSuggestionsFor } from "@uml-drawer/core/model";
 import { snippetsFor } from "./snippets.js";
 
 /**
@@ -143,11 +144,53 @@ export function plantUmlCompletions(options: PlantUmlAutocompleteOptions): Compl
   };
 }
 
+/**
+ * Matches the cursor sitting in the *type* slot of a member line, i.e.
+ * after the `:` separator on an attribute/column (or a method return type):
+ *
+ *   `* id : UUI▮`      `name: Str▮`      `+ amount : ▮`      `charge(): voi▮`
+ *
+ * Leading PK/FK markers (`*` / `+`) and class visibility glyphs
+ * (`-` / `#` / `~`) are tolerated; an optional `(...)` covers method
+ * signatures. The trailing `\w*` allows an empty partial (explicit trigger
+ * right after the colon).
+ */
+const ATTRIBUTE_TYPE_POSITION = /^\s*[*+\-#~]?\s*[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*:\s*\w*$/u;
+
+/**
+ * When the cursor is in attribute-type position, propose the diagram's type
+ * vocabulary (SQL for ER, Java for class). Returns `null` when not in that
+ * position or when the diagram type carries no typed attributes — callers
+ * then fall back to the regular keyword/snippet/identifier buckets.
+ */
+function typeCompletionsFor(
+  context: CompletionContext,
+  options: PlantUmlAutocompleteOptions,
+): Completion[] | null {
+  const line = context.state.doc.lineAt(context.pos);
+  const before = line.text.slice(0, context.pos - line.from);
+  if (!ATTRIBUTE_TYPE_POSITION.test(before)) return null;
+
+  const types = typeSuggestionsFor(options.diagramType);
+  if (types.length === 0) return null;
+
+  return types.map((label) => ({ label, type: "type", boost: 40 }));
+}
+
 function collectCompletions(
   context: CompletionContext,
   options: PlantUmlAutocompleteOptions,
   prefix: string,
 ): Completion[] {
+  // Type position is exclusive — when the user is filling in a column/field
+  // type we only want the type vocabulary, not keywords or aliases.
+  const typeBucket = typeCompletionsFor(context, options);
+  if (typeBucket) {
+    if (options.extraCompletions) typeBucket.push(...options.extraCompletions);
+    void prefix;
+    return typeBucket;
+  }
+
   const docText = context.state.doc.toString();
   const result: Completion[] = [];
 

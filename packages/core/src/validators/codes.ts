@@ -62,6 +62,7 @@ export const LINT_ERROR_CODES = {
   DuplicateLabel: "LINT_DUPLICATE_LABEL",
   InheritanceCycle: "LINT_INHERITANCE_CYCLE",
   C4EmptyRelLabel: "LINT_C4_EMPTY_REL_LABEL",
+  DanglingFkReference: "LINT_DANGLING_FK_REFERENCE",
 } as const;
 
 export type LintErrorCode = (typeof LINT_ERROR_CODES)[keyof typeof LINT_ERROR_CODES];

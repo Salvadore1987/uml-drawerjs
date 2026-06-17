@@ -159,6 +159,15 @@ export const diagramJsonSchema = {
         primaryKey: { type: "boolean" },
         foreignKey: { type: "boolean" },
         nullable: { type: "boolean" },
+        references: {
+          type: "object",
+          required: ["entity"],
+          additionalProperties: false,
+          properties: {
+            entity: { type: "string" },
+            column: { type: "string" },
+          },
+        },
         description: { type: "string" },
       },
     },

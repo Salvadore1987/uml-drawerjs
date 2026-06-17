@@ -54,6 +54,74 @@ describe("generatePlantUml — fixture round-trip", () => {
   }
 });
 
+describe("generatePlantUml — ER composition / aggregation", () => {
+  it("round-trips ER composition (`*--`) and aggregation (`o--`)", () => {
+    // Arrange
+    const source = `@startuml
+entity Order
+entity OrderLine
+entity Tag
+Order *-- OrderLine
+Order o-- Tag
+@enduml
+`;
+    const first = parsePlantUml(source, {
+      diagramType: "er",
+      diagramId: "diagram-er-comp",
+      idFactory: makeCounterFactory(),
+    });
+    expect(first.errors).toEqual([]);
+
+    // Act
+    const generated = generatePlantUml(first.ast);
+
+    // Assert — arrows survive generation and the AST round-trips.
+    expect(generated).toContain("*--");
+    expect(generated).toContain("o--");
+    const second = parsePlantUml(generated, {
+      diagramType: "er",
+      diagramId: "diagram-er-comp",
+      idFactory: makeCounterFactory(),
+    });
+    expect(second.errors).toEqual([]);
+    expect(second.ast).toEqual(first.ast);
+  });
+});
+
+describe("generatePlantUml — ER foreign-key references", () => {
+  it("round-trips `<<FK Target.col>>` on a column", () => {
+    // Arrange
+    const source = `@startuml
+entity Customer {
+  * id : UUID
+}
+entity Order {
+  + customer_id : UUID <<FK Customer.id>>
+}
+@enduml
+`;
+    const first = parsePlantUml(source, {
+      diagramType: "er",
+      diagramId: "diagram-er-fk",
+      idFactory: makeCounterFactory(),
+    });
+    expect(first.errors).toEqual([]);
+
+    // Act
+    const generated = generatePlantUml(first.ast);
+
+    // Assert
+    expect(generated).toContain("<<FK Customer.id>>");
+    const second = parsePlantUml(generated, {
+      diagramType: "er",
+      diagramId: "diagram-er-fk",
+      idFactory: makeCounterFactory(),
+    });
+    expect(second.errors).toEqual([]);
+    expect(second.ast).toEqual(first.ast);
+  });
+});
+
 describe("generatePlantUml — output shape", () => {
   it("wraps every diagram with @startuml / @enduml and trailing newline", () => {
     // Arrange
