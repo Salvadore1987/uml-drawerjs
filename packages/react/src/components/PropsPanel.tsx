@@ -78,14 +78,6 @@ const SEQUENCE_EDGE_KIND_OPTIONS: ReadonlyArray<{ value: EdgeKind; label: string
   { value: "found-message", label: "Found message ([->)" },
   { value: "lost-message", label: "Lost message (->])" },
 ];
-const CLASS_EDGE_KINDS = new Set<EdgeKind>([
-  "association",
-  "inheritance",
-  "realization",
-  "composition",
-  "aggregation",
-  "dependency",
-]);
 // Arrow hints mirror the canonical forward arrows the generator emits
 // (`FORWARD_ARROWS` in generator/class.ts), so the dropdown reads the same
 // way the PlantUML source does.
@@ -96,6 +88,16 @@ const CLASS_EDGE_KIND_OPTIONS: ReadonlyArray<{ value: EdgeKind; label: string }>
   { value: "dependency", label: "Dependency (..>)" },
   { value: "aggregation", label: "Aggregation (o--)" },
   { value: "composition", label: "Composition (*--)" },
+];
+// ER relationships: crow's-foot cardinalities plus UML ownership relations.
+// Composition / aggregation carry no cardinality (the cardinality fields below
+// stay gated on ER_EDGE_KINDS, which only holds the crow's-foot kinds).
+const ER_EDGE_KIND_OPTIONS: ReadonlyArray<{ value: EdgeKind; label: string }> = [
+  { value: "one-to-one", label: "One-to-One (||--||)" },
+  { value: "one-to-many", label: "One-to-Many (||--o{)" },
+  { value: "many-to-many", label: "Many-to-Many (}o--o{)" },
+  { value: "composition", label: "Composition (*--)" },
+  { value: "aggregation", label: "Aggregation (o--)" },
 ];
 
 /**
@@ -455,7 +457,13 @@ export function PropsPanel({
           </select>
         </label>
       )}
-      {SEQUENCE_EDGE_KINDS.has(edge.kind) ? (
+      {/*
+       * Pick the edge-kind option list by diagram type, not by which set
+       * contains `edge.kind` — `composition` lives in both the class and ER
+       * vocabularies, so a membership check would route an ER composition edge
+       * into the class dropdown.
+       */}
+      {ast.type === "sequence" ? (
         <label className="uml-field">
           <span>Kind</span>
           <select
@@ -469,7 +477,7 @@ export function PropsPanel({
             ))}
           </select>
         </label>
-      ) : CLASS_EDGE_KINDS.has(edge.kind) ? (
+      ) : ast.type === "class" ? (
         <label className="uml-field">
           <span>Kind</span>
           <select
@@ -477,6 +485,20 @@ export function PropsPanel({
             onChange={(e): void => commitEdge({ kind: e.target.value as EdgeKind })}
           >
             {CLASS_EDGE_KIND_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : ast.type === "er" ? (
+        <label className="uml-field">
+          <span>Kind</span>
+          <select
+            value={edge.kind}
+            onChange={(e): void => commitEdge({ kind: e.target.value as EdgeKind })}
+          >
+            {ER_EDGE_KIND_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
@@ -509,7 +531,7 @@ export function PropsPanel({
           </label>
         </>
       )}
-      {ER_EDGE_KINDS.has(edge.kind) && (
+      {ast.type === "er" && ER_EDGE_KINDS.has(edge.kind) && (
         <>
           <label className="uml-field">
             <span>Source cardinality</span>

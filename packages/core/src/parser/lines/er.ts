@@ -16,7 +16,8 @@ const ENTITY_DECL = /^entity\s+(?:"([^"]+)"\s+as\s+(\w+)|(\w+))(?:\s+as\s+(\w+))
 interface CrowDescriptor {
   pattern: RegExp;
   kind: EdgeKind;
-  cardinality: { source: string; target: string };
+  /** Crow's-foot relations carry cardinality; UML ownership relations don't. */
+  cardinality?: { source: string; target: string };
 }
 
 const RELS: CrowDescriptor[] = [
@@ -39,6 +40,16 @@ const RELS: CrowDescriptor[] = [
     pattern: /^(\w+)\s+\}o--o\{\s+(\w+)(?:\s*:\s*(.+))?$/u,
     kind: "many-to-many",
     cardinality: { source: "0..*", target: "0..*" },
+  },
+  // UML ownership relations between entities (no cardinality). Listed after the
+  // crow's-foot forms so `}o--o{` etc. never fall through to the bare `o--`.
+  {
+    pattern: /^(\w+)\s+\*--\s+(\w+)(?:\s*:\s*(.+))?$/u,
+    kind: "composition",
+  },
+  {
+    pattern: /^(\w+)\s+o--\s+(\w+)(?:\s*:\s*(.+))?$/u,
+    kind: "aggregation",
   },
 ];
 
@@ -136,8 +147,8 @@ function consumeRel(
     source: sourceId,
     target: targetId,
     kind: descriptor.kind,
-    cardinality: { ...descriptor.cardinality },
   };
+  if (descriptor.cardinality) edge.cardinality = { ...descriptor.cardinality };
   if (label && label.trim() !== "") edge.label = label.trim();
   ctx.edges.push(edge);
 }

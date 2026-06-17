@@ -160,6 +160,13 @@ export interface Attribute {
   foreignKey?: boolean;
   /** ER-only. */
   nullable?: boolean;
+  /**
+   * ER-only: foreign-key target. `entity` is the referenced node id; `column`
+   * optionally narrows to a specific attribute of that entity. Round-trips as a
+   * `<<FK alias[.column]>>` stereotype on the column line and is rendered as a
+   * derived relationship connector to the target entity.
+   */
+  references?: { entity: string; column?: string };
   description?: string;
 }
 

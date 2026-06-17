@@ -266,6 +266,11 @@ const CLASS_EDGE_KINDS = new Set<EdgeKind>([
   "dependency",
 ]);
 const ER_EDGE_KINDS = new Set<EdgeKind>(["one-to-one", "one-to-many", "many-to-many"]);
+// UML ownership relations also allowed between entities. These carry NO
+// cardinality (so `enforceErCardinality`, which iterates `ER_EDGE_KINDS`, must
+// keep skipping them) and round-trip as `*--` / `o--` through the ER
+// generator/parser.
+const ER_UML_EDGE_KINDS = new Set<EdgeKind>(["composition", "aggregation"]);
 const SEQUENCE_EDGE_KINDS = new Set<EdgeKind>([
   "sync-call",
   "async-call",
@@ -285,7 +290,7 @@ function isEdgeKindAllowed(type: DiagramType, kind: EdgeKind): boolean {
     case "class":
       return CLASS_EDGE_KINDS.has(kind);
     case "er":
-      return ER_EDGE_KINDS.has(kind);
+      return ER_EDGE_KINDS.has(kind) || ER_UML_EDGE_KINDS.has(kind);
     case "sequence":
       return SEQUENCE_EDGE_KINDS.has(kind);
   }

@@ -23,6 +23,13 @@ export {
 } from "./query.js";
 export { SCHEMA_VERSION, diagramJsonSchema } from "./schema.js";
 export {
+  SQL_TYPES,
+  JAVA_TYPES,
+  typeSuggestionsFor,
+  baseTypeName,
+  isSqlType,
+} from "./typeVocabulary.js";
+export {
   diagramSchema,
   parseDiagram,
   parseDiagramOrThrow,

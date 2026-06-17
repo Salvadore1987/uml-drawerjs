@@ -20,10 +20,12 @@ export interface RenderEdgeArgs {
   readonly target: NodeGeometry;
   /** Optional persisted label offset from `metadata.edgeLayoutOverrides`. */
   readonly labelOverride?: EdgeLayoutOverride;
+  /** Derived foreign-key connector — dashed + tagged, not a persisted edge. */
+  readonly fk?: boolean;
 }
 
 export function renderEdge(args: RenderEdgeArgs): VNode {
-  const { edge, source, target, labelOverride } = args;
+  const { edge, source, target, labelOverride, fk } = args;
   const { from, to } = portSnap(source, target);
 
   const children: VNode[] = [];
@@ -31,7 +33,7 @@ export function renderEdge(args: RenderEdgeArgs): VNode {
   // ~10px of the edge still resolves to it. The visible line is 1.5px
   // wide and would otherwise be near-unclickable.
   children.push(renderHitArea(from, to));
-  children.push(renderPath(edge, from, to));
+  children.push(renderPath(edge, from, to, fk));
   const hasLabel = Boolean(edge.label && edge.label.trim() !== "");
   const hasTech = Boolean(edge.technology && edge.technology.trim() !== "");
   if (hasLabel || hasTech) {
@@ -66,10 +68,12 @@ export function renderEdge(args: RenderEdgeArgs): VNode {
     "data-target-y": Math.round(to.y),
   };
   if (async) attrs["data-edge-async"] = "true";
+  if (fk) attrs["data-edge-fk"] = "true";
+  const classes = ["uml-edge", `uml-edge-${edge.kind}`];
+  if (async) classes.push("uml-edge-async");
+  if (fk) classes.push("uml-edge-fk");
   return v("g", attrs, children, {
-    classes: async
-      ? ["uml-edge", `uml-edge-${edge.kind}`, "uml-edge-async"]
-      : ["uml-edge", `uml-edge-${edge.kind}`],
+    classes,
     aria: { role: "graphics-symbol", "aria-label": ariaLabelFor(edge) },
   });
 }
@@ -122,7 +126,7 @@ const DASH_BY_KIND: Partial<Record<EdgeKind, string>> = {
   return: "5 3",
 };
 
-function renderPath(edge: DiagramEdge, from: Point, to: Point): VNode {
+function renderPath(edge: DiagramEdge, from: Point, to: Point, fk?: boolean): VNode {
   return v("line", {
     x1: from.x,
     y1: from.y,
@@ -130,11 +134,12 @@ function renderPath(edge: DiagramEdge, from: Point, to: Point): VNode {
     y2: to.y,
     stroke: "var(--uml-edge-stroke)",
     "stroke-width": "var(--uml-edge-stroke-width)",
+    // FK connectors render dashed to distinguish them from authored relations;
     // C4 async interactions render dashed regardless of kind; otherwise the
     // per-kind UML conventions (realization / dependency / return) apply.
-    "stroke-dasharray": hasAsyncTag(edge) ? "6 4" : DASH_BY_KIND[edge.kind],
-    "marker-end": markerForKind(edge.kind, "end"),
-    "marker-start": markerForKind(edge.kind, "start"),
+    "stroke-dasharray": fk ? "4 3" : hasAsyncTag(edge) ? "6 4" : DASH_BY_KIND[edge.kind],
+    "marker-end": markerForEdge(edge, "end"),
+    "marker-start": markerForEdge(edge, "start"),
     fill: "none",
   });
 }
@@ -153,35 +158,58 @@ function renderHitArea(from: Point, to: Point): VNode {
   });
 }
 
-function markerForKind(kind: EdgeKind, side: "start" | "end"): string | undefined {
-  if (side === "end") {
-    switch (kind) {
-      case "inheritance":
-      case "realization":
-        return "url(#uml-arrow-triangle)";
-      case "composition":
-        return "url(#uml-arrow-diamond-filled)";
-      case "aggregation":
-        return "url(#uml-arrow-diamond-open)";
-      case "dependency":
-      case "association":
-      case "uses":
-      case "depends-on":
-      case "sync-call":
-      case "create":
-      case "destroy":
-        return "url(#uml-arrow-arrow)";
-      case "async-call":
-        return "url(#uml-arrow-open)";
-      case "return":
-        return "url(#uml-arrow-open)";
-      default:
-        return "url(#uml-arrow-arrow)";
-    }
+/**
+ * Marker for one end of an edge. Directionality matters:
+ *
+ *  - **composition / aggregation** — the diamond sits at the *owner* end,
+ *    which is the `source` of `A *-- B` (A owns B). So the diamond is a
+ *    `marker-start`, never `marker-end`.
+ *  - **ER crow's-foot** — each end's symbol is derived from that end's
+ *    cardinality string (`edge.cardinality.source` / `.target`), so a
+ *    `one-to-many` shows a single bar at the "1" end and a crow's foot at
+ *    the "many" end.
+ *  - everything else keeps the previous head-at-target behaviour.
+ */
+function markerForEdge(edge: DiagramEdge, side: "start" | "end"): string | undefined {
+  const kind = edge.kind;
+  if (kind === "composition") {
+    return side === "start" ? "url(#uml-arrow-diamond-filled)" : undefined;
   }
-  // start side: only crow's-foot in MVP carries marker on both ends
-  if (kind === "many-to-many") return "url(#uml-arrow-arrow)";
-  return undefined;
+  if (kind === "aggregation") {
+    return side === "start" ? "url(#uml-arrow-diamond-open)" : undefined;
+  }
+  if (kind === "one-to-one" || kind === "one-to-many" || kind === "many-to-many") {
+    const card = side === "start" ? edge.cardinality?.source : edge.cardinality?.target;
+    return erCardinalityMarker(card);
+  }
+  if (side !== "end") return undefined;
+  switch (kind) {
+    case "inheritance":
+    case "realization":
+      return "url(#uml-arrow-triangle)";
+    case "async-call":
+    case "return":
+      return "url(#uml-arrow-open)";
+    default:
+      return "url(#uml-arrow-arrow)";
+  }
+}
+
+/** Crow's-foot / IE notation marker for an ER endpoint cardinality. */
+function erCardinalityMarker(card: string | undefined): string | undefined {
+  switch (card) {
+    case "1":
+    case "1..1":
+      return "url(#uml-er-one)";
+    case "0..1":
+      return "url(#uml-er-zero-one)";
+    case "1..*":
+      return "url(#uml-er-one-many)";
+    case "0..*":
+      return "url(#uml-er-zero-many)";
+    default:
+      return card ? "url(#uml-er-one)" : undefined;
+  }
 }
 
 function renderLabel(
@@ -333,12 +361,51 @@ export function renderArrowMarkerDefs(): VNode {
       ],
     );
 
+  // Crow's-foot / IE-notation markers built from stroked sub-shapes. The
+  // shapes sit just before the entity border (the marker's refX = 11 maps to
+  // the line endpoint) and `orient="auto-start-reverse"` mirrors them when
+  // used as `marker-start`, so each foot/bar opens toward its own entity.
+  const erMarker = (id: string, children: VNode[]): VNode =>
+    v(
+      "marker",
+      {
+        id,
+        viewBox: "0 0 12 12",
+        refX: 11,
+        refY: 6,
+        markerWidth: 14,
+        markerHeight: 14,
+        orient: "auto-start-reverse",
+      },
+      children,
+    );
+  const stroke = (d: string): VNode =>
+    v("path", { d, fill: "none", stroke: "var(--uml-edge-arrow)", "stroke-width": "1" });
+  const optionalCircle = (cx: number): VNode =>
+    v("circle", {
+      cx,
+      cy: 6,
+      r: 2.2,
+      fill: "var(--uml-node-bg)",
+      stroke: "var(--uml-edge-arrow)",
+      "stroke-width": "1",
+    });
+  // Crow's foot: three prongs fanning from an apex toward the entity (x=11).
+  const crowFoot = (apexX: number): VNode =>
+    stroke(`M${apexX} 6 L11 1 M${apexX} 6 L11 6 M${apexX} 6 L11 11`);
+  const bar = (x: number): VNode => stroke(`M${x} 1 L${x} 11`);
+
   return v("defs", undefined, [
     make("uml-arrow-arrow", 11, "var(--uml-edge-arrow)", "M0 0 L12 6 L0 12 Z"),
     make("uml-arrow-open", 11, "transparent", "M0 0 L12 6 L0 12"),
     make("uml-arrow-triangle", 11, "var(--uml-node-bg)", "M0 0 L12 6 L0 12 Z"),
     make("uml-arrow-diamond-filled", 11, "var(--uml-edge-arrow)", "M0 6 L6 0 L12 6 L6 12 Z"),
     make("uml-arrow-diamond-open", 11, "var(--uml-node-bg)", "M0 6 L6 0 L12 6 L6 12 Z"),
+    // ER cardinality endpoints.
+    erMarker("uml-er-one", [bar(8)]),
+    erMarker("uml-er-zero-one", [optionalCircle(3), bar(8)]),
+    erMarker("uml-er-one-many", [bar(4), crowFoot(7)]),
+    erMarker("uml-er-zero-many", [optionalCircle(2), crowFoot(7)]),
   ]);
 }
 
